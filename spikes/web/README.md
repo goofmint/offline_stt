@@ -77,4 +77,4 @@ python3 -m http.server 8000
 - `spike.js` — 可用性チェック・install・デコード/認識パイプライン・キーワード包含率スコアリングのロジック
 - `keywords.json` — `test-assets/baseline-audio/*.json` の `locale` / `transcript` / `keywords` を集約したデータ(手書きではなく元ファイルからの転記)
 - `README.md` — 本ファイル
-- `RESULTS.md` — 結果記録用テンプレート(未記入)
+- `RESULTS.md` — 実機検証結果(Chrome 153 での `available()` / `install()` は実測済み。`start(audioTrack)` 併用と精度確認は未実施)

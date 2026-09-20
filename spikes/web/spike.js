@@ -324,6 +324,9 @@ function runRecognitionSession(recognition, source, audioTrack) {
     let onendTimer = null;
     const startedAt = performance.now();
     let networkErrorSeen = false;
+    // 最初に観測した認識エラー。onend 到達時にこれを使ってセッションを reject する。
+    // 不完全な finalText を「成功」として包含率評価に渡さないための措置。
+    let recognitionError = null;
 
     const finish = (result, error) => {
       if (sessionEnded) return;
@@ -358,10 +361,20 @@ function runRecognitionSession(recognition, source, audioTrack) {
         log('"network" エラーを検知した。サーバーフォールバックの兆候の可能性があり、NFR-2違反の疑いがある。', 'ng');
       }
       // onerror 単体ではセッションを即終了させず、後続の onend を待つ (ブラウザ実装によりonendが続けて発火するため)。
-      // ただし onerror が最終手段のエラーである場合に備え、ここでは記録のみ行う。
+      // 最初のエラーのみ保持し、onend でこれを使って reject する。
+      if (!recognitionError) {
+        recognitionError = new Error(
+          `SpeechRecognition failed: ${errorCode}${event.message ? `: ${event.message}` : ''}`
+        );
+      }
     };
 
     recognition.onend = () => {
+      if (recognitionError) {
+        log('recognition.onend 発火。認識エラーが記録されているためセッションをエラーとして終了する。', 'ng');
+        finish(null, recognitionError);
+        return;
+      }
       log('recognition.onend 発火。セッションを終了する。');
       finish();
     };
@@ -374,13 +387,18 @@ function runRecognitionSession(recognition, source, audioTrack) {
       log('audio source.onended 発火。recognition.onend を待つ (タイムアウト' + ONEND_TIMEOUT_MS + 'ms)。');
       onendTimer = setTimeout(() => {
         log(`onended から ${ONEND_TIMEOUT_MS}ms 経過しても onend が来ないためタイムアウト。recognition.stop() を呼ぶ。`, 'warn');
+        const timeoutError = new Error(
+          `recognition.onend did not fire within ${ONEND_TIMEOUT_MS}ms after source.onended`
+        );
         try {
           recognition.stop();
         } catch (stopErr) {
           log(`recognition.stop() 呼び出しでエラー: ${stopErr && stopErr.message}`, 'ng');
         }
-        // stop() を呼んでもonendが来ない可能性があるため、ここで強制的にセッションを閉じる
-        finish();
+        // stop() を呼んでもonendが来ない可能性があるため、ここで強制的にセッションを閉じる。
+        // タイムアウト時の finalText は不完全な可能性があるため、明示的なエラーで終了させ、
+        // 包含率評価には渡さない。
+        finish(null, timeoutError);
       }, ONEND_TIMEOUT_MS);
     };
 
