@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
 
 /// requirements.md FR-2・§8「モデルダウンロード同意ダイアログの実装」の
@@ -15,6 +17,11 @@ import 'package:flutter/material.dart';
 /// - ダウンロードサイズの目安に触れる(Webの言語パックは約60MB、
 ///   requirements.md §3)。ただし他プラットフォームはOS管理でサイズが
 ///   異なるため、Web専用の数値であることも明示する
+///
+/// Windows(Issue #59)では、Microsoft公式ドキュメントの
+/// 「Recommended UX pattern」が同意ダイアログに含めるべき内容を具体的に
+/// 挙げているため、Windowsのときだけ専用の文面に切り替える。詳細は
+/// `packages/offline_stt_windows/README.md` §5 を参照。
 Future<bool> showDownloadConsentDialog(
   BuildContext context, {
   required String locale,
@@ -24,15 +31,7 @@ Future<bool> showDownloadConsentDialog(
     builder: (dialogContext) {
       return AlertDialog(
         title: const Text('音声認識モデルのダウンロード'),
-        content: Text(
-          '文字起こしを行うには、ロケール「$locale」向けの音声認識モデルを'
-          'ダウンロードする必要がある。このモデルはOS(またはブラウザ)が'
-          '管理し、端末に保存される。アプリ自体のサイズは増えない。\n\n'
-          'ダウンロードサイズの目安: 約60MB(Webの場合)。Android / iOS / '
-          'macOS / Windowsでは各OSがモデルを管理するため、実際の目安は'
-          'これと異なる。\n\n'
-          'この通信で音声データや文字起こし結果が送信されることはない。',
-        ),
+        content: SingleChildScrollView(child: Text(_consentBody(locale))),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -47,4 +46,41 @@ Future<bool> showDownloadConsentDialog(
     },
   );
   return agreed ?? false;
+}
+
+bool get _isWindows =>
+    !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
+
+String _consentBody(String locale) {
+  if (_isWindows) {
+    // Microsoft公式ドキュメント(Windows AI APIs / Speech Recognition の
+    // 「Recommended UX pattern」)が、EnsureReadyAsync() を呼ぶ前に
+    // ユーザーへ伝えるべきとしている4点をすべて含めている:
+    //   (a) オプションの音声認識モデルがダウンロードされること
+    //   (b) ダウンロードは Windows Update 経由でバックグラウンドに行われること
+    //   (c) 進捗は 設定 > Windows Update で確認できること
+    //   (d) モデルは後から 設定 > システム > AI コンポーネント で削除できること
+    // 「モデル名ではなく一般名称を使う」という点は requirements.md §8 と
+    // 公式ドキュメントの双方が同じことを言っている。
+    return '文字起こしを行うには、オプションのAIコンポーネントである'
+        '音声認識モデルをこの端末にダウンロードする必要がある。'
+        'アプリ自体のサイズは増えない。\n\n'
+        'ダウンロードはWindows Update経由でバックグラウンドに行われる。'
+        '進捗は「設定 > Windows Update」で確認できる。\n\n'
+        'ダウンロードしたモデルは、後から「設定 > システム > '
+        'AIコンポーネント」でいつでも削除できる。削除するとこのアプリの'
+        '文字起こしは再びダウンロードが必要な状態に戻り、'
+        'このダイアログが改めて表示される。\n\n'
+        'なお、Windowsの音声認識APIには認識する言語を指定する手段が'
+        '存在しないため、入力欄のロケール「$locale」はWindowsでは無視される'
+        '(どの言語で認識されるかはOS側の設定に依存する。'
+        'packages/offline_stt_windows/README.md §7 参照)。\n\n'
+        'この通信で音声データや文字起こし結果が送信されることはない。';
+  }
+  return '文字起こしを行うには、ロケール「$locale」向けの音声認識モデルを'
+      'ダウンロードする必要がある。このモデルはOS(またはブラウザ)が'
+      '管理し、端末に保存される。アプリ自体のサイズは増えない。\n\n'
+      'ダウンロードサイズの目安: 約60MB(Webの場合)。Android / iOS / '
+      'macOSでは各OSがモデルを管理するため、実際の目安はこれと異なる。\n\n'
+      'この通信で音声データや文字起こし結果が送信されることはない。';
 }

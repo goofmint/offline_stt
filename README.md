@@ -68,7 +68,7 @@ melos run format
 
 - `macos-26` ラベルは 2026-02-26 にGitHub ActionsでGA済み(既定Xcode 26.4.1、26.5等も選択可能)であり、requirements.md NFR-4「iOS 26 / macOS 26 以上」を満たすビルド環境として利用できる。
 - `windows-2025` ラベル(Windows Server 2025)もGA済み。requirements.md NFR-4「Windows 11 24H2 (build 26100)」とOSビルド世代は揃うが、GitHub Hosted RunnerにWindows 11クライアント版は存在せず、Server版である点に注意。
-- `offline_stt_windows/windows/CMakeLists.txt` は2026-09時点でWinAppSDKをまだNuGet等で依存宣言しておらず、`# TODO(M4)` コメントのみである。そのため現時点のWindowsビルドは WinAppSDK バージョン不一致では失敗しない。M4でWinAppSDK依存を追加した際はこの前提が変わるため、CI設定の見直しが必要になる。
+- `offline_stt_windows/windows/CMakeLists.txt` はM4(Issue #52)で `Microsoft.WindowsAppSDK`(既定 `1.7.260224002`)をNuGetで依存宣言するようになった。それ以前は `# TODO(M4)` コメントのみでWinAppSDKに一切触れていなかったためバージョン不一致では失敗しなかったが、この前提はM4で変わっている。CMake(Visual Studioジェネレータ)経由のNuGet復元とC++/WinRTプロジェクションヘッダー生成が成立するかは**未検証**であり、CIが最初の検証になる(同ファイル冒頭のコメント参照)。
 
 **ローカルで検証済みのビルド**:
 
@@ -84,10 +84,17 @@ android / windows はローカル環境の制約(JDK バージョン、OS)によ
 
 **その他の注意点**:
 
-- `apps/example` は雛形段階(機能実装はIssue #32)であり、android/ios/macos/windows/web のネイティブプロジェクト一式をまだリポジトリに含めていない。CIの各ビルドジョブは `flutter create . --platforms=<platform>` でCIワークスペース上にのみプラットフォームディレクトリを生成し(既存の `lib/pubspec.yaml` は保持される、公式にサポートされた再実行可能な操作)、リポジトリにはコミットしない。
-- macOS/iOSビルドジョブでは、`flutter create` が生成する既定のDeployment Target(macOSは10.15)が `offline_stt_darwin.podspec` の要求(`26.0`、requirements.md NFR-4)より低いため、CI内で `sed` によりDeployment Targetを26.0へ引き上げてからビルドしている。macOS・iOS ともにローカルでこの引き上げが必要であることを確認し、引き上げ後にビルドが成功することも確認済みである。
-- Androidビルドジョブでも同様に、`flutter create` が生成する既定の minSdk(24)が `offline_stt_android` の要求する 31(requirements.md NFR-4: Android 12 / API 31 以上)より低いため、CI内で 31 へ引き上げてからビルドしている。引き上げないとマニフェストのマージが `uses-sdk:minSdkVersion 24 cannot be smaller than version 31 declared in library [:offline_stt_android]` で失敗することを、CI の実行で実際に確認した。
+- ネイティブプロジェクトのうち **ios / macos / web(Issue #41)と windows(Issue #59)はリポジトリにコミット済み**である。android のみ、CIジョブ内で `flutter create . --platforms=android` により都度生成する(既存の `lib/` `pubspec.yaml` は保持される、公式にサポートされた再実行可能な操作)。
+- `apps/example/windows` をコミット対象に含めたのは、**MSIXパッケージ化に必要な `Package.appxmanifest` が `flutter create` の生成物に含まれない**ためである。CIと同じ Flutter 3.41.9 で `flutter create . --platforms=windows --org com.moongift` を実行した出力をそのままコミットし、`flutter create` が作らないMSIX関連ファイルを `apps/example/windows/packaging/` に追加している。
+- **CIのWindowsジョブが検証するのは `flutter build windows --debug` が通ること(コンパイル・リンク)だけであり、MSIXパッケージ化は検証しない。** `flutter build windows` が生成するのはパッケージ化されていない素のWin32 EXEであり、Windows AIのモデルへアクセスするのに必要な `systemAIModels` capability はMSIXの `Package.appxmanifest` にしか書けない。MSIX化は `flutter build windows` の外側の工程である(→ [packages/offline_stt_windows/README.md](./packages/offline_stt_windows/README.md))。Windows実機が無いため、MSIX生成・インストール・認識E2Eはいずれも未実施であり、Issue #58 の対象である。
+- macOS/iOSのDeployment Target引き上げ(26.0、`offline_stt_darwin.podspec` の要求)は、ネイティブプロジェクトをコミットした時点で反映済みであり、CI内での `sed` は不要になったため削除した。
+- Androidビルドジョブでは、`flutter create` が生成する既定の minSdk(24)が `offline_stt_android` の要求する 31(requirements.md NFR-4: Android 12 / API 31 以上)より低いため、CI内で 31 へ引き上げてからビルドしている。引き上げないとマニフェストのマージが `uses-sdk:minSdkVersion 24 cannot be smaller than version 31 declared in library [:offline_stt_android]` で失敗することを、CI の実行で実際に確認した。
+
+## プラットフォーム別の追加セットアップ
+
+- **Windows**: アプリを **MSIXでパッケージ化し、`Package.appxmanifest` に `systemAIModels` capability を宣言する**必要がある。依存関係を書くだけでは動かない唯一のプラットフォームである。手順・記載例・モデル削除時の再同意フロー・既知の制約は [packages/offline_stt_windows/README.md](./packages/offline_stt_windows/README.md) にまとめてある(Issue #57)。example app 固有の手順は [apps/example/windows/packaging/README.md](./apps/example/windows/packaging/README.md)。
+- Android / iOS / macOS / Web: 追加のセットアップは不要(モデルダウンロードの同意UIはいずれのプラットフォームでもアプリ側の責務である。requirements.md §8)。
 
 ## 現状
 
-本リポジトリはM1(基盤 + Web実装、tasks.md参照)の初期段階であり、`offline_stt_platform_interface` 以外の各実装パッケージは雛形(`UnimplementedError` を送出するプレースホルダー)のみである。
+`offline_stt_platform_interface` と Web / Darwin(iOS・macOS)/ Android / Windows の各実装が入っている(tasks.md の M1〜M4)。ただし **Windows実装は一度もWindows実機で動かしていない**(Windows機が無い。Issue #58)。エントリパッケージ `offline_stt` は現時点で利用者向けのファサードクラスをまだ持たず、example app は暫定的に `OfflineTranscriberPlatform.instance` を直接使用している(`apps/example/pubspec.yaml` のコメント参照)。

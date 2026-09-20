@@ -228,6 +228,25 @@ class _OfflineSttHomePageState extends State<OfflineSttHomePage> {
     final path = _selectedRequestPath;
     if (path == null || _transcribing) return;
 
+    // design.md §3 および packages/offline_stt_windows/README.md §6:
+    // モデル状態は一度 available になれば永続する、という性質のものでは
+    // ない。特にWindowsではユーザーが「設定 > システム > AIコンポーネント」
+    // からモデルをいつでも削除でき、その時点で downloadable へ戻る。
+    // 起動時に確認した状態を記憶して使い回さず、開始の直前に必ず確認し直す
+    // (再同意フロー。Issue #59)。
+    await _checkModel();
+    if (!mounted) return;
+    if (_modelState != ModelState.available) {
+      final current = _modelState;
+      setState(() {
+        _transcribeError =
+            'モデルが利用可能ではないため開始できない'
+            '(現在の状態: ${current == null ? '確認失敗' : _modelStateLabel(current)})。'
+            '${current == ModelState.downloadable ? 'モデルが削除されたか、まだ取得されていない。上の「音声認識モデルをダウンロード」から同意のうえ取得し直すこと。' : ''}';
+      });
+      return;
+    }
+
     final locale = _localeController.text.trim();
     final TranscribeRequest request;
     try {
@@ -353,14 +372,41 @@ class _OfflineSttHomePageState extends State<OfflineSttHomePage> {
         'である(design.md §4.2)。',
       );
     }
-    if (!kIsWeb &&
-        (defaultTargetPlatform == TargetPlatform.android ||
-            defaultTargetPlatform == TargetPlatform.windows)) {
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       notices.add(
         'このプラットフォーム(${defaultTargetPlatform.name})の実装は'
         'まだ提供されていない。checkModel等はUnimplementedErrorを返す'
-        '(design.md §4.3・§4.4、M3/M4で実装予定)。',
+        '(design.md §4.3、M3で実装予定)。',
       );
+    }
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {
+      // Issue #59。根拠はすべて packages/offline_stt_windows/README.md に
+      // 書いてある。ここはその要約であり、example app を起動した人が
+      // 「動かない理由」に最短で到達できるようにするためのものである。
+      notices.add(
+        'Windowsでは、MSIXパッケージとして実行し、Package.appxmanifest に '
+        'systemAIModels capability が宣言されていなければ音声認識モデルへ'
+        'アクセスできない。flutter build windows が生成するのは素のWin32 '
+        'EXEでありMSIXではないため、このまま起動しただけでは文字起こしは'
+        '動作しない(apps/example/windows/packaging/README.md 参照)。',
+      );
+      notices.add(
+        'Windowsの音声認識APIには言語を指定する手段が存在しないため、'
+        '上のロケール入力欄はWindowsでは無視される。どの言語で認識されるかは'
+        'OS側の設定に依存する(design.md §8 未決事項2)。',
+      );
+      notices.add(
+        'Windowsのダウンロード進捗は常に不定進捗になる(進捗値の値域が'
+        'ドキュメント化されていないため、根拠のない数値を出さない方針。'
+        'design.md §4.4)。実際の進捗は「設定 > Windows Update」で確認する。',
+      );
+      notices.add(
+        'ユーザーが「設定 > システム > AIコンポーネント」からモデルを削除'
+        'すると、モデル状態は downloadable に戻る。このアプリは文字起こし'
+        '開始の直前に checkModel() を呼び直し、必要なら同意ダイアログを'
+        '出し直す(再同意フロー)。',
+      );
+      notices.add('Windows実装は一度も実機で検証していない(Issue #58)。');
     }
     if (kIsWeb) {
       notices.add(

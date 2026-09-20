@@ -28,11 +28,26 @@ name: CI
 #     OSビルド世代は揃うが、Windows Server であり Windows 11 クライアント
 #     そのものではない点に注意。GitHub Hosted Runnerに Windows 11
 #     クライアント版は無い。
-#   - offline_stt_windows/windows/CMakeLists.txt(2026-09時点)はWinAppSDK
-#     をまだNuGet等で依存宣言しておらず、TODOコメントのみである。そのため
-#     現時点のWindowsビルドはWinAppSDKのバージョン不一致では失敗しない
-#     はずだが、これは「現時点のソースがまだ薄いから」であり、M4で
-#     WinAppSDK依存を追加した際にはこの前提が変わる。
+#   - offline_stt_windows/windows/CMakeLists.txt はM4(Issue #52)で
+#     Microsoft.WindowsAppSDK(既定 1.7.260224002)をNuGetで依存宣言する
+#     ようになった。それ以前はTODOコメントのみでWinAppSDKに一切触れて
+#     いなかったため、Windowsビルドはバージョン不一致では失敗しなかった。
+#     この前提はM4で変わっている。CMake(Visual Studioジェネレータ)経由の
+#     NuGet復元とC++/WinRTプロジェクションヘッダー生成が成立するかは
+#     **未検証**であり、このCIが最初の検証になる(同ファイル冒頭のコメント
+#     参照)。
+#
+# Issue #59(example appへのWindows動作追加)について:
+#   - このCIのWindowsジョブが検証するのは `flutter build windows --debug` が
+#     通ること、すなわちコンパイルとリンクだけである。**MSIXパッケージ化は
+#     検証しない。** `flutter build windows` が生成するのはパッケージ化
+#     されていない素のWin32 EXEであり、Windows AIのモデルへアクセスするのに
+#     必要な `systemAIModels` capability はMSIXの Package.appxmanifest に
+#     しか書けない。MSIX化は `flutter build windows` の外側の工程であり、
+#     手順は apps/example/windows/packaging/README.md と
+#     packages/offline_stt_windows/README.md に文書化してある(いずれも
+#     Windows実機が無いため未実行)。MSIX生成と認識E2Eは Issue #58 の
+#     実機検証の対象である。
 #
 # Issue #41(example appへのiOS/macOS動作追加)以降について:
 #   - apps/example/macos・apps/example/ios・apps/example/web はネイティブ
@@ -41,9 +56,12 @@ name: CI
 #     offline_stt_darwin.podspec要件)。そのため以下のbuildジョブでは、
 #     macos/ios/web について `flutter create .` の再生成もDeployment
 #     Target引き上げのsedも行わない(既にコミット済みの内容がそのまま
-#     使われる)。android/windows はネイティブプロジェクト一式をまだ
-#     リポジトリに含めていない(実装が無く、Issue #41のスコープ外)ため、
-#     従来どおりCIジョブ内で `flutter create .` により都度生成する。
+#     使われる)。apps/example/windows もIssue #59でネイティブプロジェクト
+#     一式をコミット済みである(Flutter 3.41.9 の `flutter create .
+#     --platforms=windows --org com.moongift` の出力そのもの。加えて
+#     `flutter create` が生成しないMSIXマニフェストを windows/packaging/ に
+#     置いてある)。android のみ、従来どおりCIジョブ内で `flutter create .`
+#     により都度生成する。
 
 on:
   push:
@@ -136,15 +154,17 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: apps/example にプラットフォームプロジェクトを生成する(android/windowsのみ)
-        # macos/ios/web はIssue #41でネイティブプロジェクト一式をリポジトリに
-        # コミット済みのため、このステップは android/windows のときのみ実行
-        # する(android/windows はまだ実装が無く、`flutter create .` による
-        # 都度生成の方針を維持する。本ファイル冒頭のコメント参照)。
+      - name: apps/example にプラットフォームプロジェクトを生成する(androidのみ)
+        # macos/ios/web(Issue #41)と windows(Issue #59)はネイティブ
+        # プロジェクト一式をリポジトリにコミット済みのため、このステップは
+        # android のときだけ実行する。windows をコミット対象に含めたのは、
+        # MSIXパッケージ化に必要な Package.appxmanifest が
+        # `flutter create` の生成物に含まれず、どこかに置く必要があるため
+        # である(本ファイル冒頭のコメント参照)。
         # `flutter create .` は既存のpubspec.yaml / lib/main.dartを保持した
         # まま不足しているプラットフォームディレクトリのみを追加する
         # (公式にサポートされた再実行可能な操作)。
-        if: matrix.platform == 'android' || matrix.platform == 'windows'
+        if: matrix.platform == 'android'
         working-directory: apps/example
         run: flutter create . --platforms=${{ matrix.platform }} --org com.moongift
 
