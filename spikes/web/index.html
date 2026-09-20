@@ -173,6 +173,15 @@
         ここで包含率を測って影響を確認する。
       </p>
     </div>
+    <div style="margin: 8px 0;">
+      <label><input type="checkbox" id="opt-continuous" checked> <code>continuous</code></label>
+      <label style="margin-left: 12px;"><input type="checkbox" id="opt-interim" checked> <code>interimResults</code></label>
+      <p class="note">
+        design.md §4.1 の既定は両方 true。実機では この組み合わせで <code>isFinal</code> が
+        一度も立たないまま <code>onend</code> に到達する事象を確認した。
+        どの組み合わせで確定結果が得られるかを切り分けるために変更できるようにしている。
+      </p>
+    </div>
     <button id="btn-transcribe">文字起こし実行</button>
     <dl>
       <dt>実行状態</dt><dd id="transcribe-status">(未実施)</dd>

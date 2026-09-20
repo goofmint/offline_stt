@@ -315,11 +315,13 @@ function buildAudioTrack(audioCtx, audioBuffer, playbackRate) {
  * SpeechRecognition インスタンスを構築し、processLocally を設定 → 読み戻し検証する。
  * NFR-2: processLocally が true で読み戻せない場合はサーバーフォールバックせずエラーで停止する。
  */
-function buildRecognition(SR, locale) {
+function buildRecognition(SR, locale, opts) {
   const recognition = new SR();
   recognition.lang = locale;
-  recognition.continuous = true;
-  recognition.interimResults = true;
+  // design.md §4.1 の既定は continuous/interimResults とも true。
+  // 実機で isFinal が立たない事象を確認したため、切り分け用に変更可能にしている。
+  recognition.continuous = opts.continuous;
+  recognition.interimResults = opts.interimResults;
 
   // processLocally はプロパティとして存在するとは限らない。存在確認せず単純代入すると
   // サイレントに無視される可能性があるため、設定直後に読み戻して必ず検証する。
@@ -349,6 +351,11 @@ function runRecognitionSession(recognition, source, audioTrack, retained) {
     // セッション中の GC を防ぐ。finish() でも参照して最適化による除去を避ける。
     const keepAlive = retained;
     let finalText = '';
+    // Chrome のオンデバイス認識は isFinal を一度も立てずに onend へ到達することがある
+    // (実機で確認済み)。その場合でも認識テキスト自体は interim として得られているため、
+    // 最後の interim を保持しておき、final が皆無だったときの記録に使う。
+    let lastInterimText = '';
+    let interimOnly = false;
     let sessionEnded = false;
     let onendTimer = null;
     const startedAt = performance.now();
@@ -367,11 +374,24 @@ function runRecognitionSession(recognition, source, audioTrack, retained) {
         log(`セッション終了時の audioTrack.readyState=${audioTrack.readyState}`);
       }
       log(`収集した確定テキスト: ${finalText.length} 文字`);
+      if (!finalText && lastInterimText) {
+        // フォールバックではなく事実の記録。final が出ないこと自体が
+        // design.md §2.2 の isFinal 設計に関わる知見であるため、
+        // interim を採用したことを必ず明示する。
+        interimOnly = true;
+        finalText = lastInterimText;
+        log(
+          'isFinal が一度も立たないまま onend に到達した。最後の interim 結果を' +
+          `採用する (${lastInterimText.length} 文字)。` +
+          'この挙動は design.md §2.2 / §4.1 の isFinal 写像に影響する。',
+          'warn'
+        );
+      }
       const elapsedMs = Math.round(performance.now() - startedAt);
       if (error) {
-        reject({ error, elapsedMs, finalText, networkErrorSeen });
+        reject({ error, elapsedMs, finalText, networkErrorSeen, interimOnly });
       } else {
-        resolve({ finalText, elapsedMs, networkErrorSeen });
+        resolve({ finalText, elapsedMs, networkErrorSeen, interimOnly });
       }
     };
 
@@ -383,6 +403,7 @@ function runRecognitionSession(recognition, source, audioTrack, retained) {
           finalText += transcript;
           log(`[final] ${transcript}`, 'ok');
         } else {
+          lastInterimText = transcript;
           log(`[partial] ${transcript}`);
         }
       }
@@ -581,7 +602,12 @@ async function runTranscription() {
       return;
     }
     const { source, destination, stream, audioTrack } = buildAudioTrack(audioCtx, audioBuffer, playbackRate);
-    const recognition = buildRecognition(SR, clip.locale);
+    const recognitionOpts = {
+      continuous: document.getElementById('opt-continuous').checked,
+      interimResults: document.getElementById('opt-interim').checked,
+    };
+    log(`認識オプション: continuous=${recognitionOpts.continuous}, interimResults=${recognitionOpts.interimResults}`);
+    const recognition = buildRecognition(SR, clip.locale, recognitionOpts);
 
     setStatus('transcribe-status', '実行中...');
     const sessionResult = await runRecognitionSession(recognition, source, audioTrack, { destination, stream });
@@ -591,6 +617,9 @@ async function runTranscription() {
     document.getElementById('result-text').value = sessionResult.finalText;
 
     log(`再生速度 ${playbackRate}x での所要時間: ${sessionResult.elapsedMs}ms`);
+    if (sessionResult.interimOnly) {
+      log('注意: この結果は確定(isFinal)結果ではなく interim 結果である。', 'warn');
+    }
     scoreResult(clipId, sessionResult.finalText, sessionResult.elapsedMs, sessionResult.networkErrorSeen);
   } catch (errInfo) {
     // decode失敗やstart失敗など、reject/throw両方の経路をまとめて捕捉する
