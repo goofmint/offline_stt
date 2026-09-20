@@ -5,7 +5,7 @@ import 'package:test/test.dart';
 
 import 'fakes/fake_offline_transcriber_platform.dart';
 
-const _request = TranscribeRequest(path: '/tmp/a.wav', locale: 'ja-JP');
+final _request = TranscribeRequest(path: '/tmp/a.wav', locale: 'ja-JP');
 
 /// マイクロタスクを1周させ、`StreamController.onListen` 等の非同期コール
 /// バックが実行されるのを待つ。

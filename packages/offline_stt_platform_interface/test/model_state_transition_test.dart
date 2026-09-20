@@ -111,7 +111,7 @@ void main() {
       );
 
       final stream = fake.transcribeFile(
-        const TranscribeRequest(path: '/tmp/a.wav', locale: 'ja-JP'),
+        TranscribeRequest(path: '/tmp/a.wav', locale: 'ja-JP'),
       );
 
       await expectLater(stream, emitsError(isA<ModelUnavailableException>()));

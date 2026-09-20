@@ -65,19 +65,78 @@ void main() {
 
   group('TranscribeRequest', () {
     test('pathとlocaleを保持する', () {
-      const request = TranscribeRequest(path: '/tmp/a.wav', locale: 'ja-JP');
+      final request = TranscribeRequest(path: '/tmp/a.wav', locale: 'ja-JP');
       expect(request.path, '/tmp/a.wav');
       expect(request.locale, 'ja-JP');
     });
 
-    test('等価性はフィールド値で判定される', () {
-      const a = TranscribeRequest(path: '/a.wav', locale: 'ja-JP');
-      const b = TranscribeRequest(path: '/a.wav', locale: 'ja-JP');
-      const c = TranscribeRequest(path: '/a.wav', locale: 'en-US');
+    test('playbackRateの既定値は1.0である(design.md §2.2)', () {
+      final request = TranscribeRequest(path: '/tmp/a.wav', locale: 'ja-JP');
+      expect(request.playbackRate, 1.0);
+    });
+
+    test('playbackRateを明示指定できる', () {
+      final request = TranscribeRequest(
+        path: '/tmp/a.wav',
+        locale: 'ja-JP',
+        playbackRate: 1.5,
+      );
+      expect(request.playbackRate, 1.5);
+    });
+
+    test('playbackRateが0以下ならArgumentErrorを投げる', () {
+      // assert はリリースビルドで無効化されるため、実行時に検証する。
+      expect(
+        () => TranscribeRequest(
+          path: '/tmp/a.wav',
+          locale: 'ja-JP',
+          playbackRate: 0,
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => TranscribeRequest(
+          path: '/tmp/a.wav',
+          locale: 'ja-JP',
+          playbackRate: -1.0,
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('playbackRateが有限値でなければArgumentErrorを投げる', () {
+      expect(
+        () => TranscribeRequest(
+          path: '/tmp/a.wav',
+          locale: 'ja-JP',
+          playbackRate: double.nan,
+        ),
+        throwsArgumentError,
+      );
+      expect(
+        () => TranscribeRequest(
+          path: '/tmp/a.wav',
+          locale: 'ja-JP',
+          playbackRate: double.infinity,
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('等価性はフィールド値で判定される(playbackRate含む)', () {
+      final a = TranscribeRequest(path: '/a.wav', locale: 'ja-JP');
+      final b = TranscribeRequest(path: '/a.wav', locale: 'ja-JP');
+      final c = TranscribeRequest(path: '/a.wav', locale: 'en-US');
+      final d = TranscribeRequest(
+        path: '/a.wav',
+        locale: 'ja-JP',
+        playbackRate: 1.5,
+      );
 
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
       expect(a, isNot(equals(c)));
+      expect(a, isNot(equals(d)));
     });
   });
 
