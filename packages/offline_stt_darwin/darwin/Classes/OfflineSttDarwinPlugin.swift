@@ -1,4 +1,9 @@
+// iOS と macOS で Flutter のモジュール名が異なるため条件付きでimportする。
+#if os(macOS)
+import FlutterMacOS
+#else
 import Flutter
+#endif
 
 /// offline_stt のDarwinネイティブ側エントリポイント(雛形)。
 ///

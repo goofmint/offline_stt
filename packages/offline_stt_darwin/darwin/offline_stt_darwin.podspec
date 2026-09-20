@@ -15,7 +15,10 @@ offline_stt のiOS/macOS共用実装。SpeechAnalyzer + AVFoundationによる
   s.author           = { 'MOONGIFT' => 'moongift@gmail.com' }
   s.source           = { :path => '.' }
   s.source_files     = 'Classes/**/*.swift'
-  s.dependency 'Flutter'
+  # iOS と macOS で Flutter のモジュール名が異なるため、プラットフォーム別に宣言する。
+  # 共通で 'Flutter' を指定すると macOS 側で依存解決とSwiftコンパイルに失敗する。
+  s.ios.dependency 'Flutter'
+  s.osx.dependency 'FlutterMacOS'
 
   s.ios.deployment_target = '26.0'
   s.osx.deployment_target = '26.0'
