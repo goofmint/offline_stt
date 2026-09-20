@@ -33,6 +33,17 @@ name: CI
 #     現時点のWindowsビルドはWinAppSDKのバージョン不一致では失敗しない
 #     はずだが、これは「現時点のソースがまだ薄いから」であり、M4で
 #     WinAppSDK依存を追加した際にはこの前提が変わる。
+#
+# Issue #41(example appへのiOS/macOS動作追加)以降について:
+#   - apps/example/macos・apps/example/ios・apps/example/web はネイティブ
+#     プロジェクト一式(Podfile・Runner.xcodeproj等)をリポジトリに
+#     コミット済みである(Deployment Targetは 26.0 に設定済み、
+#     offline_stt_darwin.podspec要件)。そのため以下のbuildジョブでは、
+#     macos/ios/web について `flutter create .` の再生成もDeployment
+#     Target引き上げのsedも行わない(既にコミット済みの内容がそのまま
+#     使われる)。android/windows はネイティブプロジェクト一式をまだ
+#     リポジトリに含めていない(実装が無く、Issue #41のスコープ外)ため、
+#     従来どおりCIジョブ内で `flutter create .` により都度生成する。
 
 on:
   push:
@@ -125,14 +136,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: apps/example にプラットフォームプロジェクトを生成する
-        # apps/example は雛形段階(tasks.md M1、機能実装はIssue #32)であり
-        # android/ios/macos/windows/web のネイティブプロジェクト一式を
-        # まだリポジトリに含めていない。`flutter create .` は既存の
-        # pubspec.yaml / lib/main.dart を保持したまま不足しているプラット
-        # フォームディレクトリのみを追加する(公式にサポートされた再実行可
-        # 能な操作、`flutter build web` のエラーメッセージ自体が案内する
-        # 手順)。CIのジョブ内でのみ生成し、リポジトリにはコミットしない。
+      - name: apps/example にプラットフォームプロジェクトを生成する(android/windowsのみ)
+        # macos/ios/web はIssue #41でネイティブプロジェクト一式をリポジトリに
+        # コミット済みのため、このステップは android/windows のときのみ実行
+        # する(android/windows はまだ実装が無く、`flutter create .` による
+        # 都度生成の方針を維持する。本ファイル冒頭のコメント参照)。
+        # `flutter create .` は既存のpubspec.yaml / lib/main.dartを保持した
+        # まま不足しているプラットフォームディレクトリのみを追加する
+        # (公式にサポートされた再実行可能な操作)。
+        if: matrix.platform == 'android' || matrix.platform == 'windows'
         working-directory: apps/example
         run: flutter create . --platforms=${{ matrix.platform }} --org com.moongift
 
@@ -150,27 +162,12 @@ jobs:
           sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 31/' android/app/build.gradle || true
           grep -rn "minSdk" android/app/build.gradle.kts android/app/build.gradle 2>/dev/null || true
 
-      - name: macOS Deployment Target を 26.0 に引き上げる(offline_stt_darwin.podspec要件)
-        # flutter create が生成する既定の macOS Deployment Target(10.15)は
-        # offline_stt_darwin.podspec の `s.osx.deployment_target = '26.0'`
-        # (requirements.md NFR-4)より低く、pod install が
-        # 「requires a higher minimum macOS deployment version」で失敗する
-        # ことをローカル(Xcode 26.6 / macOS 26.5.1)で確認済み。
-        if: matrix.platform == 'macos'
-        working-directory: apps/example
-        run: |
-          sed -i '' "s/platform :osx, '[0-9.]*'/platform :osx, '26.0'/" macos/Podfile
-          sed -i '' 's/MACOSX_DEPLOYMENT_TARGET = [0-9.]*;/MACOSX_DEPLOYMENT_TARGET = 26.0;/g' macos/Runner.xcodeproj/project.pbxproj
-
-      - name: iOS Deployment Target を 26.0 に引き上げる(offline_stt_darwin.podspec要件)
-        # macOS と同根の要件(`s.ios.deployment_target = '26.0'`)からの類推。
-        # iOS側のPodfile/pbxprojでの実際の失敗・成功は未確認(ローカルに
-        # iOS実機ビルド環境の時間的余裕が無く未検証)。
-        if: matrix.platform == 'ios'
-        working-directory: apps/example
-        run: |
-          sed -i '' "s/# platform :ios, '[0-9.]*'/platform :ios, '26.0'/" ios/Podfile
-          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*;/IPHONEOS_DEPLOYMENT_TARGET = 26.0;/g' ios/Runner.xcodeproj/project.pbxproj
+      # macOS/iOS Deployment Target を 26.0 に引き上げるsedステップは
+      # Issue #41でmacos/ios/webのネイティブプロジェクト一式をリポジトリに
+      # コミットした際に不要になったため削除した(本ファイル冒頭のコメント
+      # 参照)。apps/example/macos/Podfile・Runner.xcodeproj/project.pbxproj
+      # および apps/example/ios/Podfile・Runner.xcodeproj/project.pbxproj は
+      # 既に26.0でコミット済みであり、CI実行時に書き換える必要が無い。
 
       - name: flutter build apk --debug
         if: matrix.platform == 'android'
