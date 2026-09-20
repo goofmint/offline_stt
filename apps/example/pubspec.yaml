@@ -37,6 +37,15 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   flutter_test:
     sdk: flutter
+  # Android実機E2E(Issue #50)を integration_test/ で自動化するため。
+  # 本番実装(packages/ 配下)を実機上でそのまま呼び出して検証する。
+  integration_test:
+    sdk: flutter
+  # 同E2Eで基準音声の配置先(アプリ専用外部ストレージ)を得るために使う。
+  # このディレクトリは Context.getExternalFilesDir() 経由でしか作れない。
+  # 生パスへの Directory.createSync() は Permission denied になり、
+  # adb shell 側で作ったディレクトリはアプリから読めない(いずれも実測)。
+  path_provider: ^2.1.5
 
 flutter:
   uses-material-design: true

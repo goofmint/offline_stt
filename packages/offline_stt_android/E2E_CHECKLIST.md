@@ -6,8 +6,13 @@
 [リポジトリルートの E2E_CHECKLIST.md](../../E2E_CHECKLIST.md) を参照。
 
 **リリース前に人手で実行する手順書である。** 土台は M0 検証
-(`spikes/android/RESULTS.md`、Pixel 6 実機)だが、**本チェックリストを本番
-実装(本パッケージ)に対して通して実行した実績は無い。**
+(`spikes/android/RESULTS.md`、Pixel 6 実機)である。
+
+**実行結果は [E2E_RESULTS.md](E2E_RESULTS.md) に記録する。** 2026-09-21 に
+Pixel 6(Android 17 / API 37)で本番実装に対して初めて通した。結果は
+**不合格**である(`transcribeFile()` が `ERROR_SERVER_DISCONNECTED(11)` で
+即時失敗する不具合を発見した)。Issue #50 が要求する非Pixel機での検証は
+未実施である。
 
 ## 認識バックエンドについて(古い記述に注意)
 

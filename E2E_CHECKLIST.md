@@ -23,12 +23,12 @@ design.md §7 は **「CI: ビルド検証のみ(Android/iOS/Windows/Webのコ�
 |---|---|---|---|
 | Web (Chrome) | [packages/offline_stt_web/E2E_CHECKLIST.md](packages/offline_stt_web/E2E_CHECKLIST.md) | M0スパイクで実測あり(本番実装での再測定は未実施) | — |
 | iOS / macOS | [packages/offline_stt_darwin/E2E_CHECKLIST.md](packages/offline_stt_darwin/E2E_CHECKLIST.md) | M0スパイクで実測あり(本番実装での実機E2Eは未実施) | #40、#7(iOS 26実機) |
-| Android | [packages/offline_stt_android/E2E_CHECKLIST.md](packages/offline_stt_android/E2E_CHECKLIST.md) | M0検証でPixel 6実機の実測あり(本番実装での実機E2Eは未実施) | #50 |
+| Android | [packages/offline_stt_android/E2E_CHECKLIST.md](packages/offline_stt_android/E2E_CHECKLIST.md) | **2026-09-21 に本番実装をPixel 6で実行済み(結果は不合格)。[結果](packages/offline_stt_android/E2E_RESULTS.md)。非Pixel機は未実施** | #50 |
 | Windows | [packages/offline_stt_windows/E2E_CHECKLIST.md](packages/offline_stt_windows/E2E_CHECKLIST.md) | **全項目未実行。** Windows機が無く、ビルドすら一度も通していない | #58 |
 
-**いずれのチェックリストも、本番実装(`packages/` 配下)に対しては一度も
-通して実行されていない。** 上記「実行実績」欄の「実測あり」は M0 スパイク
-(`spikes/` 配下の独立した検証コード)での実測を指す。
+**本番実装(`packages/` 配下)に対して通して実行したのは Android のみで
+ある(2026-09-21、Pixel 6)。** 他プラットフォームの「実測あり」は M0
+スパイク(`spikes/` 配下の独立した検証コード)での実測を指す。
 
 ## 全プラットフォーム共通の前提
 
