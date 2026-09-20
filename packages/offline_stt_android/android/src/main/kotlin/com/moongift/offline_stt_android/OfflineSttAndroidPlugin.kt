@@ -27,8 +27,10 @@ class OfflineSttAndroidPlugin : FlutterPlugin {
             downloadProgressWrapper = downloadProgress,
         )
         // EventChannel自体がキャンセルされた場合の保険(EventChannelWrappers.kt参照)。
-        segments.onCancelHandler = { apiImpl.cancelFromEventChannel() }
-        downloadProgress.onCancelHandler = { apiImpl.cancelFromEventChannel() }
+        // 2本のEventChannelは独立しているため、キャンセル対象も分離する。
+        // 片方の購読解除でもう片方のJobを巻き添えにしてはならない。
+        segments.onCancelHandler = { apiImpl.cancelTranscriptionFromEventChannel() }
+        downloadProgress.onCancelHandler = { apiImpl.cancelDownloadFromEventChannel() }
 
         api = apiImpl
         segmentsWrapper = segments

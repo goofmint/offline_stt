@@ -60,11 +60,25 @@ class OfflineSttApiImpl(
     }
 
     /**
-     * EventChannel自体がキャンセルされた場合の保険
+     * `segments` EventChannel自体がキャンセルされた場合の保険
      * (`EventChannelWrappers.kt`のドキュメントコメント参照)。
+     *
+     * 停止するのは文字起こしJobのみである。2本のEventChannelは独立して
+     * いるため、片方の購読解除でもう片方を巻き添えにしてはならない
+     * (例: ja-JPの文字起こし中にen-USのダウンロードStreamの購読を解除
+     * しても、文字起こしは継続しなければならない)。明示的な[cancel]は
+     * 従来どおり両方を停止する。
      */
-    fun cancelFromEventChannel() {
+    fun cancelTranscriptionFromEventChannel() {
         currentTranscriptionJob?.cancel()
+    }
+
+    /**
+     * `downloadProgress` EventChannel自体がキャンセルされた場合の保険。
+     * 停止するのはダウンロードJobのみである(理由は
+     * [cancelTranscriptionFromEventChannel]のコメント参照)。
+     */
+    fun cancelDownloadFromEventChannel() {
         currentDownloadJob?.cancel()
     }
 
@@ -85,10 +99,13 @@ class OfflineSttApiImpl(
             downloadProgressWrapper.sendEndOfStream()
         } catch (e: CancellationException) {
             downloadProgressWrapper.sendError(AndroidTranscribeError.Cancelled)
+            downloadProgressWrapper.sendEndOfStream()
         } catch (e: AndroidTranscribeError) {
             downloadProgressWrapper.sendError(e)
+            downloadProgressWrapper.sendEndOfStream()
         } catch (e: Exception) {
             downloadProgressWrapper.sendError(AndroidTranscribeError.PlatformError("$e"))
+            downloadProgressWrapper.sendEndOfStream()
         }
     }
 
