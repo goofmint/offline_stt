@@ -1,3 +1,5 @@
 .build/
 .swiftpm/
 Package.resolved
+ios-probe/DarwinSTTProbe.xcodeproj/
+ios-probe/Info.plist

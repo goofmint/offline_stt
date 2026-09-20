@@ -122,6 +122,9 @@ AVAudioFile(任意フォーマット読込)
 - ファイル入力時の処理速度: macOS 26.5.1実機でRTF(処理時間 ÷ 実時間長)0.008〜0.026を実測済み、すなわち実時間の約38〜125倍高速(ja-JP/en-US × 10秒/3分 × wav/m4aの全8ファイル、spikes/darwin/RESULTS.md 参照)。結果をREADMEの所要時間表に反映する
 - `SpeechTranscriber.Preset` の選定は精度に大きく影響する(実測ではプリセット違いで包含率が最大20ポイント以上変動)ため、実装時に選定基準を定める必要がある。partial(volatile)結果を得るには `.progressiveTranscription` 系のプリセットが必要である(spikes/darwin/RESULTS.md 参照)
 - `AssetInventory.status(forModules:)` の `.installed` は当該ロケールが現在「予約(reserve)」されているかに連動する一時状態であり、ディスク上のアセット存在を表す永続状態(`installedLocales`)とは別軸である。FR-1の4値への写像を実装する際は `installedLocales` との突き合わせが必要である(spikes/darwin/RESULTS.md 参照)
+- `supportedLocales` はプラットフォーム・OSバージョンによって件数・内容が異なる(macOS 26.5.1: 30件、iOS 27.0: 45件)ことを実機で確認済みである。そのため静的リストを持たず、実行時に照会して解決する(spikes/darwin/RESULTS.md 参照)
+- iOSシミュレータでは `SpeechTranscriber.isAvailable` が `false` となり、SpeechAnalyzerによる認識自体が利用できないことを確認済みである。認識のE2E検証には実機が必須である(spikes/darwin/RESULTS.md 参照)
+- `AssetInventory.status(forModules:)` の `.installed` が予約状態に連動する上記の挙動は、iOS実機でも再現することを確認済みである。macOS固有の挙動ではなく、SpeechAnalyzer APIの仕様であることが確定した(spikes/darwin/RESULTS.md 参照)
 
 ### 4.3 Android(<name>_android)
 
@@ -188,7 +191,7 @@ AVAudioFile(任意フォーマット読込)
   - 共通テスト資産: ja-JP / en-US の基準音声(10秒 / 3分 / 30分、wav・m4a・mp3)+ 期待テキスト。期待テキストは「全文文字起こし」と「評価用キーワードリスト」の2要素で構成する。キーワードは意味上重要な名詞・固有名詞・数値・専門用語から選定し、各基準音声ファイルごとに個別のキーワードリストを用意する。件数の目安は10秒で5件以上、3分で15件以上とし、件数が少なすぎる統計的に弱い判定は避ける方針とする
     - 注記: tasks.mdのM0記述は10秒・3分・wav・m4aの範囲であり、本項の30分・mp3はM0スコープ外。30分版・mp3形式は後続マイルストーン(実運用に近い長時間音声での検証等)向けの用途とする
   - 評価: WERではなくキーワード包含率での簡易判定(モデル差があるため厳密一致は不可)。算出式・正規化ルール・しきい値は下記「評価基準(キーワード包含率)」を参照
-- CI: ビルド検証のみ(Android/iOS/Windows/Webのコンパイル)。認識E2Eは手動チェックリスト運用
+- CI: ビルド検証のみ(Android/iOS/Windows/Webのコンパイル)。認識E2Eは手動チェックリスト運用。iOSシミュレータではSpeechAnalyzerが利用できないため、認識E2Eはシミュレータでは原理的に実行できず実機が必須である
 - example app: ファイルピッカー → モデル状態表示 → ダウンロード同意ダイアログ → 文字起こし進行表示、の参照実装を兼ねる
 
 ### 評価基準(キーワード包含率)
@@ -236,7 +239,7 @@ macOS 26.5.1実機での実測(spikes/darwin/RESULTS.md 参照)では、基準�
 2. Windows: ja-JP対応可否
 3. Darwin: SpeechAnalyzerのja-JP対応可否とファイル処理速度
    - ファイル処理速度: **確定**。macOS 26.5.1実機でRTF 0.008〜0.026(実時間の約38〜125倍高速)を実測(spikes/darwin/RESULTS.md 参照)
-   - ja-JP対応可否: **部分確定**。macOS 26.5.1実機では `supportedLocales`(30件)にja-JPが含まれ、実際の文字起こしも動作することを確認済み。ただしiOS実機は未検証(iOSシミュレータでは`isAvailable=false`となったが原因未特定であり、macOSの結果をそのままiOSに外挿できない)。iOS実機での確認が残る
+   - ja-JP対応可否: **確認済み(iOS 26実機は未実施)**。macOS 26.5.1実機では `supportedLocales`(30件)にja-JPが含まれ、実際の文字起こしも動作することを確認済み。iOS 27.0実機(iPhone 17)でも `supportedLocales`(45件)にja-JPが含まれることを確認済み。ただしIssue #7が指定するiOS 26実機での確認は未実施である(iOSシミュレータでは`.app`バンドルでの再検証でも`isAvailable=false`となることを確認しており、原因はシミュレータ自体にオンデバイス音声モデルが無いことと判明している。spikes/darwin/RESULTS.md 参照)
 4. Web: `start(audioTrack)` + `processLocally: true` の併用動作
    - 進捗注記: `processLocally = true` の設定と読み戻しはChrome 153で可能であることを確認済み。併用動作そのものは未検証
 5. Android: MODE_ADVANCED指定時の非対応端末での自動フォールバック有無
