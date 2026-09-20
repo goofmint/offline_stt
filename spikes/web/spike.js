@@ -26,6 +26,9 @@ const THRESHOLDS = {
 // onended から onend を待つ猶予時間 (ms)。これを超えたら stop() を呼んでタイムアウト扱いにする。
 const ONEND_TIMEOUT_MS = 15000;
 
+// stop() が効かず abort() まで打った後に onend を待つ猶予 (ms)。
+const ABORT_GRACE_MS = 5000;
+
 const TARGET_LOCALES = ['ja-JP', 'en-US'];
 
 // keywords.json のクリップIDとファイル名プレフィックスの対応 (ファイル名からの自動推定に使う)
@@ -355,6 +358,7 @@ function runRecognitionSession(recognition, source, audioTrack, retained) {
       if (keepAlive && keepAlive.stream) {
         log(`セッション終了時の audioTrack.readyState=${audioTrack.readyState}`);
       }
+      log(`収集した確定テキスト: ${finalText.length} 文字`);
       const elapsedMs = Math.round(performance.now() - startedAt);
       if (error) {
         reject({ error, elapsedMs, finalText, networkErrorSeen });
@@ -403,21 +407,38 @@ function runRecognitionSession(recognition, source, audioTrack, retained) {
     };
 
     source.onended = () => {
-      log('audio source.onended 発火。recognition.onend を待つ (タイムアウト' + ONEND_TIMEOUT_MS + 'ms)。');
+      // continuous = true では、AudioBufferSourceNode が再生を終えても
+      // MediaStreamAudioDestinationNode のトラックは live のまま無音を流し続ける。
+      // そのため Chrome は入力が終わったことを知りようがなく、放置しても onend は来ない。
+      // design.md §4.1 の「sourceの onended 後、recognition.onend をもって Stream close」を
+      // 成立させるには、ここで明示的に stop() を呼んで入力終了を通知する必要がある。
+      log('audio source.onended 発火。recognition.stop() で入力終了を通知し、onend を待つ。');
+      try {
+        recognition.stop();
+        log('recognition.stop() を呼び出した。', 'ok');
+      } catch (stopErr) {
+        log(`recognition.stop() 呼び出しでエラー: ${stopErr && stopErr.message}`, 'ng');
+      }
+
       onendTimer = setTimeout(() => {
-        log(`onended から ${ONEND_TIMEOUT_MS}ms 経過しても onend が来ないためタイムアウト。recognition.stop() を呼ぶ。`, 'warn');
-        const timeoutError = new Error(
-          `recognition.onend did not fire within ${ONEND_TIMEOUT_MS}ms after source.onended`
-        );
-        try {
-          recognition.stop();
-        } catch (stopErr) {
-          log(`recognition.stop() 呼び出しでエラー: ${stopErr && stopErr.message}`, 'ng');
-        }
-        // stop() を呼んでもonendが来ない可能性があるため、ここで強制的にセッションを閉じる。
-        // タイムアウト時の finalText は不完全な可能性があるため、明示的なエラーで終了させ、
-        // 包含率評価には渡さない。
-        finish(null, timeoutError);
+        log(`stop() から ${ONEND_TIMEOUT_MS}ms 経過しても onend が来ない。トラックを停止して abort() する。`, 'warn');
+        // 入力トラック自体を終了させてから abort() する。ここまでやっても onend が
+        // 来ないのであれば、それ自体が design.md §4.1 の終了検出に関する知見となる。
+        try { audioTrack.stop(); } catch (e) { log(`audioTrack.stop() でエラー: ${e && e.message}`, 'ng'); }
+        try { recognition.abort(); } catch (e) { log(`recognition.abort() でエラー: ${e && e.message}`, 'ng'); }
+
+        onendTimer = setTimeout(() => {
+          const timeoutError = new Error(
+            `recognition.onend did not fire within ${ONEND_TIMEOUT_MS}ms after stop(), ` +
+            `nor within ${ABORT_GRACE_MS}ms after abort()`
+          );
+          // 収集済みの確定テキストがあれば必ず残す。3分クリップの認識結果を
+          // 捨てないため。ただし包含率評価には渡さない (セッションは異常終了扱い)。
+          if (finalText) {
+            log(`onend 未達だが確定テキストを ${finalText.length} 文字収集済み。結果欄に表示する。`, 'warn');
+          }
+          finish(null, timeoutError);
+        }, ABORT_GRACE_MS);
       }, ONEND_TIMEOUT_MS);
     };
 
@@ -566,6 +587,9 @@ async function runTranscription() {
     setStatus('transcribe-status', `エラー: ${message}`);
     if (partialFinal) {
       document.getElementById('result-text').value = partialFinal;
+      log(`エラー終了だが確定テキスト ${partialFinal.length} 文字を結果欄に表示した。包含率評価には渡さない。`, 'warn');
+    } else {
+      log('確定テキストは1文字も得られていない。', 'ng');
     }
     if (elapsedMs != null) {
       log(`エラー発生までの所要時間: ${elapsedMs}ms`);
