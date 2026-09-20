@@ -37,6 +37,15 @@ melos:
       exec:
         command: dart pub get
         concurrency: 1
+    format:
+      description: >-
+        dart format の差分チェックを行う(CI用、Issue #25)。Pigeon生成物
+        (*.g.dart)はコミット対象の生成コードであり手動整形しない方針
+        (design.md §2.3)のため対象から除外する。
+      run: >-
+        find . -name '*.dart' -not -name '*.g.dart'
+        -not -path '*/.dart_tool/*' -not -path '*/build/*'
+        -print0 | xargs -0 dart format --output=none --set-exit-if-changed
     pigeon:android:
       description: >-
         pigeons/offline_stt_events.dart から offline_stt_android 向けの

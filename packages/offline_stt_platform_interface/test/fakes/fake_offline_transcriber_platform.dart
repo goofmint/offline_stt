@@ -79,9 +79,7 @@ class FakeOfflineTranscriberPlatform extends OfflineTranscriberPlatform
   /// ダウンロードを成功として完了させる(downloading → available)。
   void completeDownloadSuccess() {
     modelState = ModelState.available;
-    _downloadController!.add(
-      DownloadProgress(fraction: 1.0, completed: true),
-    );
+    _downloadController!.add(DownloadProgress(fraction: 1.0, completed: true));
     unawaited(_downloadController!.close());
   }
 
@@ -102,9 +100,7 @@ class FakeOfflineTranscriberPlatform extends OfflineTranscriberPlatform
     // ModelUnavailableException をStreamエラーで返す。内部で暗黙的に
     // ダウンロードを開始してはならない。
     if (modelState != ModelState.available) {
-      return Stream<TranscriptSegment>.error(
-        const ModelUnavailableException(),
-      );
+      return Stream<TranscriptSegment>.error(const ModelUnavailableException());
     }
     return guardSession(() {
       sessionPhase = SessionPhase.decoding;

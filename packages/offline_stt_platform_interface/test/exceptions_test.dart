@@ -57,10 +57,7 @@ void main() {
         const LocaleUnsupportedException().toString(),
         'LocaleUnsupportedException',
       );
-      expect(
-        const DecodeFailedException().toString(),
-        'DecodeFailedException',
-      );
+      expect(const DecodeFailedException().toString(), 'DecodeFailedException');
       expect(
         const DeviceUnsupportedException().toString(),
         'DeviceUnsupportedException',
@@ -70,7 +67,10 @@ void main() {
 
     test('PlatformException_ のtoStringはcode/messageを含む', () {
       const withMessage = PlatformException_(code: 'E1', message: 'boom');
-      expect(withMessage.toString(), 'PlatformException_(code: E1, message: boom)');
+      expect(
+        withMessage.toString(),
+        'PlatformException_(code: E1, message: boom)',
+      );
 
       const withoutMessage = PlatformException_(code: 'E2');
       expect(withoutMessage.message, isNull);

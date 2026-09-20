@@ -69,7 +69,10 @@ void main() {
 
       final expectation = expectLater(
         stream,
-        emitsInOrder(<Object>[emitsError(isA<PlatformException_>()), emitsDone]),
+        emitsInOrder(<Object>[
+          emitsError(isA<PlatformException_>()),
+          emitsDone,
+        ]),
       );
 
       fake.failDownload(const PlatformException_(code: 'DOWNLOAD_FAILED'));
@@ -101,23 +104,20 @@ void main() {
       await expectation;
     });
 
-    test(
-      'transcribeFile()はcheckModel()がavailable以外ならModelUnavailableExceptionを'
-      '即座にStreamエラーで返す(暗黙ダウンロードしない)',
-      () async {
-        final fake = FakeOfflineTranscriberPlatform(
-          initialState: ModelState.downloadable,
-        );
+    test('transcribeFile()はcheckModel()がavailable以外ならModelUnavailableExceptionを'
+        '即座にStreamエラーで返す(暗黙ダウンロードしない)', () async {
+      final fake = FakeOfflineTranscriberPlatform(
+        initialState: ModelState.downloadable,
+      );
 
-        final stream = fake.transcribeFile(
-          const TranscribeRequest(path: '/tmp/a.wav', locale: 'ja-JP'),
-        );
+      final stream = fake.transcribeFile(
+        const TranscribeRequest(path: '/tmp/a.wav', locale: 'ja-JP'),
+      );
 
-        await expectLater(stream, emitsError(isA<ModelUnavailableException>()));
+      await expectLater(stream, emitsError(isA<ModelUnavailableException>()));
 
-        // 内部で暗黙的にダウンロードを開始していないこと。
-        expect(fake.modelState, ModelState.downloadable);
-      },
-    );
+      // 内部で暗黙的にダウンロードを開始していないこと。
+      expect(fake.modelState, ModelState.downloadable);
+    });
   });
 }

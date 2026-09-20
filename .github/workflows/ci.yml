@@ -1,0 +1,184 @@
+name: CI
+
+# offline_stt の CI(Issue #25)。
+#
+# 検証すること:
+#   - 全パッケージの静的解析(dart analyze --fatal-infos)・ユニットテスト・
+#     フォーマット
+#   - apps/example の各プラットフォーム向けコンパイル(ビルド検証)
+#
+# 検証しないこと(design.md §7 の方針どおり、CIはビルド検証に限定する):
+#   - 認識E2E(実際に音声ファイルが正しく文字起こしされるか)。以下のとおり
+#     実機依存であることが実測済みであり、CI環境では原理的に再現できない。
+#       - iOS: シミュレータでは SpeechTranscriber.isAvailable が false に
+#         なり、SpeechAnalyzerによる認識自体が利用できない
+#         (spikes/darwin/RESULTS.md)
+#       - Android: エミュレータでは checkStatus() が UNAVAILABLE になる
+#         (AICore非搭載。spikes/android/RESULTS.md)
+#       - Web: ブラウザの言語パック(約60MB)取得とChromeの実ブラウザ環境が
+#         必要であり、ヘッドレスCIでは再現しない(spikes/web/RESULTS.md)
+#     認識E2Eはリリース前の手動チェックリスト(README参照)で運用する。
+#
+# ランナー・SDKバージョンについて調べた結果(2026-09時点):
+#   - macos-26 ラベルは GitHub Actions で 2026-02-26 に GA 済み
+#     (Xcode既定 26.4.1、26.5 も選択可能)であり、requirements.md NFR-4 の
+#     「iOS 26 / macOS 26 以上」を満たすビルド環境として利用できる。
+#   - windows-2025 ラベル(Windows Server 2025)も GA 済みであり、
+#     requirements.md NFR-4 が言う「Windows 11 24H2 (build 26100)」と
+#     OSビルド世代は揃うが、Windows Server であり Windows 11 クライアント
+#     そのものではない点に注意。GitHub Hosted Runnerに Windows 11
+#     クライアント版は無い。
+#   - offline_stt_windows/windows/CMakeLists.txt(2026-09時点)はWinAppSDK
+#     をまだNuGet等で依存宣言しておらず、TODOコメントのみである。そのため
+#     現時点のWindowsビルドはWinAppSDKのバージョン不一致では失敗しない
+#     はずだが、これは「現時点のソースがまだ薄いから」であり、M4で
+#     WinAppSDK依存を追加した際にはこの前提が変わる。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  FLUTTER_VERSION: '3.41.9'
+  FLUTTER_CHANNEL: 'stable'
+
+jobs:
+  analyze-test:
+    name: Analyze + Test + Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - name: melos をインストールする
+        run: dart pub global activate melos 8.2.2
+
+      - name: workspace を解決する(Dart Pub Workspaces)
+        run: melos bootstrap
+
+      - name: dart analyze --fatal-infos(全パッケージ)
+        run: melos run analyze
+
+      - name: dart test(test/ を持つパッケージのみ)
+        run: melos run test
+
+      - name: dart format 差分チェック(*.g.dart は対象外。理由はmelosスクリプト参照)
+        run: melos run format
+
+  build:
+    name: Build example (${{ matrix.platform }})
+    needs: analyze-test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: android
+            os: ubuntu-latest
+            continue_on_error: false
+          - platform: web
+            os: ubuntu-latest
+            continue_on_error: false
+          - platform: windows
+            os: windows-2025
+            continue_on_error: false
+          - platform: macos
+            os: macos-26
+            # Xcode 26.6 / macOS 26.5.1 でローカルビルド成功を確認済み。
+            continue_on_error: false
+          - platform: ios
+            os: macos-26
+            # Xcode 26.6 でローカルビルド成功を確認済み
+            # (flutter build ios --no-codesign --debug)。
+            continue_on_error: false
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.continue_on_error }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - name: JDK 17 を用意する(Android。build.gradle の sourceCompatibility に合わせる)
+        if: matrix.platform == 'android'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Gradle キャッシュ(Android)
+        if: matrix.platform == 'android'
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('apps/example/android/**/*.gradle*', 'apps/example/android/gradle/wrapper/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: apps/example にプラットフォームプロジェクトを生成する
+        # apps/example は雛形段階(tasks.md M1、機能実装はIssue #32)であり
+        # android/ios/macos/windows/web のネイティブプロジェクト一式を
+        # まだリポジトリに含めていない。`flutter create .` は既存の
+        # pubspec.yaml / lib/main.dart を保持したまま不足しているプラット
+        # フォームディレクトリのみを追加する(公式にサポートされた再実行可
+        # 能な操作、`flutter build web` のエラーメッセージ自体が案内する
+        # 手順)。CIのジョブ内でのみ生成し、リポジトリにはコミットしない。
+        working-directory: apps/example
+        run: flutter create . --platforms=${{ matrix.platform }} --org com.moongift
+
+      - name: macOS Deployment Target を 26.0 に引き上げる(offline_stt_darwin.podspec要件)
+        # flutter create が生成する既定の macOS Deployment Target(10.15)は
+        # offline_stt_darwin.podspec の `s.osx.deployment_target = '26.0'`
+        # (requirements.md NFR-4)より低く、pod install が
+        # 「requires a higher minimum macOS deployment version」で失敗する
+        # ことをローカル(Xcode 26.6 / macOS 26.5.1)で確認済み。
+        if: matrix.platform == 'macos'
+        working-directory: apps/example
+        run: |
+          sed -i '' "s/platform :osx, '[0-9.]*'/platform :osx, '26.0'/" macos/Podfile
+          sed -i '' 's/MACOSX_DEPLOYMENT_TARGET = [0-9.]*;/MACOSX_DEPLOYMENT_TARGET = 26.0;/g' macos/Runner.xcodeproj/project.pbxproj
+
+      - name: iOS Deployment Target を 26.0 に引き上げる(offline_stt_darwin.podspec要件)
+        # macOS と同根の要件(`s.ios.deployment_target = '26.0'`)からの類推。
+        # iOS側のPodfile/pbxprojでの実際の失敗・成功は未確認(ローカルに
+        # iOS実機ビルド環境の時間的余裕が無く未検証)。
+        if: matrix.platform == 'ios'
+        working-directory: apps/example
+        run: |
+          sed -i '' "s/# platform :ios, '[0-9.]*'/platform :ios, '26.0'/" ios/Podfile
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*;/IPHONEOS_DEPLOYMENT_TARGET = 26.0;/g' ios/Runner.xcodeproj/project.pbxproj
+
+      - name: flutter build apk --debug
+        if: matrix.platform == 'android'
+        working-directory: apps/example
+        run: flutter build apk --debug
+
+      - name: flutter build ios --no-codesign --debug
+        if: matrix.platform == 'ios'
+        working-directory: apps/example
+        run: flutter build ios --no-codesign --debug
+
+      - name: flutter build macos --debug
+        if: matrix.platform == 'macos'
+        working-directory: apps/example
+        run: flutter build macos --debug
+
+      - name: flutter build windows --debug
+        if: matrix.platform == 'windows'
+        working-directory: apps/example
+        run: flutter build windows --debug
+
+      - name: flutter build web
+        if: matrix.platform == 'web'
+        working-directory: apps/example
+        run: flutter build web

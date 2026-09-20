@@ -71,7 +71,10 @@ void main() {
       final stream = fake.transcribeFile(_request);
       final expectation = expectLater(
         stream,
-        emitsInOrder(<Object>[emitsError(isA<PlatformException_>()), emitsDone]),
+        emitsInOrder(<Object>[
+          emitsError(isA<PlatformException_>()),
+          emitsDone,
+        ]),
       );
 
       await _pump();
@@ -138,7 +141,10 @@ void main() {
       final stream1 = fake.transcribeFile(_request);
       final expectation1 = expectLater(
         stream1,
-        emitsInOrder(<Object>[emitsError(isA<PlatformException_>()), emitsDone]),
+        emitsInOrder(<Object>[
+          emitsError(isA<PlatformException_>()),
+          emitsDone,
+        ]),
       );
       await _pump();
       fake.errorSession(const PlatformException_(code: 'RECOGNITION_FAILED'));
