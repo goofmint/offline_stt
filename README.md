@@ -67,7 +67,7 @@ Chrome 153 での jaJP_10s 実測では、所要時間は短縮される一方�
 ### Windows: MSIXパッケージ化(依存を書くだけでは動かない唯一のプラットフォーム)
 
 - アプリを **MSIXでパッケージ化**し、`Package.appxmanifest` に `systemAIModels` capability を宣言する必要がある。`flutter build windows` が生成するのはパッケージ化されていない素のWin32 EXEであり、capabilityを宣言する場所が無い。
-- さらに、**このプラグインのビルド自体が `winapp` CLI(`winapp init`)を必要とする**。`winapp init` が展開する `.winapp/include` にWinAppSDKのC++/WinRTプロジェクションヘッダーが含まれており、プラグインの `windows/CMakeLists.txt` はこれを検出してWindows AI実装をビルドする。見つからない場合、すべてのAPI呼び出しが「`winapp init` を実行せよ」という明示的なエラーで失敗する(黙って `unavailable` を返すフォールバックはしない)。
+- さらに、**このプラグインのビルド自体が `winapp` CLI(`winapp init`)を必要とする**。`winapp init` が展開する `.winapp/include` にWinAppSDKのC++/WinRTプロジェクションヘッダーが含まれており、プラグインの `windows/CMakeLists.txt` はこれを検出してWindows AI実装をビルドする。見つからない場合、CMake はビルドを中止せず、音声認識を無効にした実装(`speech_backend_unavailable.cpp`)を組み込む。**モデル状態の照会・モデル取得・文字起こしは「`winapp init` を実行せよ」という明示的なエラーで失敗する**(黙って `unavailable` を返すフォールバックはしない)。`cancel()` は止める対象が無いため何もしない。
 - `MaxVersionTested` を `10.0.26226.0` 以降にしておくこと。
 - 手順・マニフェスト記載例・再同意フロー・既知の制約はすべて [packages/offline_stt_windows/README.md](./packages/offline_stt_windows/README.md) にある。ここでは重複させない。**同ドキュメントの手順は一度も実行して確認していない**(Windows実機が無いため。Issue #58)。
 

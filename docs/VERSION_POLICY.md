@@ -106,21 +106,22 @@ SpeechAnalyzer がそのOSバージョンで追加されたAPIであるためで
 | WinAppSDKヘッダーの探索先 | `.winapp/include` の自動検出(`OFFLINE_STT_WINDOWS_WINAPP_INCLUDE_DIR` で上書き可) | `packages/offline_stt_windows/windows/CMakeLists.txt` |
 | CMake | `cmake_minimum_required(VERSION 3.15)` | 同上 |
 
-> **ここには文書間の食い違いがある(Issue #68 で見つけた)。**
-> design.md §4.4、`packages/offline_stt_windows/README.md` §1、
-> `.github/workflows/ci.yml` の冒頭コメントの3箇所が、
-> 「実装は1.7系の最新サービシング `1.7.260224002` を既定としている
-> (`packages/offline_stt_windows/windows/CMakeLists.txt`)」と書いている。
-> **しかし現在の `CMakeLists.txt` はNuGetのバージョンを一切参照していない。**
-> M4の途中で `VS_PACKAGE_REFERENCES` による NuGet PackageReference 方式が
-> CIで失敗し(`error C1083: Cannot open include file:
+> **経緯(Issue #68 で見つけ、同じPRで解消した)。**
+> かつて design.md §4.4、`packages/offline_stt_windows/README.md` §1、
+> `.github/workflows/ci.yml` の冒頭コメントの3箇所が、「実装は1.7系の最新
+> サービシング `1.7.260224002` を既定としている」と書いていた。
+> **しかしその時点の `CMakeLists.txt` はNuGetのバージョンを一切参照して
+> いなかった。** M4の途中で `VS_PACKAGE_REFERENCES` による NuGet
+> PackageReference 方式がCIで失敗し(`error C1083: Cannot open include file:
 > 'winrt/Microsoft.Windows.AI.h'`)、winapp CLI が展開する `.winapp/include`
 > を自動検出する方式へ切り替えた際に、バージョン番号を書く場所自体が
-> 無くなったためである。**すなわち `1.7.260224002` は現在どこからも
-> 効いていない、過去の記述の残りである。** 実際に使われるWinAppSDKの
-> バージョンは、アプリ側で `winapp init` が展開したものに決まる。
-> この3箇所の記述を直すか、CMake側にバージョン検証を入れるかは、
-> Windows実機での検証(Issue #58)に合わせて判断する。
+> 無くなったためである。**3箇所とも現在は「実際に使われるバージョンは
+> `winapp init` が展開したものに決まり、プラグイン側は下限を機械的に
+> 強制していない」という事実に書き換え済みである。**
+>
+> したがって現時点で固定されているWinAppSDKのバージョンは存在しない。
+> CMake側にバージョン検証を入れるかどうかは、Windows実機での検証
+> (Issue #58)に合わせて判断する。
 
 ### 1.5 Web
 
@@ -172,8 +173,10 @@ SpeechAnalyzer がそのOSバージョンで追加されたAPIであるためで
    **フォールバックは禁止**である。値が取れないときに既定値で取り繕うのでは
    なく、明示的に失敗させる。現に Windows 実装は、WinAppSDK ヘッダーが
    見つからない場合に黙って `unavailable` を返すのではなく「`winapp init`
-   を実行せよ」という明示的なエラーで全API呼び出しを失敗させている
-   (`packages/offline_stt_windows/windows/CMakeLists.txt`)。
+   を実行せよ」という明示的なエラーで失敗させている。正確には、CMake は
+   ビルドを中止せず音声認識を無効にした実装(`speech_backend_unavailable.cpp`)
+   を組み込み、そのバックエンドがモデル状態の照会・モデル取得・文字起こしを
+   `kPlatformError` で失敗させる(`cancel()` は止める対象が無いため何もしない)。
 5. **E2Eを再実行する。** 範囲の決め方は [MONITORING.md](./MONITORING.md) 3節。
 6. **文書を直す。** 下記「どこを直すか」。
 7. **推測を実測として書かない。** 確認できなかったことは「未確認」と書く。

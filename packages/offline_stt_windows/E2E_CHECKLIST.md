@@ -68,7 +68,7 @@
 2. `flutter build windows --release` を実行する。
    - プラグインの `windows/CMakeLists.txt` が `.winapp/include` を自動検出し、
      **WinRT実装を含めてビルドすること**を確認する。検出されない場合、
-     プラグインは音声認識を行わず、全API呼び出しが「`winapp init` を実行
+     プラグインは音声認識を行わず、モデル状態の照会・モデル取得・文字起こしが「`winapp init` を実行
      せよ」という明示的なエラーで失敗する(フォールバックはしない)。
    - **WinRT実装のコンパイルが通ること自体が未確認である。** `<experimental/
      coroutine>` の非推奨(MSVC 14.51 の `error C2338: STL1011`)対策として

@@ -31,7 +31,7 @@
   出力は素の Win32 アプリであり、`systemAIModels` capability を宣言できる
   場所が無い。加えて `winapp init` が展開する WinAppSDK の C++/WinRT
   プロジェクションヘッダーが無いと、本プラグインは Windows AI 実装を
-  ビルドせず、全API呼び出しが明示的なエラーで失敗する(黙って
+  ビルドせず、モデル状態の照会・モデル取得・文字起こしが明示的なエラーで失敗する(黙って
   `unavailable` を返すフォールバックはしない)。
 - **`locale` 引数は無視される。** `Microsoft.Windows.AI.Speech` には
   ロケール・言語を指定する API が存在しないことがドキュメント調査で確定
