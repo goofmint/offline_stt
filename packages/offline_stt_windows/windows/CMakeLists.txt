@@ -6,6 +6,7 @@ set(PLUGIN_NAME "offline_stt_windows_plugin")
 
 add_library(${PLUGIN_NAME} SHARED
   "offline_stt_windows_plugin.cpp"
+  "pigeon.g.cpp"
 )
 
 apply_standard_settings(${PLUGIN_NAME})

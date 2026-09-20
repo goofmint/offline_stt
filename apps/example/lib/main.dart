@@ -19,9 +19,7 @@ class OfflineSttExampleApp extends StatelessWidget {
       title: 'offline_stt example',
       home: Scaffold(
         appBar: AppBar(title: const Text('offline_stt example')),
-        body: const Center(
-          child: Text('機能実装はIssue #32で行う。'),
-        ),
+        body: const Center(child: Text('機能実装はIssue #32で行う。')),
       ),
     );
   }
