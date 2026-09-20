@@ -62,13 +62,18 @@ mixin TranscribeSessionGuard {
   ) {
     late final StreamController<TranscriptSegment> controller;
     StreamSubscription<TranscriptSegment>? sourceSubscription;
+    // この呼び出しがセッション枠を取得したかどうか。2本目として拒否された
+    // 場合は取得していないため、解放してはならない。拒否経路でも
+    // controller.close() により購読が終了し onCancel が呼ばれるため、
+    // これを見ないと1本目が実行中にもかかわらず枠が解放されてしまう。
+    var owned = false;
     var released = false;
 
     void release() {
       // 正常終了(onDone)・エラー終了(onError)・キャンセル(onCancel)の
       // いずれの経路からも呼ばれ得るため、二重解放を防ぐためべき等にして
-      // ある。
-      if (released) return;
+      // ある。枠を取得していない(拒否された)呼び出しは解放しない。
+      if (!owned || released) return;
       released = true;
       _sessionActive = false;
     }
@@ -87,11 +92,20 @@ mixin TranscribeSessionGuard {
           return;
         }
         _sessionActive = true;
+        owned = true;
         sourceSubscription = startSession().listen(
           controller.add,
           onError: (Object error, StackTrace stackTrace) {
+            // startSession() が返す Stream は onError の後に done になるとは
+            // 限らない。解放だけして購読を残すと、source が後続イベントを
+            // 送り続けたまま2本目が開始できてしまう。最初のエラーで購読を
+            // 打ち切り、出力側も閉じる。
             release();
             controller.addError(error, stackTrace);
+            final sub = sourceSubscription;
+            sourceSubscription = null;
+            unawaited(sub?.cancel() ?? Future<void>.value());
+            unawaited(controller.close());
           },
           onDone: () {
             release();
