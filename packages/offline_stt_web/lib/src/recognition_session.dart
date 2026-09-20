@@ -173,7 +173,10 @@ Stream<TranscriptSegment> runTranscriptionSession(TranscribeRequest request) {
                 finalBuffer.write(transcript);
                 controller.add(
                   TranscriptSegment(
-                    text: stripChromeSegmentationWhitespace(transcript, request.locale),
+                    text: stripChromeSegmentationWhitespace(
+                      transcript,
+                      request.locale,
+                    ),
                     isFinal: true,
                   ),
                 );
@@ -218,7 +221,10 @@ Stream<TranscriptSegment> runTranscriptionSession(TranscribeRequest request) {
               );
               controller.add(
                 TranscriptSegment(
-                  text: stripChromeSegmentationWhitespace(lastInterimText, request.locale),
+                  text: stripChromeSegmentationWhitespace(
+                    lastInterimText,
+                    request.locale,
+                  ),
                   isFinal: true,
                 ),
               );
