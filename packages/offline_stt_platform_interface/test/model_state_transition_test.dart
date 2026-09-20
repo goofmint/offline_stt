@@ -43,14 +43,14 @@ void main() {
         final expectation = expectLater(
           stream,
           emitsInOrder(<Object>[
-            const DownloadProgress(fraction: 0.5, completed: false),
-            const DownloadProgress(fraction: 1.0, completed: true),
+            DownloadProgress(fraction: 0.5, completed: false),
+            DownloadProgress(fraction: 1.0, completed: true),
             emitsDone,
           ]),
         );
 
         fake.emitDownloadProgress(
-          const DownloadProgress(fraction: 0.5, completed: false),
+          DownloadProgress(fraction: 0.5, completed: false),
         );
         fake.completeDownloadSuccess();
 
@@ -87,14 +87,14 @@ void main() {
       final expectation = expectLater(
         stream,
         emitsInOrder(<Object>[
-          const DownloadProgress(fraction: null, completed: false),
-          const DownloadProgress(fraction: 1.0, completed: true),
+          DownloadProgress(fraction: null, completed: false),
+          DownloadProgress(fraction: 1.0, completed: true),
           emitsDone,
         ]),
       );
 
       fake.emitDownloadProgress(
-        const DownloadProgress(fraction: null, completed: false),
+        DownloadProgress(fraction: null, completed: false),
       );
       fake.completeDownloadSuccess();
 

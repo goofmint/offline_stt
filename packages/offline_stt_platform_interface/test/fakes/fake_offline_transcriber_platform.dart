@@ -80,7 +80,7 @@ class FakeOfflineTranscriberPlatform extends OfflineTranscriberPlatform
   void completeDownloadSuccess() {
     modelState = ModelState.available;
     _downloadController!.add(
-      const DownloadProgress(fraction: 1.0, completed: true),
+      DownloadProgress(fraction: 1.0, completed: true),
     );
     unawaited(_downloadController!.close());
   }
