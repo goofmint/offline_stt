@@ -74,15 +74,21 @@ object ModelAvailability {
             val destroyed = AtomicBoolean(false)
             val mainExecutor = context.mainExecutor
             fun destroyOnce() {
-                if (!destroyed.compareAndSet(false, true)) return
+                // 生成前に呼ばれた場合は `destroyed` を立てずに帰る。先に
+                // 立ててしまうと、生成とキャンセルが競合したときに
+                // 「フラグだけ立って実体は破棄されない」状態になり、以降の
+                // destroyOnce() が何もしなくなってリークする。
                 val target = recognizer ?: return
+                if (!destroyed.compareAndSet(false, true)) return
                 mainExecutor.execute { runCatching { target.destroy() } }
             }
 
-            continuation.invokeOnCancellation { destroyOnce() }
-
             try {
                 recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+                // ハンドラの登録は生成後に行う。既にキャンセル済みであれば
+                // `invokeOnCancellation` は登録時点で即座にハンドラを実行する
+                // ため、生成直後にキャンセルされていても取りこぼさない。
+                continuation.invokeOnCancellation { destroyOnce() }
                 recognizer.checkRecognitionSupport(
                     buildRecognizerIntent(locale),
                     mainExecutor,
