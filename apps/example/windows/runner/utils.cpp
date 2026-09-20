@@ -45,13 +45,22 @@ std::string Utf8FromUtf16(const wchar_t* utf16_string) {
   if (utf16_string == nullptr) {
     return std::string();
   }
-  unsigned int target_length = ::WideCharToMultiByte(
+  // NOTE: 本ファイルは `flutter create` が生成するランナーのテンプレートだが、
+  // 以下はテンプレートのままだと符号なしアンダーフローを起こすため意図的に
+  // 変更してある(Issue #59 のレビュー指摘)。
+  // `WideCharToMultiByte` は `WC_ERR_INVALID_CHARS` 指定時、不正なUTF-16を
+  // 与えられると 0 を返す。テンプレートはその戻り値を `unsigned int` に入れて
+  // から 1 を引くため、`target_length` が `UINT_MAX` になり、直後の `resize`
+  // が巨大な確保を試みてプロセスを落としうる。
+  // 終端NULLを変換対象から外して入力長を先に求め、符号付きで受ける形に
+  // 直してある。
+  int input_length = static_cast<int>(wcslen(utf16_string));
+  int target_length = ::WideCharToMultiByte(
       CP_UTF8, WC_ERR_INVALID_CHARS, utf16_string,
-      -1, nullptr, 0, nullptr, nullptr)
-    -1; // remove the trailing null character
-  int input_length = (int)wcslen(utf16_string);
+      input_length, nullptr, 0, nullptr, nullptr);
   std::string utf8_string;
-  if (target_length == 0 || target_length > utf8_string.max_size()) {
+  if (target_length <= 0 ||
+      static_cast<size_t>(target_length) > utf8_string.max_size()) {
     return utf8_string;
   }
   utf8_string.resize(target_length);

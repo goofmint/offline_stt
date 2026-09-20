@@ -32,19 +32,44 @@ namespace {
 class OfflineSttWindowsPlugin : public flutter::Plugin {
  public:
   explicit OfflineSttWindowsPlugin(
-      std::unique_ptr<PlatformThreadDispatcher> dispatcher,
+      std::shared_ptr<PlatformThreadDispatcher> dispatcher,
       std::unique_ptr<OfflineSttApiImpl> api)
       : dispatcher_(std::move(dispatcher)), api_(std::move(api)) {}
 
-  ~OfflineSttWindowsPlugin() override = default;
+  // Issue #59 / CodeRabbit 指摘「非同期処理の完了前にコールバック対象を
+  // 破棄しないでください」への対処。
+  //
+  // デストラクタは Flutter のプラットフォームスレッドで走る
+  // (`PluginRegistrarWindows` が保持しており、エンジン破棄時に解放される)。
+  // 順序に意味があるので明示する:
+  //   1. `api_->Shutdown()`
+  //      Dart への配送を止め(`StreamCallbackSender::Shutdown()`)、
+  //      実行中の `EnsureReadyAsync` / 認識セッションへキャンセルを要求する。
+  //      **完了は待たない。** 待たない理由と、待ってもデッドロックはしない
+  //      ことの確認は `offline_stt_api_impl.cpp` の `Shutdown()` の前に
+  //      書いたコメントを参照。
+  //   2. `dispatcher_->Shutdown()`
+  //      メッセージ専用ウィンドウを破棄し、未実行タスクを捨てる。以後
+  //      プラットフォームスレッドでタスクが走ることは無くなるため、破棄済み
+  //      の `BinaryMessenger` を触る経路が閉じる。未実行タスクを捨てるのは
+  //      「タスク→`StreamCallbackSender`→ディスパッチャ」の参照の循環を
+  //      断つためでもある(`platform_thread_dispatcher.h` 参照)。
+  //
+  // この時点でまだ走っている非同期処理があっても、それが触るのは
+  // `AsyncCallbackContext` が `shared_ptr` で生かしているオブジェクトだけ
+  // なので、解放済みメモリには触れない。
+  ~OfflineSttWindowsPlugin() override {
+    api_->Shutdown();
+    dispatcher_->Shutdown();
+  }
 
   OfflineSttApiImpl* api() { return api_.get(); }
 
  private:
-  // 破棄順の都合で `api_` より先に宣言する(`api_` が保持する
-  // `StreamCallbackSender` が `dispatcher_` を参照するため、
-  // `dispatcher_` のほうが後に破棄されるようメンバー順を逆にしている)。
-  std::unique_ptr<PlatformThreadDispatcher> dispatcher_;
+  // `dispatcher_` は `StreamCallbackSender` からも `shared_ptr` で握られる
+  // ため、メンバーの破棄順に安全性は依存しない。それでも
+  // 「`api_` が先に破棄される」という元の並びは維持しておく。
+  std::shared_ptr<PlatformThreadDispatcher> dispatcher_;
   std::unique_ptr<OfflineSttApiImpl> api_;
 };
 
@@ -54,7 +79,7 @@ void RegisterPlugin(flutter::PluginRegistrarWindows* registrar) {
   // **必ずプラットフォームスレッド上で構築すること**という
   // `PlatformThreadDispatcher` の前提は、プラグイン登録がプラットフォーム
   // スレッドで行われることによって満たされる。
-  auto dispatcher = std::make_unique<PlatformThreadDispatcher>();
+  auto dispatcher = std::make_shared<PlatformThreadDispatcher>();
   if (!dispatcher->IsValid()) {
     // ネイティブ→Dartのコールバックを一切配送できない状態であり、
     // 登録しても「結果が永遠に来ない」プラグインになるだけである。
@@ -64,9 +89,12 @@ void RegisterPlugin(flutter::PluginRegistrarWindows* registrar) {
     return;
   }
 
-  auto sender = std::make_unique<StreamCallbackSender>(
+  // `dispatcher` は `shared_ptr` で渡す。ワーカースレッドから投函された
+  // タスクが、プラグイン破棄と競合して解放済みのディスパッチャを触ることが
+  // 無いようにするため(Issue #59)。
+  auto sender = StreamCallbackSender::Create(
       std::make_unique<OfflineSttStreamCallbackApi>(registrar->messenger()),
-      dispatcher.get());
+      dispatcher);
 
   auto api = std::make_unique<OfflineSttApiImpl>(CreateSpeechBackend(),
                                                  std::move(sender));

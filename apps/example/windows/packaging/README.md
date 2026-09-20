@@ -45,7 +45,9 @@ flutter build windows --release
 #    出力: build\windows\x64\runner\Release\example.exe ほか
 
 # 2. マニフェストとアセットを出力ディレクトリへ重ねる
-copy windows\packaging\Package.appxmanifest build\windows\x64\runner\Release\
+copy windows\packaging\Package.appxmanifest build\windows\x64\runner\Release\AppxManifest.xml
+#    MakeAppx はレイアウト内の AppxManifest.xml を読む。Package.appxmanifest の
+#    名前のままではマニフェストとして認識されない。
 xcopy /E /I windows\packaging\Assets build\windows\x64\runner\Release\Assets
 #    Assets\ の実体(StoreLogo.png 等)は同梱していない。
 #    windows\packaging\Assets\PLACEHOLDER.txt を参照して用意すること。

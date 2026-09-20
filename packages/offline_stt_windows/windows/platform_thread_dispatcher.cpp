@@ -36,20 +36,47 @@ PlatformThreadDispatcher::PlatformThreadDispatcher() {
   }
 }
 
-PlatformThreadDispatcher::~PlatformThreadDispatcher() {
-  if (window_ != nullptr) {
-    ::SetWindowLongPtr(window_, GWLP_USERDATA, 0);
-    ::DestroyWindow(window_);
+PlatformThreadDispatcher::~PlatformThreadDispatcher() { Shutdown(); }
+
+void PlatformThreadDispatcher::Shutdown() {
+  std::deque<std::function<void()>> pending;
+  HWND window = nullptr;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (stopped_) return;
+    stopped_ = true;
+    window = window_;
     window_ = nullptr;
+    pending.swap(tasks_);
   }
+  if (window != nullptr) {
+    ::SetWindowLongPtr(window, GWLP_USERDATA, 0);
+    ::DestroyWindow(window);
+  }
+  // 未実行タスクの破棄はロックの外で行う。タスクが握る `shared_ptr` の解放が
+  // 連鎖して、巡り巡って `Post()` を呼ぶ可能性を完全には否定できないため
+  // (現状の呼び出し側ではそうならないが、ここで自己デッドロックする形に
+  // しておく理由が無い)。
+  pending.clear();
+}
+
+bool PlatformThreadDispatcher::IsValid() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return window_ != nullptr;
 }
 
 void PlatformThreadDispatcher::Post(std::function<void()> task) {
-  if (window_ == nullptr) return;
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    tasks_.push_back(std::move(task));
-  }
+  // `Shutdown()` 後は「黙って捨てる」。これはフォールバックではなく、
+  // 「エンジンが消えたのでDartへ届ける先がもう無い」という事実そのもので
+  // ある(届けようとすると破棄済みの `BinaryMessenger` を触る)。
+  //
+  // `PostMessage` をロック内で呼ぶのは、`Shutdown()` がウィンドウを破棄した
+  // 直後に無効な `HWND` へ投函する窓を無くすため。`PostMessage` は非同期
+  // (`SendMessage` と違い `WndProc` をその場で呼ばない)なので、ここで
+  // `DrainTasks()` が再入して同じ `mutex_` を取りにくることは無い。
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (stopped_ || window_ == nullptr) return;
+  tasks_.push_back(std::move(task));
   ::PostMessage(window_, kRunTasksMessage, 0, 0);
 }
 

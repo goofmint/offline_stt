@@ -30,6 +30,24 @@
 //   `flutter::BinaryMessenger` の C++ ラッパー越しには露出しておらず、
 //   Pigeon 生成コードがそのラッパーを使う以上、適用できない。
 //
+// ## 破棄と「投函済みタスク」の扱い(Issue #59 / CodeRabbit 指摘対応)
+// このディスパッチャが配送するタスクは、`StreamCallbackSender` を経由して
+// 最終的に Pigeon 生成の `OfflineSttStreamCallbackApi`(= Flutter の
+// `BinaryMessenger`)を叩く。`BinaryMessenger` はプラグイン(= エンジン)の
+// 破棄後には触れてはならないため、**破棄後にタスクが1件でも走る余地を
+// 残してはならない**。
+// そのため `Shutdown()` を用意し、
+//   1. 以後の `Post()` を受け付けなくする
+//   2. 未実行タスクをその場で破棄する
+//   3. メッセージ専用ウィンドウを破棄する(以後 `WndProc` は呼ばれない)
+// の3つを一括で行う。プラグインのデストラクタ(プラットフォームスレッド)
+// から呼ぶ。
+//
+// 未実行タスクをその場で破棄するのは、寿命の循環を断つためでもある。
+// タスクは `StreamCallbackSender` の `shared_ptr` を握り、その
+// `StreamCallbackSender` はこのディスパッチャの `shared_ptr` を握る。
+// キューを空にしない限りこの循環で両者が解放されない。
+//
 // **未検証**: Windows 実機が無いため、この仕組みが実際に動作することは
 // 確認できていない(Issue #58)。
 #ifndef OFFLINE_STT_WINDOWS_PLATFORM_THREAD_DISPATCHER_H_
@@ -50,6 +68,7 @@
 #include <deque>
 #include <functional>
 #include <mutex>
+#include <utility>
 
 namespace offline_stt_windows {
 
@@ -72,15 +91,24 @@ class PlatformThreadDispatcher {
   // がその場で明確に失敗させる方針とする。
   void Post(std::function<void()> task);
 
-  bool IsValid() const { return window_ != nullptr; }
+  // **必ずプラットフォームスレッドから呼ぶこと**(プラグインのデストラクタ)。
+  // 冪等。呼び出し後は `Post()` は何もせず、未実行タスクも実行されない。
+  // デストラクタからも呼ばれるので、明示的に呼ばない経路でも安全側に倒れる。
+  void Shutdown();
+
+  bool IsValid() const;
 
  private:
   static LRESULT CALLBACK WndProc(HWND hwnd, UINT message, WPARAM wparam,
                                   LPARAM lparam);
   void DrainTasks();
 
+  // `window_` は `Post()`(任意のスレッド)と `Shutdown()`(プラットフォーム
+  // スレッド)の双方から触られるため、`tasks_` と同じ `mutex_` で守る。
+  // 以前は無保護で読んでおり、破棄と `Post()` が競合しうる状態だった。
+  mutable std::mutex mutex_;
   HWND window_ = nullptr;
-  std::mutex mutex_;
+  bool stopped_ = false;
   std::deque<std::function<void()>> tasks_;
 };
 

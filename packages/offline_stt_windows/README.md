@@ -120,9 +120,12 @@ winapp cert install .\devcert.pfx   # 管理者権限。証明書ごとに1回
 
 **このプラグインにとって `winapp init` は MSIX 化のためだけの手順ではない。** `winapp init` が展開する `.winapp/include` には WinAppSDK の C++/WinRT プロジェクションヘッダー(`winrt/Microsoft.Windows.AI.Speech.h` 等)が含まれており、**プラグインの `windows/CMakeLists.txt` はこのディレクトリを自動検出して Windows AI 実装をビルドする**。見つからない場合、プラグインは音声認識を行わず、すべての API 呼び出しが「`winapp init` を実行せよ」という明示的なエラーで失敗する(黙って `unavailable` を返すようなフォールバックはしない)。
 
-したがって **`winapp init` を実行していないアプリでは、このプラグインは動かない。**
+したがって **既定の構成では、`winapp init` を実行していないアプリでこのプラグインは動かない。**
 
-ヘッダーを別の場所に用意している場合は CMake 変数 `OFFLINE_STT_WINDOWS_WINAPP_INCLUDE_DIR` でその場所を指定できる。
+ただし `winapp init` そのものが必須なわけではない。必須なのは次の2つであり、`winapp init` はそれを一度に用意する最も簡単な手段にすぎない。
+
+1. **WinAppSDK の C++/WinRT プロジェクションヘッダー**が読める場所にあること。`winapp init` 以外の方法で用意した場合は、CMake 変数 `OFFLINE_STT_WINDOWS_WINAPP_INCLUDE_DIR` にその場所を指定すれば同じように動く。
+2. **`systemAIModels` capability を宣言した MSIX としてパッケージ識別が与えられていること**。これは §4 の A〜C のいずれの手段で用意しても構わない。
 
 > **なぜ NuGet の PackageReference ではないのか。** 当初はプラグインの CMake から `VS_PACKAGE_REFERENCES` で `Microsoft.WindowsAppSDK` を参照する方式を実装したが、CI(windows-2025)で実際にビルドしたところ `error C1083: Cannot open include file: 'winrt/Microsoft.Windows.AI.h'` で失敗した。WinAppSDK のプロジェクションヘッダーは Windows SDK には含まれず、NuGet パッケージ内の `.winmd` から `cppwinrt.exe` が生成するものであり、CMake が生成する `.vcxproj` に PackageReference を足すだけでは復元も生成も走らなかった。詳細は `windows/CMakeLists.txt` の冒頭コメントに記録してある。
 
@@ -134,6 +137,17 @@ winapp cert install .\devcert.pfx   # 管理者権限。証明書ごとに1回
 
 欠点は Visual Studio(または Build Tools + 「ユニバーサル Windows プラットフォーム開発」ワークロード)が必要になること、そして Flutter のビルド出力を外部から参照する形になるため `.wapproj` を手で書く必要があることである。`spikes/windows/packaging/WindowsSTTSpikePackage.wapproj` に、素の Win32 EXE を対象とした `.wapproj` の例がある(これも未検証)。
 
+**`.wapproj` を使う場合は、次の設定をパッケージングプロジェクトに追加すること。**
+
+```xml
+<PropertyGroup>
+  <AppxOSMinVersionReplaceManifestVersion>false</AppxOSMinVersionReplaceManifestVersion>
+  <AppxOSMaxVersionTestedReplaceManifestVersion>false</AppxOSMaxVersionTestedReplaceManifestVersion>
+</PropertyGroup>
+```
+
+これが無いと、Visual Studio がビルド時に `Package.appxmanifest` の `MaxVersionTested` をプロジェクト側の値で上書きしうる。§3 のとおり `MaxVersionTested` が古いままだと、`systemAIModels` を正しく宣言していてもモデルの読み込みが「Not declared by app」で失敗する。
+
 ### B. `MakeAppx.exe` + `SignTool.exe` による手動パッケージング
 
 Windows SDK に含まれるコマンドラインツールだけで完結する。おおよそ次の形になる。
@@ -144,7 +158,9 @@ flutter build windows --release
 # 出力: build\windows\x64\runner\Release\
 
 # 2. その中に Package.appxmanifest と Assets\ を置く
-copy windows\packaging\Package.appxmanifest build\windows\x64\runner\Release\
+copy windows\packaging\Package.appxmanifest build\windows\x64\runner\Release\AppxManifest.xml
+#    MakeAppx はレイアウト内の AppxManifest.xml を読む。Package.appxmanifest の
+#    名前のままではマニフェストとして認識されない。
 xcopy /E /I windows\packaging\Assets build\windows\x64\runner\Release\Assets
 
 # 3. MSIX を作る
@@ -281,10 +297,11 @@ design.md §5 のエラーマッピング表 Windows 列に対応する。
 
 この文書と Windows 実装全体について、Windows 実機でしか確定できない事項:
 
+> **既に決着している項目(再試行しないこと)**: 「CMake 経由での WinAppSDK NuGet 復元と C++/WinRT プロジェクションヘッダー生成」は**未検証ではなく、CI(windows-2025)で実際に失敗することが確認済み**である(`error C1083: Cannot open include file: 'winrt/Microsoft.Windows.AI.h'`)。そのため §4.0 の `.winapp/include` 方式へ切り替えてある。この経路を再試行する必要はない。
+
 1. **MSIX 化そのもの。** 本リポジトリの `Package.appxmanifest` で MSIX を生成し、インストールし、起動するところまで一度も実施していない。
 2. Desktop Bridge(`Windows.FullTrustApplication` + `runFullTrust`)と `systemAIModels` capability の組み合わせが実際に機能するか(公式サンプルは WinUI 3 / WPF / WinForms / .NET MAUI のみ)。
 3. `flutter build windows` の出力に対する `MakeAppx` / `.wapproj` / `msix` pub package それぞれの適用可否。
-4. CMake(Visual Studio ジェネレータ)経由での WinAppSDK NuGet 復元と C++/WinRT プロジェクションヘッダー生成が機能するか(`windows/CMakeLists.txt` 冒頭のコメント)。
 5. `EnsureNeeded` の実在(§6)。
 6. `SpeechRecognitionModelProgress.Progress` の値域とフェーズごとの挙動(§7 制約2)。
 7. ロケール指定 API が無い状態で、実際にどの言語で認識されるか。ja-JP の認識可否・精度(§7 制約3)。

@@ -68,7 +68,8 @@ melos run format
 
 - `macos-26` ラベルは 2026-02-26 にGitHub ActionsでGA済み(既定Xcode 26.4.1、26.5等も選択可能)であり、requirements.md NFR-4「iOS 26 / macOS 26 以上」を満たすビルド環境として利用できる。
 - `windows-2025` ラベル(Windows Server 2025)もGA済み。requirements.md NFR-4「Windows 11 24H2 (build 26100)」とOSビルド世代は揃うが、GitHub Hosted RunnerにWindows 11クライアント版は存在せず、Server版である点に注意。
-- `offline_stt_windows/windows/CMakeLists.txt` はM4(Issue #52)で `Microsoft.WindowsAppSDK`(既定 `1.7.260224002`)をNuGetで依存宣言するようになった。それ以前は `# TODO(M4)` コメントのみでWinAppSDKに一切触れていなかったためバージョン不一致では失敗しなかったが、この前提はM4で変わっている。CMake(Visual Studioジェネレータ)経由のNuGet復元とC++/WinRTプロジェクションヘッダー生成が成立するかは**未検証**であり、CIが最初の検証になる(同ファイル冒頭のコメント参照)。
+- `offline_stt_windows/windows/CMakeLists.txt` のWinAppSDK取り込み方式はM4で二転した。当初はCMakeの `VS_PACKAGE_REFERENCES` でNuGetのPackageReferenceを足す方式にしたが、**CIで実際にビルドして失敗した**(`error C1083: Cannot open include file: 'winrt/Microsoft.Windows.AI.h'`)。WinAppSDKのプロジェクションヘッダーはWindows SDKに含まれず、NuGetパッケージ内の `.winmd` から `cppwinrt.exe` が生成するものであり、CMakeが生成する `.vcxproj` にPackageReferenceを足すだけでは復元も生成も走らなかった。現在は winapp CLI(`winapp init`)がアプリ側に展開する `.winapp/include` を自動検出する方式である。
+- **したがって、CIのWindowsジョブはWinRT実装をコンパイルしていない。** CIランナーは winapp CLI を持たないため、`speech_backend_winrt.cpp` / `model_availability.cpp` / `model_acquisition.cpp` / `recognition_session.cpp` はビルド対象から外れ、`speech_backend_unavailable.cpp` がリンクされる。CIが検証しているのはWinRTに触れない部分(Pigeon受け口・スレッド調停・エラー分類・Media Foundation変換)のコンパイルだけである。**WinRT実装のコンパイルは一度も通っていない。** 確認はIssue #58の実機検証に委ねている。
 
 **ローカルで検証済みのビルド**:
 

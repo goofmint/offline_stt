@@ -178,6 +178,23 @@ void RecognitionSession::Start(
   // 呼び出し側(`OfflineSttHostApi.transcribeFile`)は「開始のみ」の契約
   // (`pigeons/offline_stt_windows.dart` 参照)なので、スレッドは join せず
   // detach する。完了は `on_complete` で通知される。
+  //
+  // ## detach したままで安全である理由(Issue #59 / CodeRabbit 指摘対応)
+  // このスレッドはプラグインより長く生きうる。したがって、ここから触れる
+  // ものはすべてこのスレッド自身が寿命を握っていなければならない。
+  //   - `state`: `shared_ptr` を値で捕捉しているので、`RecognitionSession`
+  //     本体(= `SpeechBackend` ごとプラグインと一緒に破棄される)が消えても
+  //     生き続ける。
+  //   - `on_complete`: `state` が保持する。その中身は
+  //     `offline_stt_api_impl.cpp` が `AsyncCallbackContext` の `shared_ptr`
+  //     **だけ**を捕捉して作ったものであり、生の `this` は捕捉していない
+  //     (以前は捕捉しており、それがこの指摘の本体だった)。
+  //   - `converted.output_path` / `file_path_utf8`: 値で保持している。
+  // Dart への送信はプラグイン破棄時に `StreamCallbackSender::Shutdown()` で
+  // 止まるため、破棄後に完了しても何も送られない。
+  //
+  // **未検証**: Windows 実機が無いため、プラグイン破棄と認識完了が競合する
+  // 経路は実際には一度も走らせていない(Issue #58)。
   worker.detach();
 }
 

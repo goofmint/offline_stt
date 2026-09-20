@@ -1,4 +1,6 @@
 // stream_callback_sender.cpp
+//
+// 共有所有にした理由は stream_callback_sender.h のコメントを参照。
 #include "stream_callback_sender.h"
 
 #include <utility>
@@ -21,43 +23,82 @@ std::function<void(const FlutterError&)> NoopError() {
 
 }  // namespace
 
+std::shared_ptr<StreamCallbackSender> StreamCallbackSender::Create(
+    std::unique_ptr<OfflineSttStreamCallbackApi> api,
+    std::shared_ptr<PlatformThreadDispatcher> dispatcher) {
+  // コンストラクタが private のため `make_shared` は使えない。
+  return std::shared_ptr<StreamCallbackSender>(
+      new StreamCallbackSender(std::move(api), std::move(dispatcher)));
+}
+
 StreamCallbackSender::StreamCallbackSender(
     std::unique_ptr<OfflineSttStreamCallbackApi> api,
-    PlatformThreadDispatcher* dispatcher)
-    : api_(std::move(api)), dispatcher_(dispatcher) {}
+    std::shared_ptr<PlatformThreadDispatcher> dispatcher)
+    : api_(std::move(api)), dispatcher_(std::move(dispatcher)) {}
+
+void StreamCallbackSender::Shutdown() {
+  std::lock_guard<std::mutex> lock(mutex_);
+  shut_down_ = true;
+}
+
+bool StreamCallbackSender::IsShutDown() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return shut_down_;
+}
+
+void StreamCallbackSender::Dispatch(std::function<void()> task) {
+  auto self = shared_from_this();
+  std::shared_ptr<PlatformThreadDispatcher> dispatcher;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (shut_down_) return;
+    dispatcher = dispatcher_;
+  }
+  // `self` を捕捉することで、タスクがキューに残っている間は `api_` も
+  // `dispatcher_` も解放されない。実行はプラットフォームスレッドで行われ、
+  // `Shutdown()` も同じスレッドから呼ばれる契約なので、下の判定と
+  // `Shutdown()` が交錯することはない(判定後に `shut_down_` が立って
+  // そのまま送ってしまう、という競合が起きない)。
+  dispatcher->Post([self, task = std::move(task)]() {
+    if (self->IsShutDown()) return;
+    task();
+  });
+}
 
 void StreamCallbackSender::SendSegment(const std::string& text, bool is_final) {
-  dispatcher_->Post([this, text, is_final]() {
-    api_->OnSegment(TranscriptSegment(text, is_final), NoopSuccess(),
-                    NoopError());
+  Dispatch([self = shared_from_this(), text, is_final]() {
+    self->api_->OnSegment(TranscriptSegment(text, is_final), NoopSuccess(),
+                          NoopError());
   });
 }
 
 void StreamCallbackSender::SendDownloadProgress(std::optional<double> fraction,
                                                 bool completed) {
-  dispatcher_->Post([this, fraction, completed]() {
+  Dispatch([self = shared_from_this(), fraction, completed]() {
     DownloadProgress progress(completed);
     if (fraction.has_value()) {
       progress.set_fraction(*fraction);
     }
-    api_->OnDownloadProgress(progress, NoopSuccess(), NoopError());
+    self->api_->OnDownloadProgress(progress, NoopSuccess(), NoopError());
   });
 }
 
 void StreamCallbackSender::SendError(const TranscribeError& error) {
-  dispatcher_->Post([this, error]() {
+  Dispatch([self = shared_from_this(), error]() {
     if (error.message.empty()) {
-      api_->OnStreamError(error.code, nullptr, NoopSuccess(), NoopError());
+      self->api_->OnStreamError(error.code, nullptr, NoopSuccess(),
+                                NoopError());
     } else {
-      api_->OnStreamError(error.code, &error.message, NoopSuccess(),
-                          NoopError());
+      self->api_->OnStreamError(error.code, &error.message, NoopSuccess(),
+                                NoopError());
     }
   });
 }
 
 void StreamCallbackSender::SendDone() {
-  dispatcher_->Post(
-      [this]() { api_->OnStreamDone(NoopSuccess(), NoopError()); });
+  Dispatch([self = shared_from_this()]() {
+    self->api_->OnStreamDone(NoopSuccess(), NoopError());
+  });
 }
 
 }  // namespace offline_stt_windows

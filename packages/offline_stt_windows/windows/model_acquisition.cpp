@@ -120,9 +120,21 @@ void ModelAcquisition::Cancel() {
     operation = state->operation;
   }
   if (operation) {
-    // `Cancel()` は IAsyncInfo の標準メンバー。キャンセルが受理されると
-    // 上の Completed ハンドラが `AsyncStatus::Canceled` で呼ばれる。
-    operation.Cancel();
+    try {
+      // `Cancel()` は IAsyncInfo の標準メンバー。キャンセルが受理されると
+      // 上の Completed ハンドラが `AsyncStatus::Canceled` で呼ばれる。
+      operation.Cancel();
+    } catch (const winrt::hresult_error&) {
+      // 既に完了している操作の `Cancel()` は失敗しうる
+      // (`recognition_session.cpp` の `Cancel()` と同じ扱い)。
+      //
+      // ここを握り潰すことには、もう1つ積極的な理由がある。Issue #59 以降、
+      // この経路はプラグインのデストラクタからも呼ばれる
+      // (`OfflineSttApiImpl::Shutdown()` → `SpeechBackend::Cancel()`)。
+      // デストラクタから例外を投げると `std::terminate` になるため、
+      // 外へ漏らしてはならない。`cancel_requested` は立っているので、
+      // 完了ハンドラ側の扱いは変わらない。
+    }
   }
 }
 
