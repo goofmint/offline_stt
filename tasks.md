@@ -18,8 +18,8 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」タ�
 
 - [x] Chrome 142+ で `SpeechRecognition.available({langs: ['ja-JP'], processLocally: true})` の結果確認(結果: downloadable。spikes/web/RESULTS.md 参照)
 - [x] `install()` での ja-JP 言語パック取得確認(取得成功、約8.7秒で available へ遷移。spikes/web/RESULTS.md 参照)
-- [ ] `start(audioTrack)` + `processLocally: true` の併用動作確認(設計未決事項4)
-- [ ] 基準音声での書き起こし精度確認
+- [x] `start(audioTrack)` + `processLocally: true` の併用動作確認(設計未決事項4)(成立。source.onended 後に stop() を呼ぶと isFinal 結果と onend が発火する。spikes/web/RESULTS.md 参照)
+- [x] 基準音声での書き起こし精度確認(jaJP_10s で 66.7%、しきい値未達。倍速は精度が単調低下。spikes/web/RESULTS.md 参照)
 
 ### Darwin
 

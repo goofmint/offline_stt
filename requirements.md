@@ -55,6 +55,19 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」要�
 - `transcribeFile(path, locale)` で音声ファイルを文字起こしし、`Stream<TranscriptSegment>` を返す
 - partial結果を許容する(isFinalフラグで区別)。Windowsバッチ認識はfinalのみ1回emit
 - キャンセル可能であること(Streamのcancelで下層の認識セッションを停止)
+- Webでは確定(final)結果が形態素単位で空白区切りされることをChrome 153実機で確認した(spikes/web/RESULTS.md 参照)。アプリへ返す前にこの空白を除去するかどうか、Web実装ではテキスト整形の方針を決める必要がある
+- 再生速度オプション(`playbackRate`、§7参照)は、1.0より大きい値を指定すると所要時間を短縮できるが、認識精度が低下しうる。Chrome 153実機でのjaJP_10s(音声長9.56秒、期待キーワード6件)実測は以下のとおりである
+
+  | 再生速度 | 所要時間 | 包含率 | isFinal発火 |
+  |---|---|---|---|
+  | 1.0x | 9,676 ms | 4/6 = 66.7% | あり |
+  | 1.1x | 8,808 ms | 4/6 = 66.7% | なし(interim採用) |
+  | 1.25x | 7,726 ms | 4/6 = 66.7% | なし(interim採用) |
+  | 1.5x | 6,464 ms | 3/6 = 50.0% | あり |
+  | 1.75x | (未実施) | (未実施) | (未実施) |
+  | 2.0x | 4,867 ms | 2/6 = 33.3% | あり |
+
+  1.25xまでは本測定ではキーワード包含率そのものは変化しなかったが、認識結果のテキスト自体はキーワード判定に現れない形で劣化が進行していた。例えば「株式会社モーンギフト」の認識結果は、1.0x「ムーンギフト」→ 1.1x「モヨンギフト」→ 1.25x「オンギフト」→ 1.5x「モンギフト」→ 2.0x(消失)と推移した。包含率が同じでも精度が劣化している場合があるため、包含率のみでの判断は不十分である
 
 ### FR-4 音声デコード層(任意フォーマット対応の中核)
 
@@ -82,7 +95,8 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」要�
 ### NFR-1 処理時間
 
 - 所要時間はプラットフォーム依存であることをAPI契約に明記
-- Android(実時間レート供給制約)とWeb(リアルタイム処理)はファイル長と同等の時間がかかる
+- Android(実時間レート供給制約)とWeb(リアルタイム処理)はファイル長と同等の時間がかかる。Webについては、Chrome 153実機で9.56秒の基準音声(jaJP_10s)の文字起こしに9,676msを要し、Webが実時間処理であることが実測で裏付けられた(spikes/web/RESULTS.md 参照)
+- Webは再生速度オプション(`playbackRate`、§7参照)により、この実時間制約を緩和できる。1.0より大きい値を指定すると所要時間は短縮される(jaJP_10s実測: 1.0xで9,676ms、2.0xで4,867ms)。ただし処理時間の短縮と認識精度はトレードオフの関係にあり、`AudioBufferSourceNode.playbackRate` はピッチも同倍率で変化させるため、速度を上げるほど精度が低下しうる(1.0x: 66.7% → 1.5x: 50.0% → 2.0x: 33.3%、jaJP_10s実測。spikes/web/RESULTS.md 参照)
 - Windowsバッチは非実時間。macOS 26.5.1実機では RTF(処理時間 ÷ 実時間長)0.008〜0.026、すなわち実時間の約38〜125倍高速にファイル入力の文字起こしが完了することを実測済み(spikes/darwin/RESULTS.md 参照)。Android/Webの実時間制約とは対照的に高速である。iOSのファイル処理速度は実機未測定であり、引き続き要実測
 
 ### NFR-2 プライバシー
@@ -126,11 +140,12 @@ class TranscriptSegment {
 abstract class OfflineTranscriber {
   Future<ModelState> checkModel(String locale);
   Stream<double> downloadModel(String locale);
-  Stream<TranscriptSegment> transcribeFile(String path, String locale);
+  Stream<TranscriptSegment> transcribeFile(String path, String locale, {double playbackRate = 1.0});
 }
 ```
 
 - タイムスタンプ・信頼度スコアはプラットフォーム間で対応差が大きいためv1では非対応(将来拡張)
+- `playbackRate`(既定値 1.0)は再生速度を指定するオプションである。意味を持つのはWebのみで、`AudioBufferSourceNode.playbackRate` に直結する。Darwin(SpeechAnalyzer)・Windows(BatchRecognition)はバッチ処理であり速度という概念自体が存在しないため、指定しても無視される(値そのものは受理するが動作に影響しない)。Androidは実時間ポンプ方式のため理論上は同種の適用余地があるが、M0時点では未検証である
 
 ## 8. 利用者(アプリ側)に課される制約(ドキュメント必須事項)
 
@@ -146,7 +161,7 @@ abstract class OfflineTranscriber {
 | ML Kit GenAI (alpha) の破壊的変更 | Android実装の書き直し | バージョン固定 + 0.x運用、CHANGELOG追従 |
 | Chrome オンデバイスWeb Speechの不安定さ(過去に一時無効化の実績) | Web実装が突然動かなくなる | `available()` を毎回確認、機能検出ベースで劣化 |
 | iOS SpeechAnalyzer / Windows AI の日本語対応が未確認 | 主要ユースケース不成立 | 実装前に4プラットフォームでja-JP実機検証(マイルストーン0)。macOS 26.5.1実機では`supportedLocales`にja-JPを含むことを確認済み(spikes/darwin/RESULTS.md 参照)。iOS実機での確認は残課題 |
-| `start(audioTrack)` + `processLocally` の組み合わせ動作が未検証 | Web実装不成立 | マイルストーン0で検証 |
+| `start(audioTrack)` + `processLocally` の組み合わせ動作が未検証 | Web実装不成立 | マイルストーン0で検証。Chrome 153実機で確認済み: 併用動作は成立(source.onendedの後にrecognition.stop()を呼ぶことでisFinal結果とonendが発火する。spikes/web/RESULTS.md 参照) |
 | Advanced→Basicフォールバック挙動が未検証 | Android品質のばらつき | 実機検証 + preferredModeの挙動をドキュメント化 |
 | 最低OSバージョンが高くユーザー母数が限られる | 採用が進まない | READMEに前提を明記、モデル同梱型代替(sherpa-onnx等)への誘導を記載 |
 
