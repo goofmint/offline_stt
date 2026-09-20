@@ -51,7 +51,8 @@ set(PLUGIN_NAME "offline_stt_windows_plugin")
 # 本 CMakeLists は `.winapp/include` を自動検出する:
 #   - 見つかった場合  -> WinRT 実装(speech_backend_winrt.cpp 等)をビルドする。
 #   - 見つからない場合 -> speech_backend_unavailable.cpp をビルドする。
-#     全 API 呼び出しは「WinAppSDK ヘッダー無しでビルドされている。
+#     モデル状態の照会・モデル取得・文字起こしは「WinAppSDK ヘッダー無しで
+#     ビルドされている。
 #     アプリ側で winapp init を実行せよ」という**明示的なエラー**で失敗する。
 #     黙って `unavailable` を返すようなフォールバックはしない。
 #   どちらになったかは構成時に message() で必ず出力する。

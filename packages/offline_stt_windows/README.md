@@ -17,7 +17,7 @@ requirements.md NFR-4 および公式ドキュメント(最終更新 2026-07-07)
 | 項目 | 要件 |
 |---|---|
 | OS | Windows 11, version 24H2 (build 26100) 以降 |
-| WinAppSDK | 1.7.1 以降(NuGet の `Microsoft.WindowsAppSDK` では `1.7.250401001` 相当。本プラグインの既定は 1.7 系の最新サービシング `1.7.260224002`) |
+| WinAppSDK | 1.7.1 以降(NuGet の `Microsoft.WindowsAppSDK` では `1.7.250401001` 相当)。**実際に使われるバージョンは `winapp init` が `.winapp/include` へ展開したものに決まる。プラグイン側はバージョンを固定しておらず、下限を機械的に強制もしていない**(§4.0) |
 | ハードウェア | NPU 搭載の Copilot+ PC、**または** 推奨 CPU 要件を満たす任意の Windows PC |
 | パッケージ形態 | **MSIX**(`systemAIModels` capability 宣言つき) |
 
@@ -118,7 +118,7 @@ winapp pack .\dist --cert .\devcert.pfx
 winapp cert install .\devcert.pfx   # 管理者権限。証明書ごとに1回
 ```
 
-**このプラグインにとって `winapp init` は MSIX 化のためだけの手順ではない。** `winapp init` が展開する `.winapp/include` には WinAppSDK の C++/WinRT プロジェクションヘッダー(`winrt/Microsoft.Windows.AI.Speech.h` 等)が含まれており、**プラグインの `windows/CMakeLists.txt` はこのディレクトリを自動検出して Windows AI 実装をビルドする**。見つからない場合、プラグインは音声認識を行わず、すべての API 呼び出しが「`winapp init` を実行せよ」という明示的なエラーで失敗する(黙って `unavailable` を返すようなフォールバックはしない)。
+**このプラグインにとって `winapp init` は MSIX 化のためだけの手順ではない。** `winapp init` が展開する `.winapp/include` には WinAppSDK の C++/WinRT プロジェクションヘッダー(`winrt/Microsoft.Windows.AI.Speech.h` 等)が含まれており、**プラグインの `windows/CMakeLists.txt` はこのディレクトリを自動検出して Windows AI 実装をビルドする**。見つからない場合、CMake はビルドを中止せず、音声認識を無効にした実装(`speech_backend_unavailable.cpp`)を組み込む。**モデル状態の照会・モデル取得・文字起こしは「`winapp init` を実行せよ」という明示的なエラーで失敗する**(黙って `unavailable` を返すようなフォールバックはしない)。`cancel()` は止める対象が無いため何もしない。
 
 したがって **既定の構成では、`winapp init` を実行していないアプリでこのプラグインは動かない。**
 

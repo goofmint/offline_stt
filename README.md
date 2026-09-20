@@ -67,7 +67,7 @@ Chrome 153 での jaJP_10s 実測では、所要時間は短縮される一方�
 ### Windows: MSIXパッケージ化(依存を書くだけでは動かない唯一のプラットフォーム)
 
 - アプリを **MSIXでパッケージ化**し、`Package.appxmanifest` に `systemAIModels` capability を宣言する必要がある。`flutter build windows` が生成するのはパッケージ化されていない素のWin32 EXEであり、capabilityを宣言する場所が無い。
-- さらに、**このプラグインのビルド自体が `winapp` CLI(`winapp init`)を必要とする**。`winapp init` が展開する `.winapp/include` にWinAppSDKのC++/WinRTプロジェクションヘッダーが含まれており、プラグインの `windows/CMakeLists.txt` はこれを検出してWindows AI実装をビルドする。見つからない場合、すべてのAPI呼び出しが「`winapp init` を実行せよ」という明示的なエラーで失敗する(黙って `unavailable` を返すフォールバックはしない)。
+- さらに、**このプラグインのビルド自体が `winapp` CLI(`winapp init`)を必要とする**。`winapp init` が展開する `.winapp/include` にWinAppSDKのC++/WinRTプロジェクションヘッダーが含まれており、プラグインの `windows/CMakeLists.txt` はこれを検出してWindows AI実装をビルドする。見つからない場合、CMake はビルドを中止せず、音声認識を無効にした実装(`speech_backend_unavailable.cpp`)を組み込む。**モデル状態の照会・モデル取得・文字起こしは「`winapp init` を実行せよ」という明示的なエラーで失敗する**(黙って `unavailable` を返すフォールバックはしない)。`cancel()` は止める対象が無いため何もしない。
 - `MaxVersionTested` を `10.0.26226.0` 以降にしておくこと。
 - 手順・マニフェスト記載例・再同意フロー・既知の制約はすべて [packages/offline_stt_windows/README.md](./packages/offline_stt_windows/README.md) にある。ここでは重複させない。**同ドキュメントの手順は一度も実行して確認していない**(Windows実機が無いため。Issue #58)。
 
@@ -205,23 +205,50 @@ melos run format
 | `flutter build web` | 成功 |
 | `flutter build macos --debug` | 成功(Xcode 26.6 / macOS 26.5.1) |
 | `flutter build ios --no-codesign --debug` | 成功(Xcode 26.6) |
+| `flutter build apk --debug` | 成功(JDK 17。Issue #51 でコミットした `apps/example/android` に対して実行) |
 
-android / windows はローカル環境の制約(JDK バージョン、OS)により未検証であり、CI が初回の検証となる。
+**windows のみローカル未検証である**(Windows実機が無いため。CI が唯一の検証手段であり、それもWinRT実装を除外した構成のコンパイルに限られる。Issue #58)。
+
+Android のローカルビルドには **JDK 17 が必要である**。検証に使ったマシンの既定 JDK は 26.0.1 であり、同梱の Kotlin コンパイラがそのバージョン文字列を解釈できず `java.lang.IllegalArgumentException: 26.0.1` で失敗する。次のように JDK 17 を明示して実行した。
+
+```bash
+cd apps/example
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home flutter build apk --debug
+```
+
+CI の Android ジョブが `actions/setup-java` で JDK 17 を用意しているのと同じ理由である(`android/build.gradle` の `sourceCompatibility` は 17)。
 
 **Swift の言語モードについて**: `offline_stt_darwin.podspec` は `s.swift_version = '5.0'` を指定している。Swift 6 言語モード(strict concurrency)では、Pigeon が生成する `Pigeon.g.swift` のトップレベル `var`(`pigeonPigeonMethodCodec`)が `is not concurrency-safe because it is nonisolated global shared mutable state` としてコンパイルエラーになる。Pigeon 27.3.0 と最新の 29.0.2 のどちらでも同じコードが生成されるため、Pigeon の更新では解決しない。Swift 5 モードでも async/await と actor は使えるため、design.md §4.2 の SpeechAnalyzer 連携(M2)には支障がない。
 
 **その他の注意点**:
 
-- ネイティブプロジェクトのうち **ios / macos / web(Issue #41)と windows(Issue #59)はリポジトリにコミット済み**である。android のみ、CIジョブ内で `flutter create . --platforms=android` により都度生成する(既存の `lib/` `pubspec.yaml` は保持される、公式にサポートされた再実行可能な操作)。
+- ネイティブプロジェクトは **5プラットフォームすべてリポジトリにコミット済み**である(ios / macos / web は Issue #41、windows は Issue #59、android は Issue #51)。**CIジョブ内で `flutter create` を実行することはもう無い。** いずれも CI と同じ Flutter 3.41.9 の `flutter create . --platforms=<platform> --org com.moongift` の出力をそのままコミットしてある。
 - `apps/example/windows` をコミット対象に含めたのは、**MSIXパッケージ化に必要な `Package.appxmanifest` が `flutter create` の生成物に含まれない**ためである。CIと同じ Flutter 3.41.9 で `flutter create . --platforms=windows --org com.moongift` を実行した出力をそのままコミットし、`flutter create` が作らないMSIX関連ファイルを `apps/example/windows/packaging/` に追加している。
 - **CIのWindowsジョブが検証するのは `flutter build windows --debug` が通ること(コンパイル・リンク)だけであり、MSIXパッケージ化は検証しない。** `flutter build windows` が生成するのはパッケージ化されていない素のWin32 EXEであり、Windows AIのモデルへアクセスするのに必要な `systemAIModels` capability はMSIXの `Package.appxmanifest` にしか書けない。MSIX化は `flutter build windows` の外側の工程である(→ [packages/offline_stt_windows/README.md](./packages/offline_stt_windows/README.md))。Windows実機が無いため、MSIX生成・インストール・認識E2Eはいずれも未実施であり、Issue #58 の対象である。
 - macOS/iOSのDeployment Target引き上げ(26.0、`offline_stt_darwin.podspec` の要求)は、ネイティブプロジェクトをコミットした時点で反映済みであり、CI内での `sed` は不要になったため削除した。
-- Androidビルドジョブでは、`flutter create` が生成する既定の minSdk(24)が `offline_stt_android` の要求する 31(requirements.md NFR-4: Android 12 / API 31 以上)より低いため、CI内で 31 へ引き上げてからビルドしている。引き上げないとマニフェストのマージが `uses-sdk:minSdkVersion 24 cannot be smaller than version 31 declared in library [:offline_stt_android]` で失敗することを、CI の実行で実際に確認した。
+- `apps/example/android` をコミット対象に含めたのは、(a) 他の4プラットフォームと扱いを揃えるため、(b) `minSdk 31` の要件をリポジトリ内で表明でき、CI内の `sed` による書き換えという間接的な手当を無くせるため、(c) 実機E2E(Issue #50)を行う人が `flutter create` を自分で再実行せずに `flutter build apk` できるため、の3点である。
+- `apps/example/android/app/build.gradle.kts` の `minSdk` は `flutter.minSdkVersion`(Flutter 3.41.9 の既定は 24)ではなく **`31` を直接書いてある**。`offline_stt_android` が要求する 31(requirements.md NFR-4: Android 12 / API 31 以上)より低いと、マニフェストのマージが `uses-sdk:minSdkVersion 24 cannot be smaller than version 31 declared in library [:offline_stt_android]` で失敗することを CI の実行で実際に確認している(Issue #82)。**以前は CI 内の `sed` で引き上げていたが、Issue #51 でこのステップは削除した。** macOS/iOS の Deployment Target を `sed` で引き上げるステップを Issue #41 で削除したのと同じ理由である。
 
 ## プラットフォーム別の追加セットアップ
 
 - **Windows**: アプリを **MSIXでパッケージ化し、`Package.appxmanifest` に `systemAIModels` capability を宣言する**必要がある。依存関係を書くだけでは動かない唯一のプラットフォームである。手順・記載例・モデル削除時の再同意フロー・既知の制約は [packages/offline_stt_windows/README.md](./packages/offline_stt_windows/README.md) にまとめてある(Issue #57)。example app 固有の手順は [apps/example/windows/packaging/README.md](./apps/example/windows/packaging/README.md)。
 - Android / iOS / macOS / Web: 追加のセットアップは不要(モデルダウンロードの同意UIはいずれのプラットフォームでもアプリ側の責務である。requirements.md §8)。
+
+## 継続運用のドキュメント(`docs/`)
+
+`requirements.md` / `design.md` / `tasks.md` が**何を作るか**を、
+`E2E_CHECKLIST.md` が**リリース前にどう検証するか**を決めるのに対し、
+`docs/` 配下は**公開後に継続して回す運用**を扱う。読み手も頻度も違うため
+分けてある。
+
+| 文書 | 内容 | 対応Issue |
+|---|---|---|
+| [docs/MONITORING.md](./docs/MONITORING.md) | 依存プラットフォーム(Android標準SpeechRecognizer + Google Play services / Chromeオンデバイス Web Speech / WinAppSDK・Windows AI APIs / Apple Speech framework)とOSベータの変更監視手順。何を・どこで・どの頻度で見て、何を再実行するか | #67 |
+| [docs/VERSION_POLICY.md](./docs/VERSION_POLICY.md) | リポジトリ内で固定しているバージョンの一覧(どのファイルの何行目に何が書いてあるか)と、破壊的変更が起きたとき・固定値を動かすときの手順 | #68 |
+| [docs/FUTURE_EXTENSIONS.md](./docs/FUTURE_EXTENSIONS.md) | 将来拡張3件(タイムスタンプ / マイク入力 / 同時複数セッション)の設計レベルの評価。各プラットフォームAPIが何を提供しているか、何が必要か、今何が塞いでいるか | #69 |
+
+**いずれも文書であって実行実績ではない。** #67 の四半期監視は一度も実行
+されておらず、#68 の手順も一度も回っていない。#69 はどれも未着手である。
 
 ## 現状
 

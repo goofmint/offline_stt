@@ -268,10 +268,9 @@ class _OfflineSttHomePageState extends State<OfflineSttHomePage> {
 
     final Stream<TranscriptSegment> stream;
     try {
-      // transcribeFile()の呼び出し自体(Streamオブジェクトの生成)は
-      // 未実装プラットフォーム(Android/Windows、M3/M4で実装予定)では
-      // 同期的に UnimplementedError を送出しうるため、ここもtry/catchで
-      // 捕捉する。
+      // transcribeFile()の呼び出し自体(Streamオブジェクトの生成)が
+      // 同期的に例外を送出しうる経路(未登録のプラットフォームでの
+      // UnimplementedError等)があるため、ここもtry/catchで捕捉する。
       stream = OfflineTranscriberPlatform.instance.transcribeFile(request);
     } catch (e) {
       setState(() {
@@ -362,8 +361,9 @@ class _OfflineSttHomePageState extends State<OfflineSttHomePage> {
   Widget _buildPlatformNoticeCard(ThemeData theme) {
     // requirements.md §8・design.md §4.2: iOSシミュレータでは
     // SpeechTranscriber.isAvailableがfalseになり認識自体が利用できない
-    // (実機が必須)。Android/Windowsはまだ未実装(M3/M4、design.md §4.3・
-    // §4.4)。example appがクラッシュせず、その旨を表示する。
+    // (実機が必須)。Android(design.md §4.3)・Windows(§4.4)にも
+    // それぞれ固有の前提があるため、起動した人が「動かない理由」に最短で
+    // 到達できるよう要約を表示する。
     final notices = <String>[];
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
       notices.add(
@@ -373,10 +373,45 @@ class _OfflineSttHomePageState extends State<OfflineSttHomePage> {
       );
     }
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      // Issue #51。根拠はすべて packages/offline_stt_android/README.md と
+      // design.md §4.3 にある。ここはその要約である。
       notices.add(
-        'このプラットフォーム(${defaultTargetPlatform.name})の実装は'
-        'まだ提供されていない。checkModel等はUnimplementedErrorを返す'
-        '(design.md §4.3、M3で実装予定)。',
+        'Androidのバックエンドは Android 標準の '
+        'android.speech.SpeechRecognizer(オンデバイス)である。'
+        'ML Kit GenAI / AICore は使っていない(M0検証で Pixel 6 の AICore が'
+        '実体の無いstub版であることが判明したため差し替えた。design.md '
+        '§4.3)。',
+      );
+      notices.add(
+        'エミュレータでは動作しない。オンデバイス認識のモデルはOS / '
+        'Google Play services 側が保持しており、エミュレータには存在しない'
+        'ため実機が必要である。',
+      );
+      notices.add(
+        'minSdk は 31 だが、モデル状態の判定に使う checkRecognitionSupport() '
+        'が API 33 で追加されたAPIであるため、API 31/32 では checkModel() が'
+        '常に「利用不可」を返す。実質的に API 33 以上が必要である。',
+      );
+      notices.add(
+        'Androidは実時間方式である。デコード済みPCMをパイプへ毎秒約32KBで'
+        '供給するため、文字起こしにはファイル長と同等の時間がかかる'
+        '(Pixel 6実機の実測: 9.56秒の音声にポンプ9,564ms、実効31,993.7'
+        'バイト/秒)。バッチ認識の iOS / macOS / Windows とはこの点が'
+        '根本的に異なる。',
+      );
+      notices.add(
+        'マイクは使わないため RECORD_AUDIO 権限は不要である'
+        '(音声は ParcelFileDescriptor パイプ経由で供給される)。',
+      );
+      notices.add(
+        'triggerModelDownload() の完了通知は当てにできないことが実測で'
+        '判明している。このアプリはダウンロード完了後に必ず checkModel() を'
+        '呼び直して available を確認してから文字起こしへ進む。',
+      );
+      notices.add(
+        'Android実装を本番実装で実機E2E検証した実績は無い(Issue #50)。'
+        '実測値はいずれもM0検証(Pixel 6単一機種)のものであり、'
+        '他機種での挙動は未検証である。',
       );
     }
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.windows) {

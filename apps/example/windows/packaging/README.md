@@ -23,7 +23,7 @@ CI の `flutter build windows --debug` は**コンパイルが通ることしか
 
 ## 推奨手順: winapp CLI(未検証)
 
-Microsoft は Flutter 向けの公式手順を用意している(`packages/offline_stt_windows/README.md` §4.0)。**このプラグインは `winapp init` が展開する `.winapp/include` を自動検出して Windows AI 実装をビルドするため、`winapp init` を実行しないと example app でも音声認識は動かない**(すべての API 呼び出しが明示的なエラーになる)。
+Microsoft は Flutter 向けの公式手順を用意している(`packages/offline_stt_windows/README.md` §4.0)。**このプラグインは `winapp init` が展開する `.winapp/include` を自動検出して Windows AI 実装をビルドするため、`winapp init` を実行しないと example app でも音声認識は動かない**(モデル状態の照会・モデル取得・文字起こしが明示的なエラーになる)。
 
 ```powershell
 cd apps\example

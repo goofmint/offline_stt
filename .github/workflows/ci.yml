@@ -34,7 +34,7 @@ name: CI
 #     そのものではない点に注意。GitHub Hosted Runnerに Windows 11
 #     クライアント版は無い。
 #   - offline_stt_windows/windows/CMakeLists.txt はM4(Issue #52)で
-#     Microsoft.WindowsAppSDK(既定 1.7.260224002)をNuGetで依存宣言する
+#     Microsoft.WindowsAppSDK をNuGetで依存宣言する
 #     ようになった。それ以前はTODOコメントのみでWinAppSDKに一切触れて
 #     いなかったため、Windowsビルドはバージョン不一致では失敗しなかった。
 #     この前提はM4で変わった。当初はCMakeの`VS_PACKAGE_REFERENCES`で
@@ -67,19 +67,33 @@ name: CI
 #     Windows実機が無いため未実行)。MSIX生成と認識E2Eは Issue #58 の
 #     実機検証の対象である。
 #
-# Issue #41(example appへのiOS/macOS動作追加)以降について:
-#   - apps/example/macos・apps/example/ios・apps/example/web はネイティブ
-#     プロジェクト一式(Podfile・Runner.xcodeproj等)をリポジトリに
-#     コミット済みである(Deployment Targetは 26.0 に設定済み、
-#     offline_stt_darwin.podspec要件)。そのため以下のbuildジョブでは、
-#     macos/ios/web について `flutter create .` の再生成もDeployment
-#     Target引き上げのsedも行わない(既にコミット済みの内容がそのまま
-#     使われる)。apps/example/windows もIssue #59でネイティブプロジェクト
-#     一式をコミット済みである(Flutter 3.41.9 の `flutter create .
+# Issue #51(example appへのAndroid動作追加)で、**5プラットフォームすべての
+# ネイティブプロジェクトがリポジトリにコミット済みになった**:
+#   - macos / ios / web ... Issue #41(Deployment Target 26.0 設定済み、
+#     offline_stt_darwin.podspec 要件)
+#   - windows ........... Issue #59(Flutter 3.41.9 の `flutter create .
 #     --platforms=windows --org com.moongift` の出力そのもの。加えて
 #     `flutter create` が生成しないMSIXマニフェストを windows/packaging/ に
-#     置いてある)。android のみ、従来どおりCIジョブ内で `flutter create .`
-#     により都度生成する。
+#     置いてある)
+#   - android ........... Issue #51(同じく Flutter 3.41.9 の
+#     `flutter create . --platforms=android --org com.moongift` の出力。
+#     ただし app/build.gradle.kts の minSdk だけは `flutter.minSdkVersion`
+#     (既定 24)ではなく 31 を直接書いてある。offline_stt_android が
+#     minSdk 31 を宣言しており、24 のままだとマニフェストのマージが
+#     「uses-sdk:minSdkVersion 24 cannot be smaller than version 31
+#     declared in library [:offline_stt_android]」で失敗するためである)
+#
+#   そのため以下のbuildジョブでは、`flutter create .` による再生成も、
+#   Deployment Target / minSdk を書き換える sed も一切行わない。ジョブは
+#   コミット済みのプロジェクトをそのままビルドする。Issue #51 以前は
+#   android だけをジョブ内で都度生成し、minSdk を sed で引き上げていたが、
+#   その2ステップは削除した。
+#
+#   android をコミット対象に含めた理由は、(a) 他の4プラットフォームと
+#   扱いを揃えること、(b) minSdk 31 の要件をリポジトリ内で表明でき、CIの
+#   sed による書き換えという間接的な手当を無くせること、(c) 実機E2E
+#   (Issue #50)を行う人が `flutter create` を自分で再実行することなく
+#   `flutter build apk` できること、の3点である。
 
 on:
   push:
@@ -178,40 +192,18 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-gradle-
 
-      - name: apps/example にプラットフォームプロジェクトを生成する(androidのみ)
-        # macos/ios/web(Issue #41)と windows(Issue #59)はネイティブ
-        # プロジェクト一式をリポジトリにコミット済みのため、このステップは
-        # android のときだけ実行する。windows をコミット対象に含めたのは、
-        # MSIXパッケージ化に必要な Package.appxmanifest が
-        # `flutter create` の生成物に含まれず、どこかに置く必要があるため
-        # である(本ファイル冒頭のコメント参照)。
-        # `flutter create .` は既存のpubspec.yaml / lib/main.dartを保持した
-        # まま不足しているプラットフォームディレクトリのみを追加する
-        # (公式にサポートされた再実行可能な操作)。
-        if: matrix.platform == 'android'
-        working-directory: apps/example
-        run: flutter create . --platforms=${{ matrix.platform }} --org com.moongift
-
-      - name: Android minSdk を 31 に引き上げる(offline_stt_android 要件)
-        # flutter create が生成する既定の minSdk(24)は
-        # offline_stt_android の minSdk 31(requirements.md NFR-4:
-        # Android 12 / API 31 以上)より低く、マニフェストのマージが
-        # 「uses-sdk:minSdkVersion 24 cannot be smaller than version 31
-        # declared in library [:offline_stt_android]」で失敗する。
-        # 実際に CI で発生した失敗への対処である。
-        if: matrix.platform == 'android'
-        working-directory: apps/example
-        run: |
-          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 31/' android/app/build.gradle.kts || true
-          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 31/' android/app/build.gradle || true
-          grep -rn "minSdk" android/app/build.gradle.kts android/app/build.gradle 2>/dev/null || true
-
-      # macOS/iOS Deployment Target を 26.0 に引き上げるsedステップは
-      # Issue #41でmacos/ios/webのネイティブプロジェクト一式をリポジトリに
-      # コミットした際に不要になったため削除した(本ファイル冒頭のコメント
-      # 参照)。apps/example/macos/Podfile・Runner.xcodeproj/project.pbxproj
-      # および apps/example/ios/Podfile・Runner.xcodeproj/project.pbxproj は
-      # 既に26.0でコミット済みであり、CI実行時に書き換える必要が無い。
+      # プラットフォームプロジェクトを `flutter create` で都度生成する
+      # ステップは、Issue #51 で apps/example/android をリポジトリに
+      # コミットした時点で全プラットフォーム分が不要になったため削除した
+      # (macos/ios/web は Issue #41、windows は Issue #59 で先にコミット
+      # 済みだった)。apps/example 配下の android/ ios/ macos/ web/
+      # windows/ はすべてコミット済みの内容がそのまま使われる。
+      #
+      # 併せて、Android の minSdk を 31 へ引き上げる sed ステップも削除した。
+      # apps/example/android/app/build.gradle.kts に `minSdk = 31` を直接
+      # 書いてコミットしてあるため、CI実行時に書き換える必要が無い
+      # (macos/iOS の Deployment Target 26.0 を sed で引き上げるステップを
+      # Issue #41 で削除したのと同じ理由である)。
 
       - name: flutter build apk --debug
         if: matrix.platform == 'android'
