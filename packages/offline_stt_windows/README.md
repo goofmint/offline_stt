@@ -17,7 +17,7 @@ requirements.md NFR-4 および公式ドキュメント(最終更新 2026-07-07)
 | 項目 | 要件 |
 |---|---|
 | OS | Windows 11, version 24H2 (build 26100) 以降 |
-| WinAppSDK | 1.7.1 以降(NuGet の `Microsoft.WindowsAppSDK` では `1.7.250401001` 相当。本プラグインの既定は 1.7 系の最新サービシング `1.7.260224002`) |
+| WinAppSDK | 1.7.1 以降(NuGet の `Microsoft.WindowsAppSDK` では `1.7.250401001` 相当)。**実際に使われるバージョンは `winapp init` が `.winapp/include` へ展開したものに決まる。プラグイン側はバージョンを固定しておらず、下限を機械的に強制もしていない**(§4.0) |
 | ハードウェア | NPU 搭載の Copilot+ PC、**または** 推奨 CPU 要件を満たす任意の Windows PC |
 | パッケージ形態 | **MSIX**(`systemAIModels` capability 宣言つき) |
 

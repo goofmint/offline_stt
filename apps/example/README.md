@@ -23,6 +23,27 @@ cd apps/example
 flutter run -d macos   # または -d chrome 等
 ```
 
+### Android(Issue #51)
+
+`apps/example/android/` はリポジトリにコミット済みである(Flutter 3.41.9 の
+`flutter create . --platforms=android --org com.moongift` の出力に、
+`app/build.gradle.kts` の `minSdk = 31` だけを加えたもの)。`flutter create`
+を再実行する必要は無い。
+
+```
+cd apps/example
+JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
+  flutter build apk --debug
+flutter run -d <実機のデバイスID>
+```
+
+**JDK 17 を明示する必要がある場合がある。** 検証に使ったマシンの既定JDKは
+26.0.1 であり、同梱のKotlinコンパイラがそのバージョン文字列を解釈できず
+`java.lang.IllegalArgumentException: 26.0.1` で失敗する。CIの Android ジョブ
+が `actions/setup-java` で JDK 17 を用意しているのと同じ理由である
+(`packages/offline_stt_android/android/build.gradle` の
+`sourceCompatibility` は 17)。
+
 ## プラットフォームごとの注意
 
 - **iOSシミュレータでは動作しない。** `SpeechTranscriber.isAvailable` が
@@ -30,10 +51,18 @@ flutter run -d macos   # または -d chrome 等
   (design.md §4.2)。文字起こしのE2E検証には実機が必要である。
 - **Androidは実機が必要である。** バックエンドはAndroid標準の
   `android.speech.SpeechRecognizer`(オンデバイス)であり、エミュレータには
-  オンデバイス認識のモデルが存在しない。また `minSdk` は 31 だが、モデル
-  状態の判定に使う `checkRecognitionSupport()` がAPI 33 で追加された
-  APIであるため、**API 31/32 では `checkModel()` が常に `unavailable` を
-  返す。** 詳細は `packages/offline_stt_android/E2E_CHECKLIST.md` を参照。
+  オンデバイス認識のモデルが存在しない(ML Kit GenAI / AICore は使って
+  いない。design.md §4.3)。また `minSdk` は 31 だが、モデル状態の判定に
+  使う `checkRecognitionSupport()` がAPI 33 で追加されたAPIであるため、
+  **API 31/32 では `checkModel()` が常に `unavailable` を返す。**
+- **Androidは実時間方式であり、ファイル長と同等の時間がかかる。**
+  デコード済みPCMを `ParcelFileDescriptor` パイプへ毎秒約32KBで供給する
+  ためである(Pixel 6実機の実測: 9.56秒の音声にポンプ9,564ms、実効
+  31,993.7バイト/秒)。バッチ認識の iOS / macOS / Windows とはこの点が
+  根本的に異なるため、長時間の音声ではその長さ分だけ待つことになる。
+  なお **`RECORD_AUDIO` 権限は不要である**(マイクを使わない)。
+  詳細は `packages/offline_stt_android/README.md` と
+  `packages/offline_stt_android/E2E_CHECKLIST.md` を参照。
 - **Windowsは依存を書くだけでは動かない。** MSIXパッケージ化と
   `systemAIModels` capability の宣言、および `winapp init`(WinAppSDKの
   C++/WinRTプロジェクションヘッダー展開)が必要である。手順は
@@ -51,9 +80,10 @@ flutter run -d macos   # または -d chrome 等
 **検証状況について**: Android / iOS / macOS / Windows / Web のいずれについて
 も、**本appを使って実機E2Eチェックリストを通して実行した実績は無い**
 (`E2E_CHECKLIST.md` の「実行実績」欄を参照)。ローカルでビルド成功を確認
-しているのは web / macOS / iOS の3つであり、android / windows はCIの
-コンパイル検証のみである。実機E2Eは Issue #40(Darwin)/ #50(Android)/
-#58(Windows)の対象である。
+しているのは web / macOS / iOS / Android の4つであり(Androidは
+`flutter build apk --debug` のみ。実機へのインストールと認識は未実施)、
+windows はCIのコンパイル検証のみである。実機E2Eは Issue #40(Darwin)/
+#50(Android)/ #58(Windows)の対象である。
 
 ## モデルダウンロードの同意について
 

@@ -129,6 +129,22 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」タ�
 
 ## 継続タスク(公開後)
 
-- [ ] ML Kit alpha / Chrome / WinAppSDK / OSベータの変更監視(四半期ごとに基準音声E2E再実行)
-- [ ] 破壊的変更時の追従とバージョン固定更新
-- [ ] 将来拡張の検討: タイムスタンプ、マイク入力、同時複数セッション
+いずれもコードとして「実装」できる種類のタスクではなく、**リポジトリの外で
+継続的に人が回す運用**である。Issue #67 / #68 / #69 では、その運用の拠り所に
+なる文書を `docs/` に用意した。**文書があることと運用が回っていることは別で
+あり、下記のいずれもまだ一度も実行されていない。**
+
+- [ ] 依存プラットフォームの変更監視(四半期ごとに基準音声E2E再実行)。
+      手順は [docs/MONITORING.md](./docs/MONITORING.md)(Issue #67)。
+      **監視対象は `android.speech.SpeechRecognizer` + Google Play services /
+      Chromeのオンデバイス Web Speech / WinAppSDK・Windows AI APIs /
+      iOS・macOS・Android・Windows のOSベータである。**
+      当初ここに書いてあった「ML Kit alpha」は**対象外である**。M0検証で
+      AICoreがPixel 6で使えないことが判明し、バックエンドを Android 標準の
+      `android.speech.SpeechRecognizer` へ差し替えたため
+      (design.md §4.3 冒頭、spikes/android/RESULTS.md)。
+- [ ] 破壊的変更時の追従とバージョン固定更新。
+      方針は [docs/VERSION_POLICY.md](./docs/VERSION_POLICY.md)(Issue #68)。
+- [ ] 将来拡張の検討: タイムスタンプ、マイク入力、同時複数セッション。
+      設計レベルの評価は
+      [docs/FUTURE_EXTENSIONS.md](./docs/FUTURE_EXTENSIONS.md)(Issue #69)。
