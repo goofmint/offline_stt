@@ -1,0 +1,23 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<testsuites tests="15" failures="0" errors="0" skipped="0" time="0.000" timestamp="2026-09-20T11:36:44" hostname="localhost">
+  <testsuite name="com.moongift.offlinestt.spike.MediaCodecDecodeRateTest" tests="15" failures="0" errors="0" skipped="0" time="18.997" timestamp="2026-09-20T11:36:44" hostname="localhost">
+    <properties>
+      <property name="device" value="emulator-5554" />
+    </properties>
+    <testcase name="jaJP_3m_m4a" classname="com.moongift.offlinestt.spike.MediaCodecDecodeRateTest" time="6.217" />
+    <testcase name="jaJP_3m_wav" classname="com.moongift.offlinestt.spike.MediaCodecDecodeRateTest" time="0.886" />
+    <testcase name="jaJP_10s_m4a" classname="com.moongift.offlinestt.spike.MediaCodecDecodeRateTest" time="0.832" />
+    <testcase name="jaJP_10s_wav" classname="com.moongift.offlinestt.spike.MediaCodecDecodeRateTest" time="0.203" />
+    <testcase name="enUS_3m_m4a" classname="com.moongift.offlinestt.spike.MediaCodecDecodeRateTest" time="6.751" />
+    <testcase name="enUS_3m_wav" classname="com.moongift.offlinestt.spike.MediaCodecDecodeRateTest" time="0.354" />
+    <testcase name="rate_22050_mono_wav" classname="com.moongift.offlinestt.spike.MediaCodecDecodeRateTest" time="0.081" />
+    <testcase name="rate_8000_mono_wav" classname="com.moongift.offlinestt.spike.MediaCodecDecodeRateTest" time="0.069" />
+    <testcase name="rate_44100_stereo_m4a" classname="com.moongift.offlinestt.spike.MediaCodecDecodeRateTest" time="1.001" />
+    <testcase name="rate_44100_stereo_mp3" classname="com.moongift.offlinestt.spike.MediaCodecDecodeRateTest" time="0.623" />
+    <testcase name="rate_44100_stereo_wav" classname="com.moongift.offlinestt.spike.MediaCodecDecodeRateTest" time="0.218" />
+    <testcase name="enUS_10s_m4a" classname="com.moongift.offlinestt.spike.MediaCodecDecodeRateTest" time="0.468" />
+    <testcase name="enUS_10s_wav" classname="com.moongift.offlinestt.spike.MediaCodecDecodeRateTest" time="0.167" />
+    <testcase name="rate_48000_stereo_m4a" classname="com.moongift.offlinestt.spike.MediaCodecDecodeRateTest" time="0.916" />
+    <testcase name="rate_48000_stereo_wav" classname="com.moongift.offlinestt.spike.MediaCodecDecodeRateTest" time="0.211" />
+  </testsuite>
+</testsuites>

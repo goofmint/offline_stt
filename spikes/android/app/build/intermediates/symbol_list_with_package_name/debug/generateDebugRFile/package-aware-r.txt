@@ -1,0 +1,11 @@
+com.moongift.offlinestt.spike
+id btn_cancel
+id btn_check_basic
+id btn_run_advanced
+id btn_run_basic
+id text_env
+id text_log
+id text_result
+layout activity_main
+string app_name
+style Theme_OfflineSttSpike

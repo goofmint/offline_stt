@@ -1,0 +1,15 @@
+In San Francisco, on November 3rd, 2024, at 3 PM, Moongift Incorporated announced its new product. Attendance reached 128 people, filling the venue completely. The event was held on the ninth floor of the Salesforce Tower, and the new product introduced was an offline speech transcription app called MojiTal Core, priced starting at nine dollars and eighty cents per month.
+
+The opening remarks were delivered by CEO Kenichi Tanaka, who explained that since the company's founding in 2019, cumulative users had surpassed three hundred and twenty thousand across five years. Following his remarks, Chief Product Officer Misaki Sato demonstrated the product live on stage.
+
+During the demonstration, a ten minute meeting recording was transcribed in just forty five seconds. Recognition accuracy reached ninety six point four percent for Japanese and ninety eight point one percent for English. The product currently supports twelve languages, with plans to expand to twenty languages by next March.
+
+During the question and answer session, a representative from a small business in Chicago asked about the monthly processing limit. Sato replied that the higher tier plan allows up to five thousand files per month.
+
+The event concluded at four thirty PM, and attendees received a custom notebook as a souvenir. The next event is scheduled for February 15th, 2025, in Austin, Texas.
+
+Looking ahead, Moongift Incorporated plans to accelerate its international expansion. In the fall of 2025, the company will establish a subsidiary in Berlin, Germany, to strengthen its offering for the European market, targeting first year revenue of three million dollars. The pricing plans include a light plan at nine dollars and eighty cents per month for individuals, a business plan at forty nine dollars and eighty cents per month, and a custom quote for the enterprise plan.
+
+Security lead Kenta Yamada explained that all audio data is processed entirely on device, with no data ever transmitted to external servers. The company expects to complete its ISO 27001 certification by the end of 2025. Public relations manager Ichiro Suzuki confirmed that the next announcement event will take place at the same time next year, despite the rain, twelve more attendees than expected showed up, and a staff of eighteen people managed the event smoothly.
+
+The venue is a three minute walk from Montgomery Street station, making it easy for attendees to reach by public transit. Customer support will soon offer a dedicated chat channel available on weekdays from 9 AM to 6 PM. Presentation materials will be available for download from the official website starting November 10th, 2024. Engineering director Misaki Sato added that a beta version for macOS will ship in January 2025, followed by a Windows release in March 2025, and that the team currently numbers forty two engineers across three offices.
