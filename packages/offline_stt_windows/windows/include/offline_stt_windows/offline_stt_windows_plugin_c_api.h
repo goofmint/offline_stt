@@ -13,11 +13,11 @@
 extern "C" {
 #endif
 
-// offline_stt のWindowsネイティブ側エントリポイント(雛形)。
+// offline_stt のWindowsネイティブ側エントリポイント(Issue #52)。
 //
-// Pigeonスキーマ確定(design.md §2.3)後、Windows AI Speech Recognition
-// (BatchRecognition.RecognizeFromFile)との連携をここに実装する
-// (design.md §4.4、M4)。
+// 実装本体は offline_stt_windows_plugin.cpp。Pigeon生成の
+// `OfflineSttHostApi` / `OfflineSttStreamCallbackApi`(design.md §2.3)と、
+// Windows AI Speech Recognition 連携(design.md §4.4)を結びつける。
 FLUTTER_PLUGIN_EXPORT void OfflineSttWindowsPluginCApiRegisterWithRegistrar(
     FlutterDesktopPluginRegistrarRef registrar);
 
