@@ -119,7 +119,9 @@ AVAudioFile(任意フォーマット読込)
 - モデル管理: AssetInventoryでlocaleのアセット状態を照会・取得要求。FR-1/FR-2に写像
 - OSバージョンゲート: iOS 26 / macOS 26 未満は `checkModel()` で `unavailable`(コンパイルは下位OSでも通す。`if #available` で分岐)
 - 1パッケージでiOS/macOS両対応(sharedなSwiftソースを `darwin/` 配下に置くFlutter標準構成)
-- 要実測: ファイル入力時の処理速度(実時間より速いか)。結果をREADMEの所要時間表に反映
+- ファイル入力時の処理速度: macOS 26.5.1実機でRTF(処理時間 ÷ 実時間長)0.008〜0.026を実測済み、すなわち実時間の約38〜125倍高速(ja-JP/en-US × 10秒/3分 × wav/m4aの全8ファイル、spikes/darwin/RESULTS.md 参照)。結果をREADMEの所要時間表に反映する
+- `SpeechTranscriber.Preset` の選定は精度に大きく影響する(実測ではプリセット違いで包含率が最大20ポイント以上変動)ため、実装時に選定基準を定める必要がある。partial(volatile)結果を得るには `.progressiveTranscription` 系のプリセットが必要である(spikes/darwin/RESULTS.md 参照)
+- `AssetInventory.status(forModules:)` の `.installed` は当該ロケールが現在「予約(reserve)」されているかに連動する一時状態であり、ディスク上のアセット存在を表す永続状態(`installedLocales`)とは別軸である。FR-1の4値への写像を実装する際は `installedLocales` との突き合わせが必要である(spikes/darwin/RESULTS.md 参照)
 
 ### 4.3 Android(<name>_android)
 
@@ -170,6 +172,8 @@ AVAudioFile(任意フォーマット読込)
 | DeviceUnsupported | ブートローダーアンロック / API<31 | OS 26未満 | NotSupportedOnCurrentSystem | 非Chrome系 |
 | Cancelled | Flow cancel | Task cancel | 認識中断 | stop/abort |
 
+- 注記: Darwin列のうち DecodeFailed(AVAudioFileエラー)と LocaleUnsupported(supportedLocales外)は、macOS 26.5.1実機でエラーを実発火させ動作を確認済みである(spikes/darwin/RESULTS.md 参照)。
+
 ## 6. 並行性・スレッディング
 
 - Android: デコードポンプはDispatchers.IO、認識FlowはML Kit既定。EventChannelへの転送はメインスレッドへpost
@@ -211,11 +215,21 @@ AVAudioFile(任意フォーマット読込)
 | クリーン基準音声(共通) | - | 上記未満 | 「不成立」。tasks.mdの「M0 出口判定」で対象外化または構成変更の検討対象とする |
 | 実環境(ノイズあり、参考値) | ja-JP / en-US | 上記しきい値から一律5ポイント程度緩和した値を参考とする | 後続のE2E回帰でも同一の算出式・正規化ルールを再利用する |
 
+### 注記: Darwin M0スパイクでのキーワード包含率実測結果
+
+macOS 26.5.1実機での実測(spikes/darwin/RESULTS.md 参照)では、基準音声8ファイル(ja-JP/en-US × 10秒/3分 × wav/m4a)**全てで上記しきい値に対して「不成立」**という結果になった(ja-JP: 28.6〜66.7%、en-US: 44.0〜80.0%)。
+
+一方で、認識自体は概ね正確であることも確認できている。例えば jaJP_10s では6キーワード中4つが一致しており、不一致となった2件は「株式会社モーンギフト」→「モーギフト/モギフト」(架空の固有名詞の誤認識)と「128名」→「102十8名」(数値の表記形式の揺れ)のみであった。
+
+**基準音声の読み上げスクリプトが架空の固有名詞(会社名・人名等)を含むこと、および数値キーワードが表記形式の揺れ(「128名」のような読み上げ結果の書き起こし表記)を吸収できていないことが、判定基準側の偽陰性を生んでいる可能性がある。** この扱い(基準音声・キーワード選定の見直しか、しきい値そのものの見直しか)をどうするかはM0出口判定で決めるべき論点として残す。
+
 ## 8. 設計上の未決事項(M0の結果で確定)
 
 1. Windows: RecognizeFromFileの対応フォーマットとロケール指定可否
 2. Windows: ja-JP対応可否
 3. Darwin: SpeechAnalyzerのja-JP対応可否とファイル処理速度
+   - ファイル処理速度: **確定**。macOS 26.5.1実機でRTF 0.008〜0.026(実時間の約38〜125倍高速)を実測(spikes/darwin/RESULTS.md 参照)
+   - ja-JP対応可否: **部分確定**。macOS 26.5.1実機では `supportedLocales`(30件)にja-JPが含まれ、実際の文字起こしも動作することを確認済み。ただしiOS実機は未検証(iOSシミュレータでは`isAvailable=false`となったが原因未特定であり、macOSの結果をそのままiOSに外挿できない)。iOS実機での確認が残る
 4. Web: `start(audioTrack)` + `processLocally: true` の併用動作
    - 進捗注記: `processLocally = true` の設定と読み戻しはChrome 153で可能であることを確認済み。併用動作そのものは未検証
 5. Android: MODE_ADVANCED指定時の非対応端末での自動フォールバック有無
