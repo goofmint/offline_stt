@@ -26,6 +26,7 @@ import android.speech.RecognitionSupport
 import android.speech.RecognitionSupportCallback
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.suspendCancellableCoroutine
 
 object ModelAvailability {
@@ -60,32 +61,47 @@ object ModelAvailability {
      */
     suspend fun querySupport(context: Context, locale: String): RecognitionSupport? =
         suspendCancellableCoroutine { continuation ->
+            // `SpeechRecognizer` の破棄経路を1箇所に集約する。コールバック・
+            // 同期例外・コルーチンのキャンセルのいずれで終わっても、必ず
+            // 1回だけ `destroy()` する。
+            //
+            // 破棄はメインスレッドで行う。`SpeechRecognizer` はメインスレッド
+            // から操作する契約であり、違反が例外になると `runCatching` が
+            // 握り潰してサービス接続の解放が保証できなくなる。ダウンロード
+            // 完了ポーリングは2秒間隔で最大10分続くため、取りこぼしが反復
+            // するとインスタンスが積み上がる。
+            var recognizer: SpeechRecognizer? = null
+            val destroyed = AtomicBoolean(false)
+            val mainExecutor = context.mainExecutor
+            fun destroyOnce() {
+                if (!destroyed.compareAndSet(false, true)) return
+                val target = recognizer ?: return
+                mainExecutor.execute { runCatching { target.destroy() } }
+            }
+
+            continuation.invokeOnCancellation { destroyOnce() }
+
             try {
-                val recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+                recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
                 recognizer.checkRecognitionSupport(
                     buildRecognizerIntent(locale),
-                    // メインスレッドのExecutorを使う。`SpeechRecognizer` は
-                    // メインスレッドから操作する契約であり、コールバック内で
-                    // `recognizer.destroy()` を呼ぶため、専用スレッドの
-                    // Executorでは契約違反になる。違反が例外になった場合
-                    // 下の `runCatching` が握り潰すため、SpeechRecognizerと
-                    // サービス接続の解放が保証できなくなる。ダウンロード完了
-                    // ポーリングは2秒間隔で最大10分続くので、取りこぼしが
-                    // 反復するとインスタンスが積み上がる。
-                    context.mainExecutor,
+                    mainExecutor,
                     object : RecognitionSupportCallback {
                         override fun onSupportResult(recognitionSupport: RecognitionSupport) {
-                            runCatching { recognizer.destroy() }
-                            if (continuation.isActive) continuation.resumeWith(Result.success(recognitionSupport))
+                            destroyOnce()
+                            if (continuation.isActive) {
+                                continuation.resumeWith(Result.success(recognitionSupport))
+                            }
                         }
 
                         override fun onError(error: Int) {
-                            runCatching { recognizer.destroy() }
+                            destroyOnce()
                             if (continuation.isActive) continuation.resumeWith(Result.success(null))
                         }
                     },
                 )
             } catch (t: Throwable) {
+                destroyOnce()
                 if (continuation.isActive) continuation.resumeWith(Result.success(null))
             }
         }

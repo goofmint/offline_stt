@@ -33,12 +33,15 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioFormat
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import java.io.IOException
 import java.io.OutputStream
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -193,7 +196,15 @@ object RecognitionSession {
         // design.md §4.3(wt73版)「onResults()のtextsがnullになる。その場合は
         // 直前のonPartialResults()の最上位候補を確定結果として採用する」。
         var lastPartialTopCandidate: String? = null
-        var settled = false
+        // `settled` はメインスレッドの `RecognitionListener` と、IOスレッドから
+        // 走りうる `invokeOnCancellation` の両方から触られる。`pumpJob` は
+        // Dispatchers.IO 上で失敗を再送出するため、子ジョブの失敗で親スコープが
+        // キャンセルされるとキャンセルハンドラはIOスレッドで実行される。
+        // 通常の Boolean では競合するので AtomicBoolean で原子的に扱う。
+        val settled = AtomicBoolean(false)
+        // `SpeechRecognizer` はメインスレッドから操作する契約であるため、
+        // 後始末は必ずメインスレッドへ post する。
+        val mainHandler = Handler(Looper.getMainLooper())
 
         recognizer.setRecognitionListener(
             object : RecognitionListener {
@@ -208,8 +219,7 @@ object RecognitionSession {
                 override fun onEndOfSpeech() {}
 
                 override fun onError(error: Int) {
-                    if (settled) return
-                    settled = true
+                    if (!settled.compareAndSet(false, true)) return
                     val mapped = ErrorMapping.map(error)
                     segmentsWrapper.sendError(mapped)
                     runCatching { recognizer.destroy() }
@@ -217,8 +227,7 @@ object RecognitionSession {
                 }
 
                 override fun onResults(results: Bundle?) {
-                    if (settled) return
-                    settled = true
+                    if (!settled.compareAndSet(false, true)) return
                     // Issue #47/#48。design.md §4.3(wt73版)の実測どおり
                     // texts が null になり得る。その場合は直前の
                     // onPartialResults() の最上位候補を確定結果として採用
@@ -236,7 +245,7 @@ object RecognitionSession {
                 }
 
                 override fun onPartialResults(partialResults: Bundle?) {
-                    if (settled) return
+                    if (settled.get()) return
                     val texts =
                         partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     val top = texts?.firstOrNull() ?: return
@@ -249,14 +258,17 @@ object RecognitionSession {
         )
 
         continuation.invokeOnCancellation {
-            if (settled) return@invokeOnCancellation
-            settled = true
-            // Issue #48。design.md §4.3(wt73版)「キャンセル時はパイプclose
+            if (!settled.compareAndSet(false, true)) return@invokeOnCancellation
+            // Issue #48。design.md §4.3「キャンセル時はパイプclose
             // → stopListening() → destroy()」の順序どおり実施する。
+            // `stopListening()` / `destroy()` はメインスレッド契約があるため
+            // post する。このハンドラ自体はIOスレッドから走りうる。
             runCatching { pumpJob.cancel() }
             runCatching { readSide.close() }
-            runCatching { recognizer.stopListening() }
-            runCatching { recognizer.destroy() }
+            mainHandler.post {
+                runCatching { recognizer.stopListening() }
+                runCatching { recognizer.destroy() }
+            }
             // デコード・リサンプリング側の失敗で親スコープがキャンセルされた
             // 場合は「キャンセル」ではない。後始末だけ行い、エラーの送出は
             // `run()` から伝播する例外を受ける `OfflineSttApiImpl` に任せる

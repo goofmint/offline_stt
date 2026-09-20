@@ -86,17 +86,24 @@ object AudioDecoder {
         extractor.selectTrack(trackIndex)
 
         val mime = inputFormat.getString(MediaFormat.KEY_MIME)!!
-        val codec: MediaCodec
+        // `createDecoderByType()` が成功したあと `configure()` / `start()` が
+        // 失敗すると、生成済みの MediaCodec が release() されずネイティブ
+        // リソースを保持したまま残る(非対応プロファイルの入力で実際に
+        // 起きる)。同一プロセスで繰り返すとコーデックインスタンスが枯渇
+        // するため、catch 節から参照できる変数に受けて必ず release する。
+        var created: MediaCodec? = null
         try {
-            codec = MediaCodec.createDecoderByType(mime)
-            codec.configure(inputFormat, null, null, 0)
-            codec.start()
+            created = MediaCodec.createDecoderByType(mime)
+            created.configure(inputFormat, null, null, 0)
+            created.start()
         } catch (e: Exception) {
+            runCatching { created?.release() }
             extractor.release()
             throw AndroidTranscribeError.DecodeFailed(
                 "MediaCodec初期化失敗(mime=$mime): ${e.message}",
             )
         }
+        val codec: MediaCodec = created
 
         // 入力側MediaFormatの値を初期値とし、INFO_OUTPUT_FORMAT_CHANGEDが
         // 通知された場合はデコーダの実際の出力フォーマットで上書きする。

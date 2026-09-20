@@ -55,6 +55,13 @@ Stream<TranscriptSegment> runTranscriptionSession(
         } on TranscribeException catch (e) {
           finish(error: e);
           return;
+        } catch (e, st) {
+          // TranscribeException 以外(例: プラグイン未登録の
+          // `MissingPluginException`)をここで拾わないと、`unawaited` の
+          // クロージャ内で未処理の非同期エラーになるだけで Stream は終了
+          // せず、`TranscribeSessionGuard` がセッション枠を保持し続ける。
+          finish(error: e, stackTrace: st);
+          return;
         }
         if (finished) return; // 上記await中にキャンセルされた場合。
         if (state != ModelState.available) {
@@ -102,6 +109,11 @@ Stream<TranscriptSegment> runTranscriptionSession(
           await hostApi.transcribeFile(nativeRequest);
         } on PlatformException catch (e, st) {
           finish(error: mapPlatformException(e), stackTrace: st);
+          return;
+        } catch (e, st) {
+          // PlatformException 以外も同様に Stream を終了させる(理由は
+          // 上の catch のコメント参照)。
+          finish(error: e, stackTrace: st);
           return;
         }
       }());
