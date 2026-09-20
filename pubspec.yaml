@@ -37,3 +37,48 @@ melos:
       exec:
         command: dart pub get
         concurrency: 1
+    pigeon:android:
+      description: >-
+        pigeons/offline_stt_events.dart から offline_stt_android 向けの
+        Dart + Kotlin を生成する(design.md §2.3、Issue #24)。
+      run: >-
+        ROOT="$(pwd)" && cd packages/offline_stt_android && dart run pigeon
+        --input "$ROOT/pigeons/offline_stt_events.dart"
+        --package_name offline_stt_android
+        --dart_out lib/src/pigeon.g.dart
+        --kotlin_out android/src/main/kotlin/com/moongift/offline_stt_android/Pigeon.g.kt
+        --kotlin_package com.moongift.offline_stt_android
+    pigeon:darwin:
+      description: >-
+        pigeons/offline_stt_events.dart から offline_stt_darwin 向けの
+        Dart + Swift を生成する(design.md §2.3、Issue #24)。
+      run: >-
+        ROOT="$(pwd)" && cd packages/offline_stt_darwin && dart run pigeon
+        --input "$ROOT/pigeons/offline_stt_events.dart"
+        --package_name offline_stt_darwin
+        --dart_out lib/src/pigeon.g.dart
+        --swift_out darwin/Classes/Pigeon.g.swift
+    pigeon:windows:
+      description: >-
+        pigeons/offline_stt_windows.dart から offline_stt_windows 向けの
+        Dart + C++ を生成する(design.md §2.3、Issue #24)。EventChannelは
+        Pigeon の C++ 生成器が未対応のため、Android/Darwinとはスキーマ
+        ファイル自体を分けている(pigeons/offline_stt_windows.dart 冒頭
+        コメント参照)。
+      run: >-
+        ROOT="$(pwd)" && cd packages/offline_stt_windows && dart run pigeon
+        --input "$ROOT/pigeons/offline_stt_windows.dart"
+        --package_name offline_stt_windows
+        --dart_out lib/src/pigeon.g.dart
+        --cpp_header_out windows/pigeon.g.h
+        --cpp_source_out windows/pigeon.g.cpp
+        --cpp_namespace offline_stt_windows
+    pigeon:
+      description: >-
+        pigeons/ 配下の全スキーマから Android/Darwin/Windows 向けの生成物を
+        再生成する(Issue #24)。個別実行は pigeon:android / pigeon:darwin /
+        pigeon:windows を参照。
+      run: >-
+        melos run pigeon:android &&
+        melos run pigeon:darwin &&
+        melos run pigeon:windows

@@ -68,6 +68,10 @@ class PlatformException_ extends TranscribeException { final String code; final 
 - Android / Darwin / Windows: Pigeonでスキーマ駆動生成。手書きMethodChannelは使わない
   - 理由: 3ネイティブ言語(Kotlin / Swift / C++)への型安全な同時生成、enum・sealedのシリアライズ事故防止
 - ストリームはPigeonのEventChannel対応(`@EventChannelApi`)で `segments` / `downloadProgress` の2本を定義
+  - **ただしWindowsは例外**。PigeonのC++ジェネレータはEventChannelに未対応であり、`@EventChannelApi` を含むスキーマに `--cpp_header_out` を指定すると `C++ does not support event channels` で生成が失敗する(Pigeon 27.3.0 / 29.0.2 の両方で実行確認済み。Pigeon の README にも「Event channels are supported only on the Swift, Kotlin, and Dart generators.」と明記されている)
+  - そのためWindowsのみ **HostApi + FlutterApi のコールバック**で同等のストリーム機能を実現する。スキーマファイルを Android/Darwin 用と Windows 用の2本に分ける。手書きMethodChannel/EventChannelは使わないという方針は維持する
+- 共通エラー列挙型 `TranscribeErrorCode`(`modelUnavailable` / `localeUnsupported` / `decodeFailed` / `deviceUnsupported` / `cancelled` / `platformError`)をPigeonスキーマに定義する。§2.2 の sealed 例外階層に対応するが、C++ は sealed class を持てないため列挙型でワイヤを渡す。Android/Darwin ではEventChannelの組み込みエラーシンクを使うため、スキーマ上は定義のみとする
+- 生成物(`.g.dart` / `.g.kt` / `.g.swift` / `.g.h` / `.g.cpp`)は**リポジトリにコミットする**。ネイティブビルド(Gradle / Xcode / CMake)はDart・Pigeonツールチェーンを経由せず生成済みコードを直接コンパイルするため、コミットしないとネイティブビルドが成立しない。再生成は melos スクリプト(`melos run pigeon`)で行う
 - Web: Pigeon不要。`package:web` + `dart:js_interop` で直接実装
 
 ## 3. 状態遷移
@@ -81,6 +85,25 @@ class PlatformException_ extends TranscribeException { final String code; final 
 
 - `transcribeFile()` は `checkModel()` が available 以外なら即座に `ModelUnavailableException` をStreamエラーで返す(内部で暗黙ダウンロードしない。同意UXをアプリ側に強制するため)
 - 同時セッションはv1では1本に制限(プラットフォーム側の並行動作が未検証のため)。2本目の開始は `StateError`
+
+### 状態遷移の細則
+
+M1 の実装(`offline_stt_platform_interface`)で必要になったため、上記だけでは曖昧だった点を以下のとおり確定する。**全プラットフォーム実装はこの解釈に従うこと。** 実装が分かれると利用者から見た挙動が食い違う。
+
+1. **セッションの開始時点と終了時点**
+   - 開始は `transcribeFile()` の**呼び出し時点ではなく、返り値のStreamが購読(listen)された時点**とする。Dart の Stream は未購読なら何もしないのが自然であり、呼び出し時点で開始すると購読前に破棄した場合にセッション枠を1本消費してしまうため
+   - 終了は正常終了(done) / エラー終了(error) / 購読キャンセル(cancel) のいずれかの時点とする。いずれの経路でも確実に解放すること
+
+2. **2本目のセッションの拒否方法**
+   - `StateError` は**同期的に throw せず、Streamエラーとして通知する**。`ModelUnavailableException` と流儀を揃え、「購読時点でセッション開始」という上記1と整合させるため
+   - 2本目が拒否された場合、下層の認識セッションは**一切開始しない**こと
+
+3. **`downloadModel()` の細則**
+   - `downloadable` 以外の状態(特に `unavailable`)で呼ばれた場合は、**状態を一切変化させず、何も emit せずに完了するStreamを返す**
+   - 状態変化(`downloadable` → `downloading`)は、`transcribeFile()` とは異なり**呼び出し時点で即座に**確定させる。ダウンロード同意UXがアプリ側で完了した後に呼ばれる前提であり、購読前の破棄を考慮する必要が薄いため。この非対称性は意図的である
+
+4. **セッション内部フェーズ(`decoding` / `recognizing`)の扱い**
+   - 上記の遷移図には現れるが、`TranscriptSegment` には現れないため**公開APIには露出しない**。各ネイティブ実装の内部状態として扱う
 
 ## 4. プラットフォーム別設計
 

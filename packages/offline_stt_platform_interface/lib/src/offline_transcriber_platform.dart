@@ -66,14 +66,21 @@ abstract class OfflineTranscriberPlatform extends PlatformInterface {
 
   /// 音声ファイルを文字起こしし、結果をStreamで返す(requirements.md FR-3)。
   ///
-  /// 状態遷移とセッション排他の規則(design.md §3。網羅テストと排他ロジック
-  /// の実装はIssue #23で行う):
+  /// 状態遷移とセッション排他の規則(design.md §3):
   /// - `checkModel()` が `ModelState.available` 以外を返す状態でこの
   ///   メソッドを呼び出した場合、実装は即座に `ModelUnavailableException`
   ///   相当のエラーをStreamエラーとして返さなければならない。内部で暗黙的に
   ///   モデルをダウンロードしてはならない
   /// - 同時セッションはv1では1本に制限する。既に1本のセッションが実行中の
   ///   状態で2本目の `transcribeFile()` が呼ばれた場合、実装は `StateError`
-  ///   を送出しなければならない
+  ///   をStreamエラーとして送出しなければならない
+  ///
+  /// セッション排他ガードの実装は本パッケージの `TranscribeSessionGuard`
+  /// (`lib/src/session_guard.dart`、Issue #23で実装)として共有層に用意
+  /// されている。各ネイティブ実装はこれを `with` し、`guardSession()` へ
+  /// ネイティブセッション開始処理を渡すことで上記の規則を満たせる。
+  /// 「セッション開始」はこのメソッドの呼び出し時点ではなく、返り値の
+  /// Streamが購読(listen)された時点とみなす(理由は `TranscribeSessionGuard`
+  /// のドキュメントコメントを参照)。
   Stream<TranscriptSegment> transcribeFile(TranscribeRequest request);
 }
