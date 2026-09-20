@@ -23,7 +23,8 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」タ�
 
 ### Darwin
 
-- [x] iOS 26実機で SpeechTranscriber の supportedLocales に ja が含まれるか確認(設計未決事項3)(iOS 27.0 実機で supportedLocales 45件に ja-JP を確認。iOS 26 実機は未接続のため未検証。シミュレータでは isAvailable=false。spikes/darwin/RESULTS.md 参照)
+- [ ] iOS 26実機で SpeechTranscriber の supportedLocales に ja が含まれるか確認(設計未決事項3)(iOS 26 実機は未接続のため**未検証**。iOS 27.0 実機では supportedLocales 45件に ja-JP を確認したが、supportedLocales は OS バージョンで異なる(macOS 26.5.1 は30件)ため iOS 26 の結果は外挿できない。シミュレータでは isAvailable=false のため検証不可。spikes/darwin/RESULTS.md 参照)
+- [ ] iOS 実機でのファイル文字起こし検証(記録済みのファイル入力結果は macOS のものであり、iOS 実機では未実施。spikes/darwin/RESULTS.md 参照)
 - [x] AVAudioFile → SpeechAnalyzer のファイル入力スパイク(Swift単体、Flutter外)(ja-JP/en-US × 10秒/3分 × wav/m4a の全8ファイルでエラーなく完走。spikes/darwin/RESULTS.md 参照)
 - [x] ファイル処理速度の実測(実時間比)(RTF 0.008〜0.026、実時間の38〜125倍高速。spikes/darwin/RESULTS.md 参照)
 - [x] macOS 26 でも同スパイクを確認(macOS 26.5.1 実機で確認済み。ただしキーワード包含率は8ファイル中8ファイルとも判定基準未達。spikes/darwin/RESULTS.md 参照)
