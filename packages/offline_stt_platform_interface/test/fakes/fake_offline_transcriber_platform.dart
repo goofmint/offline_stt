@@ -142,4 +142,13 @@ class FakeOfflineTranscriberPlatform extends OfflineTranscriberPlatform
     _sessionController!.addError(error);
     unawaited(_sessionController!.close());
   }
+
+  /// エラーを通知するがStreamを閉じない(→ error)。
+  ///
+  /// `startSession()` が返すStreamは `onError` の後に必ず done になるとは
+  /// 限らない。ガードがこの場合でも購読を打ち切ることを検証するために使う。
+  void errorSessionWithoutClose(Object error) {
+    sessionPhase = SessionPhase.error;
+    _sessionController!.addError(error);
+  }
 }

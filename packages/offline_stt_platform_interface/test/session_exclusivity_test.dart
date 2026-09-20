@@ -160,6 +160,68 @@ void main() {
       await sub2.cancel();
     });
 
+    test('2本目が拒否されても1本目の枠は解放されず、3本目も拒否される', () async {
+      // 拒否経路でも controller.close() により購読が終了し onCancel が
+      // 呼ばれる。枠を取得していない呼び出しが解放してしまうと、
+      // 1本目が実行中にもかかわらず3本目が開始できてしまう。
+      final fake = FakeOfflineTranscriberPlatform(
+        initialState: ModelState.available,
+      );
+
+      final stream1 = fake.transcribeFile(_request);
+      final sub1 = stream1.listen((_) {});
+      await _pump();
+      expect(fake.sessionPhase, SessionPhase.decoding);
+
+      // 2本目: 拒否される
+      await expectLater(
+        fake.transcribeFile(_request),
+        emitsError(isStateError),
+      );
+      await _pump();
+
+      // 3本目: 1本目がまだ実行中なので、同様に拒否されなければならない
+      await expectLater(
+        fake.transcribeFile(_request),
+        emitsError(isStateError),
+      );
+      await _pump();
+
+      // 1本目は影響を受けず、まだ実行中である
+      expect(fake.sessionPhase, SessionPhase.decoding);
+
+      fake.completeSession();
+      await sub1.cancel();
+    });
+
+    test('1本目がエラー終了したら購読が打ち切られ、2本目を開始できる', () async {
+      // startSession() の Stream は onError の後に done になるとは限らない。
+      // 解放だけして購読を残すと、2本目の開始後も1本目が動き続ける。
+      final fake = FakeOfflineTranscriberPlatform(
+        initialState: ModelState.available,
+      );
+
+      final stream1 = fake.transcribeFile(_request);
+      final errors = <Object>[];
+      final sub1 = stream1.listen((_) {}, onError: errors.add);
+      await _pump();
+
+      fake.errorSessionWithoutClose(Exception('session failed'));
+      await _pump();
+
+      expect(errors, hasLength(1));
+
+      final stream2 = fake.transcribeFile(_request);
+      final sub2 = stream2.listen((_) {});
+      await _pump();
+
+      expect(fake.sessionPhase, SessionPhase.decoding);
+
+      fake.completeSession();
+      await sub1.cancel();
+      await sub2.cancel();
+    });
+
     test('1本目がキャンセルされた後も2本目を開始できる', () async {
       final fake = FakeOfflineTranscriberPlatform(
         initialState: ModelState.available,
