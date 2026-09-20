@@ -32,7 +32,7 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」タ�
 ### Android
 
 - [ ] Pixel以外のAPI 31+実機で Basic モード + ja-JP の動作確認(ハーネス実装済み。Pixel 6 実機(API 37、ブートローダーロック済み)で実行したが、AICore が stub 版のため checkStatus() が PERMISSION_DENIED: Api access revoked. を返し到達せず。実体のある AICore を持つ端末が必要。**ユーザー判断によりバックエンドをML Kit GenAI Speech RecognitionからAndroid標準SpeechRecognizerへ差し替えたため、本項目が意図していた「Basicモード」自体がML Kit固有の概念であり対象外となった。標準SpeechRecognizerについてPixel 6実機ではja-JPのファイル文字起こしに成功した(包含率66.7%)が、Pixel以外の実機での動作は別途検証が必要である。** spikes/android/RESULTS.md 参照)
-- [ ] `MODE_ADVANCED` 指定時の非対応端末フォールバック挙動確認(design.md §8未決事項5)(ハーネス実装済み。Pixel 6 実機(API 37、ブートローダーロック済み)で実行したが、AICore が stub 版のため checkStatus() が PERMISSION_DENIED: Api access revoked. を返し到達せず。実体のある AICore を持つ端末が必要。**ユーザー判断によりバックエンドをML Kit GenAI Speech RecognitionからAndroid標準SpeechRecognizerへ差し替えたため、`MODE_ADVANCED`/`MODE_BASIC`という概念自体がML Kit固有であり本項目は対象外となった(design.md §8未決事項5参照)。標準SpeechRecognizerには対応するモード概念が無いため、本項目に代わる検証は不要である。** spikes/android/RESULTS.md 参照)
+- [x] `MODE_ADVANCED` 指定時の非対応端末フォールバック挙動確認(design.md §8未決事項5)(ハーネス実装済み。Pixel 6 実機(API 37、ブートローダーロック済み)で実行したが、AICore が stub 版のため checkStatus() が PERMISSION_DENIED: Api access revoked. を返し到達せず。実体のある AICore を持つ端末が必要。**ユーザー判断によりバックエンドをML Kit GenAI Speech RecognitionからAndroid標準SpeechRecognizerへ差し替えたため、`MODE_ADVANCED`/`MODE_BASIC`という概念自体がML Kit固有であり本項目は対象外となった(design.md §8未決事項5参照)。標準SpeechRecognizerには対応するモード概念が無いため、本項目に代わる検証は不要である。** spikes/android/RESULTS.md 参照)(**#20で失効として確定**。design.md §8 未決事項5 参照)
 - [ ] PFDパイプ + 実時間ポンプの最小実装で `AudioSource.fromPfd()` が受理されるか確認(ハーネス実装済み。Pixel 6 実機(API 37、ブートローダーロック済み)で実行したが、AICore が stub 版のため checkStatus() が PERMISSION_DENIED: Api access revoked. を返し到達せず。実体のある AICore を持つ端末が必要。**ユーザー判断によりバックエンドをML Kit GenAI Speech RecognitionからAndroid標準SpeechRecognizerへ差し替えたため、`AudioSource.fromPfd()`というML Kit固有APIでの受理確認自体は対象外となった。標準SpeechRecognizerの等価な仕組み(`RecognizerIntent.EXTRA_AUDIO_SOURCE`)については別途スパイクで受理を確認済み(Pixel 6実機、既存の実時間ポンプをそのまま流用)だが、これは本項目の代替検証であり別途実施したものである。Pixel以外の機種での受理確認は未実施のため、改めて別途検証が必要である。** spikes/android/RESULTS.md 参照)
 - [x] 手持ち音源の MediaCodec デコード出力レート調査(リサンプリング要否判定、設計未決事項6)(結論: リサンプリング必須。MediaCodecはrate/chを変換しない。spikes/android/RESULTS.md 参照)
 
@@ -46,7 +46,7 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」タ�
 ### M0 出口判定
 
 - [ ] 4プラットフォームの判定結果を requirements.md の対応表に反映(不成立項目は対象外化 or 構成変更)
-- [ ] design.md の未決事項1〜6を確定値で更新
+- [x] design.md の未決事項1〜6を確定値で更新(あわせて §4.3 Android を標準 `SpeechRecognizer` 前提へ全面書き換え、§5 の Android 列を `ERROR_*` 写像へ更新、§7 しきい値表の内部矛盾(ja-JP 90% と「90〜94% は条件付き合格」の併記)を3区分に分けて解消、未決事項7(`playbackRate`)を追加して確定させた)
 
 ## M1 基盤 + Web実装
 

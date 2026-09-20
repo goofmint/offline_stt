@@ -1,3 +1,26 @@
+/// `offline_stt` のWindows実装パッケージ。
+///
+/// **利用者がこのパッケージへ直接依存することはない**(requirements.md §6)。
+/// アプリは `offline_stt` にのみ依存すれば、エントリパッケージの
+/// `flutter.plugin.platforms.windows.default_package` によってこの実装が
+/// 自動的に選択される(design.md §1 のfederated plugin構成)。
+///
+/// **ただしWindowsだけは依存関係を書くだけでは動かない。** アプリを MSIX で
+/// パッケージ化して `systemAIModels` capability を宣言し、`winapp init` で
+/// WinAppSDK の C++/WinRT プロジェクションヘッダーを配置する必要がある。
+/// 手順とその未検証箇所は本パッケージの `README.md` にある。
+///
+/// **本パッケージのネイティブ実装は一度も実行されていない。** Windows実機が
+/// 無いため、WinRT実装のコンパイル・MSIX化・認識のいずれも未実施である
+/// (CIはWinRTバックエンドを除外した構成のみをコンパイルする)。実機での
+/// 確認はIssue #58に委ねている。
+///
+/// 公開APIは [OfflineSttWindows] のみである。`src/stream_router.dart` の
+/// `WindowsStreamRouter` は本バレルから export しておらず、内部実装として
+/// `registerWith()` から使う。詳細は [OfflineSttWindows] のdocコメントを
+/// 参照すること。
+library;
+
 import 'package:offline_stt_platform_interface/offline_stt_platform_interface.dart';
 // offline_stt_platform_interfaceのdocコメント(lib/src/session_guard.dart)が
 // 明記するとおり、TranscribeSessionGuardはネイティブ実装パッケージ間だけの

@@ -1,6 +1,3 @@
-<<<<<<< HEAD
-.DS_Store
-=======
 # Dart / Flutter
 .dart_tool/
 .packages
@@ -44,4 +41,10 @@ melos_*.iml
 
 # 一時設計ノート
 .tmp/
->>>>>>> origin/main
+
+# dart doc の出力(melos run doc)。生成物であり追跡しない(Issue #63)。
+# `doc/api/` はスラッシュを含むためこの .gitignore のあるディレクトリに
+# 固定され、packages/*/doc/api/ にマッチしなかった。melos run doc は各
+# パッケージ配下に出力するため、`**/` を付けて全階層にマッチさせる。
+# (マッチしないと生成HTMLが pub publish のアーカイブに混入する。)
+**/doc/api/

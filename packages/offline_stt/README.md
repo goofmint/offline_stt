@@ -1,0 +1,114 @@
+# offline_stt
+
+録音済み音声ファイルを、**OSネイティブの音声認識APIだけで**オフライン文字起こしするFlutterライブラリ。認識モデルも推論エンジンも同梱せず、モデルの取得・更新・削除はすべてOSに委ねる。音声も書き起こし結果もネットワークに出ない([requirements.md](https://github.com/goofmint/offline_stt/blob/main/requirements.md) NFR-2)。
+
+**これはfederated pluginのエントリパッケージである。アプリが依存するのはこのパッケージだけでよい。** `offline_stt_android` / `offline_stt_darwin` / `offline_stt_windows` / `offline_stt_web` は endorsed な実装パッケージであり、`flutter.plugin.platforms.*.default_package` によって自動的に選択される。直接依存に書く必要は無い([design.md](https://github.com/goofmint/offline_stt/blob/main/design.md) §1)。
+
+---
+
+## 対応プラットフォームとバックエンド
+
+| プラットフォーム | バックエンドAPI | 最低OSバージョン |
+|---|---|---|
+| Android | 標準 `android.speech.SpeechRecognizer`(`createOnDeviceSpeechRecognizer`)+ MediaCodecデコード | Android 12 / API 31(ただし後述の制約により実質 API 33 以上) |
+| iOS / macOS | `SpeechAnalyzer` + `SpeechTranscriber` + `AssetInventory` | iOS 26 / macOS 26 |
+| Windows | Windows AI APIs Speech Recognition(`BatchRecognition`)+ Media Foundation | Windows 11 24H2 (build 26100) / WinAppSDK 1.7.1 以上。**加えてMSIXパッケージ化が必須** |
+| Web | Chrome オンデバイス Web Speech(`processLocally: true`)+ Web Audio | Chrome 142 以上のデスクトップ版。localhost または https 配信であること |
+
+Linuxは対象外である(OSネイティブのASR APIが存在しないため)。
+
+各実装パッケージの詳細・セットアップ・既知の制約:
+
+- [offline_stt_android/README.md](https://github.com/goofmint/offline_stt/blob/main/packages/offline_stt_android/README.md)
+- [offline_stt_darwin/README.md](https://github.com/goofmint/offline_stt/blob/main/packages/offline_stt_darwin/README.md)
+- [offline_stt_windows/README.md](https://github.com/goofmint/offline_stt/blob/main/packages/offline_stt_windows/README.md)
+- [offline_stt_web/README.md](https://github.com/goofmint/offline_stt/blob/main/packages/offline_stt_web/README.md)
+
+## API
+
+本パッケージは現在、[`offline_stt_platform_interface`](https://pub.dev/packages/offline_stt_platform_interface) が定義する型を再エクスポートしている。
+
+- `ModelState`(`available` / `downloadable` / `downloading` / `unavailable`)
+- `DownloadProgress` / `TranscribeRequest` / `TranscriptSegment`
+- `TranscribeException`(sealed)とその派生: `ModelUnavailableException` / `LocaleUnsupportedException` / `DecodeFailedException` / `DeviceUnsupportedException` / `CancelledException` / `PlatformException_`
+
+操作は3つである。
+
+| メソッド | シグネチャ |
+|---|---|
+| モデル状態の確認 | `Future<ModelState> checkModel(String locale)` |
+| モデル取得 | `Stream<DownloadProgress> downloadModel(String locale)` |
+| 文字起こし | `Stream<TranscriptSegment> transcribeFile(TranscribeRequest request)` |
+
+上記3メソッドは `OfflineTranscriber` が公開している。
+
+```dart
+import 'package:offline_stt/offline_stt.dart';
+
+const transcriber = OfflineTranscriber();
+
+final state = await transcriber.checkModel('ja-JP');
+if (state == ModelState.downloadable) {
+  // アプリ側で同意を取ってから呼ぶ(ライブラリは同意UIを出さない)。
+  await for (final _ in transcriber.downloadModel('ja-JP')) {}
+}
+await for (final segment in transcriber.transcribeFile(
+  TranscribeRequest(path: path, locale: 'ja-JP'),
+)) {
+  if (segment.isFinal) {
+    // 確定テキスト
+  }
+}
+```
+
+`OfflineTranscriber` は `OfflineTranscriberPlatform.instance` へ委譲するだけの薄い層であり、独自のロジック・状態・既定値を持たない。**`offline_stt_platform_interface` を直接依存に書く必要はない。**
+
+> 参照実装の [`apps/example`](https://github.com/goofmint/offline_stt/tree/main/apps/example) は、ファサードが無かった頃の名残で `offline_stt_platform_interface` を直接依存に書いている。利用側で真似する必要はない。
+
+## 正しい呼び出し順序
+
+```
+checkModel(locale)
+  ├─ available    → transcribeFile() を呼んでよい
+  ├─ downloadable → 【アプリが同意UIを出す】→ 同意後に downloadModel()
+  │                  → 完了後に再度 checkModel()
+  ├─ downloading  → 待つ
+  └─ unavailable  → 端末・OS・ブラウザの問題。アプリからは解消できない
+```
+
+**ライブラリは暗黙にモデルをダウンロードしない**(requirements.md FR-2 / §8)。同意UIはアプリ側の責務である。文言は具体的なモデル名・ベンダー名を出さず「音声認識モデル」のような一般名称で呼ぶこと。参照実装は [`apps/example/lib/src/download_consent_dialog.dart`](https://github.com/goofmint/offline_stt/blob/main/apps/example/lib/src/download_consent_dialog.dart) にある。
+
+また、**認識セッションは同時に1本までである**(design.md §3)。実行中に2本目の `transcribeFile()` を呼ぶと `StateError` になる。
+
+## アプリ側に必要な対応
+
+| プラットフォーム | 依存を書く以外に必要なこと |
+|---|---|
+| Android | 無し(`RECORD_AUDIO` 権限も不要)。ただしモデル取得の同意UIはアプリ側 |
+| iOS / macOS | 無し。同意UIはアプリ側 |
+| Web | localhost または https 配信。同意UIはアプリ側 |
+| Windows | **MSIXパッケージ化 + `systemAIModels` capability 宣言 + `winapp init`。依存を書くだけでは動かない唯一のプラットフォームである** |
+
+Windowsの手順は [offline_stt_windows/README.md](https://github.com/goofmint/offline_stt/blob/main/packages/offline_stt_windows/README.md) にまとめてある。
+
+## 既知の制約(採用前に読むこと)
+
+- **精度がしきい値に届いていない。** design.md §7 のしきい値(クリーン基準音声 ja-JP 90%以上)を満たしたプラットフォームは1つも無い。実測できた Darwin(macOS 26.5.1)/ Web(Chrome 153)/ Android(Pixel 6)の3つはいずれも基準音声 `jaJP_10s` で**ちょうど 66.7%(4/6)**であり、3つとも `株式会社モーンギフト` を落としている。**この原因は未確定である**(基準音声がTTS合成音声であること、キーワード選定と正規化規則、認識モデル自体の精度、のいずれが支配的かを分離する対照実験を行っていない)。「OSネイティブだから十分な精度が出る」と期待して採用してはいけない段階である。
+- **最低OSバージョンが高い。** 特に iOS 26 / macOS 26 の下限は、採用できるユーザー母数を大きく制限する。
+- **Windowsは一度も動かしていない。** リポジトリにWindows実機が無く、MSIX生成・インストール・認識のいずれも未実施である(Issue #58)。
+- **Windowsでは認識言語を指定できない。** `Microsoft.Windows.AI.Speech` にロケール指定APIが存在しないため `locale` 引数が無視される。
+- **マイク入力のリアルタイム認識は対象外**である(v1はファイル入力専用)。
+- **Linuxは対象外**である。
+- 土台のOS APIにalpha / Experimental段階のものを含むため、0.x系で公開している(NFR-5)。
+
+モデル同梱型(sherpa-onnx / whisper.cpp / Vosk 等)との使い分けは、[リポジトリルートのREADME](https://github.com/goofmint/offline_stt/blob/main/README.md)に比較軸をまとめてある。
+
+## 実機E2Eの状況
+
+認識のE2E(実際に音声ファイルが正しく文字起こしされること)はCIでは検証していない(実機・実ブラウザ依存であることが実測済みのため)。リリース前の手動チェックリストで運用する: [E2E_CHECKLIST.md](https://github.com/goofmint/offline_stt/blob/main/E2E_CHECKLIST.md)。
+
+**本番実装に対して通して実行されたチェックリストは、現時点で1つも無い。** 実機E2Eは Issue #40(Darwin)/ #50(Android)/ #58(Windows)、および iOS 26 実機の確認は Issue #7 が対象である。
+
+## ライセンス
+
+MIT License。[LICENSE](https://github.com/goofmint/offline_stt/blob/main/packages/offline_stt/LICENSE) を参照。

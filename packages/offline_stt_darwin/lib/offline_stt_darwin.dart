@@ -1,3 +1,20 @@
+/// `offline_stt` のiOS/macOS共用実装パッケージ。
+///
+/// **利用者がこのパッケージへ直接依存することはない**(requirements.md §6)。
+/// アプリは `offline_stt` にのみ依存すれば、エントリパッケージの
+/// `flutter.plugin.platforms.ios` / `.macos` の `default_package` によって
+/// この実装が自動的に選択される(design.md §1 のfederated plugin構成)。
+///
+/// 認識バックエンドは `SpeechAnalyzer` + `SpeechTranscriber`、デコードは
+/// `AVAudioFile` である(design.md §4.2)。iOSシミュレータでは
+/// `SpeechTranscriber.isAvailable` が `false` になり利用できないことが
+/// M0検証で確定している(spikes/darwin/RESULTS.md)。認識の検証には実機が
+/// 必要である。
+///
+/// 公開APIは [OfflineSttDarwin] 1クラスのみであり、残りは `src/` 配下の
+/// 非公開実装である。実装の分担は同クラスのdocコメントを参照すること。
+library;
+
 import 'package:offline_stt_platform_interface/offline_stt_platform_interface.dart';
 // offline_stt_platform_interfaceのdocコメント(lib/src/session_guard.dart)が
 // 明記するとおり、TranscribeSessionGuardはネイティブ実装パッケージ間だけの

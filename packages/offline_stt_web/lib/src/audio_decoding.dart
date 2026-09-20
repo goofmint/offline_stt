@@ -23,6 +23,8 @@ import 'package:web/web.dart' as web;
 /// 対応である。このクラスにフィールドとして保持させることで、
 /// [DecodedAudioTrack] インスタンスが生きている限りGCされないようにする。
 class DecodedAudioTrack {
+  /// 4つのノードをまとめて受け取り、認識セッションが終わるまで生存させる
+  /// のがこのコンストラクタの目的である(クラスのdocコメントのGC対策参照)。
   DecodedAudioTrack({
     required this.source,
     required this.destination,
@@ -30,9 +32,18 @@ class DecodedAudioTrack {
     required this.audioTrack,
   });
 
+  /// デコード済み `AudioBuffer` の再生ノード。再生開始(`start()`)と
+  /// 停止(`stop()`)、および `playbackRate` の設定先である。
   final web.AudioBufferSourceNode source;
+
+  /// [source] の接続先。GC対策のため保持する(クラスのdocコメント参照)。
   final web.MediaStreamAudioDestinationNode destination;
+
+  /// [destination] が生成したストリーム。GC対策のため保持する。
   final web.MediaStream stream;
+
+  /// `SpeechRecognition.start(audioTrack)` に渡す音声トラック。
+  /// [stream] の唯一の音声トラックである。
   final web.MediaStreamTrack audioTrack;
 }
 

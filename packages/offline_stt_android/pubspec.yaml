@@ -4,7 +4,9 @@ description: >-
   (オンデバイス) + MediaCodecデコード + リサンプリング + 実時間ポンプ
   (PR #73 design.md §4.3)。
 version: 0.1.0
-publish_to: none
+homepage: https://github.com/goofmint/offline_stt
+repository: https://github.com/goofmint/offline_stt
+issue_tracker: https://github.com/goofmint/offline_stt/issues
 
 environment:
   sdk: ^3.9.0

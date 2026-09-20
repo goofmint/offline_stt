@@ -1,9 +1,11 @@
 name: offline_stt_web
 description: >-
   offline_stt のWeb実装(Dart JS interop、Chrome オンデバイスWeb Speech +
-  Web Audio、design.md §4.1)。雛形のみ、実装はM1で行う。
+  Web Audio、design.md §4.1)。Chrome 142以上のデスクトップ版が必要。
 version: 0.1.0
-publish_to: none
+homepage: https://github.com/goofmint/offline_stt
+repository: https://github.com/goofmint/offline_stt
+issue_tracker: https://github.com/goofmint/offline_stt/issues
 
 environment:
   sdk: ^3.9.0

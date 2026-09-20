@@ -13,8 +13,13 @@ name: CI
 #       - iOS: シミュレータでは SpeechTranscriber.isAvailable が false に
 #         なり、SpeechAnalyzerによる認識自体が利用できない
 #         (spikes/darwin/RESULTS.md)
-#       - Android: エミュレータでは checkStatus() が UNAVAILABLE になる
-#         (AICore非搭載。spikes/android/RESULTS.md)
+#       - Android: バックエンドは Android 標準の
+#         android.speech.SpeechRecognizer(オンデバイス)である
+#         (ML Kit GenAI / AICore ではない。M0検証で AICore が使えない
+#         ことが判明して差し替えた)。オンデバイス認識のモデルは
+#         OS / Google Play services 側が保持しており、エミュレータには
+#         存在しないため実機が要る。さらにM0検証で、実機であっても機種に
+#         よっては成立しないことが判明している(spikes/android/RESULTS.md)
 #       - Web: ブラウザの言語パック(約60MB)取得とChromeの実ブラウザ環境が
 #         必要であり、ヘッドレスCIでは再現しない(spikes/web/RESULTS.md)
 #     認識E2Eはリリース前の手動チェックリスト(README参照)で運用する。
@@ -112,6 +117,12 @@ jobs:
 
       - name: dart format 差分チェック(*.g.dart は対象外。理由はmelosスクリプト参照)
         run: melos run format
+
+      # 公開APIドキュメントが生成でき、かつリンク切れが無いことを検証する
+      # (Issue #63)。melos の doc スクリプトは apps/example を除外し、
+      # 公開6パッケージで `dart doc --validate-links` を実行する。
+      - name: dart doc 生成とリンク検証
+        run: melos run doc
 
   build:
     name: Build example (${{ matrix.platform }})

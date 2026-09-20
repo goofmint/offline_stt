@@ -34,6 +34,10 @@ class DownloadProgress {
   /// ダウンロードが完了したかどうか。
   final bool completed;
 
+  /// 値等価。
+  ///
+  /// 進捗イベントはStreamで届くたびに新しく生成されるため、同一性比較では
+  /// 一致しない。テストでの期待値比較を成立させるために値等価を定義する。
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -42,6 +46,7 @@ class DownloadProgress {
         other.completed == completed;
   }
 
+  /// `==` を上書きしたため対で上書きする(Dartの等価契約)。
   @override
   int get hashCode => Object.hash(fraction, completed);
 

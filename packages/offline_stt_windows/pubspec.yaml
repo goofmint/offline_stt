@@ -3,7 +3,9 @@ description: >-
   offline_stt のWindows実装(C++/WinRT、Windows AI Speech Recognition +
   Media Foundation、design.md §4.4)。
 version: 0.1.0
-publish_to: none
+homepage: https://github.com/goofmint/offline_stt
+repository: https://github.com/goofmint/offline_stt
+issue_tracker: https://github.com/goofmint/offline_stt/issues
 
 environment:
   sdk: ^3.9.0

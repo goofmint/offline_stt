@@ -1,3 +1,20 @@
+/// `offline_stt` のAndroid実装パッケージ。
+///
+/// **利用者がこのパッケージへ直接依存することはない**(requirements.md §6)。
+/// アプリは `offline_stt` にのみ依存すれば、エントリパッケージの
+/// `flutter.plugin.platforms.android.default_package` によってこの実装が
+/// 自動的に選択される(design.md §1 のfederated plugin構成)。
+///
+/// 認識バックエンドはAndroid標準の `android.speech.SpeechRecognizer` の
+/// オンデバイス認識である。当初設計のML Kit GenAI(AICore)は、M0検証で
+/// 使用したPixel 6実機のAICoreがstub版であり利用できなかったため採用して
+/// いない(spikes/android/RESULTS.md)。
+///
+/// 公開APIは [OfflineSttAndroid] 1クラスのみであり、残りは `src/` 配下の
+/// 非公開実装である。実装の分担・既知の制約は同クラスのdocコメントを
+/// 参照すること。
+library;
+
 import 'package:offline_stt_platform_interface/offline_stt_platform_interface.dart';
 // offline_stt_platform_interfaceのdocコメント(lib/src/session_guard.dart)が
 // 明記するとおり、TranscribeSessionGuardはネイティブ実装パッケージ間だけの

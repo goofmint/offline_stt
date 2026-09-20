@@ -2,7 +2,134 @@
 
 録音済み音声ファイルを、OSネイティブの音声認識APIのみでオフライン文字起こしするFlutterライブラリ(モノレポ)。詳細な要件・設計は [requirements.md](./requirements.md) / [design.md](./design.md) / [tasks.md](./tasks.md) を参照。
 
-このREADMEは最小限の構成案内のみを記載する。本格的なREADME(対応状況マトリクス等)はIssue #60〜#62で整備する。
+## 対応状況マトリクス
+
+**このマトリクスは実測に基づく。実測していない欄は「未検証」と書いてあり、推測値は入れていない。**
+各欄の根拠は `spikes/{web,darwin,android,windows}/RESULTS.md` にある。
+
+| プラットフォーム | バックエンドAPI | 最低OSバージョン | 所要時間特性 | ja-JP検証結果 |
+|---|---|---|---|---|
+| Android | 標準 `android.speech.SpeechRecognizer`(`createOnDeviceSpeechRecognizer`)+ MediaCodecデコード + 実時間ポンプ | Android 12 / API 31(`minSdk 31`) | **実時間**。PFDパイプへ毎秒約32KBで供給するため、ファイル長と同等の時間がかかる(Pixel 6実機: 9.56秒の音声に対しポンプ9,564ms、実効31,993.7バイト/秒) | **不成立**。Pixel 6(Android 17 / API 37)実機で jaJP_10s 66.7%(4/6) |
+| iOS / macOS | SpeechAnalyzer + SpeechTranscriber(AVFoundationデコード) | iOS 26 / macOS 26(podspec の deployment target も 26.0) | **非実時間・高速**。macOS 26.5.1実機でRTF 0.008〜0.026(実時間の約38〜125倍速)。**iOSでのファイル処理速度は未測定** | **不成立**。macOS 26.5.1実機で jaJP_10s 66.7%(4/6)。**iOS実機では `supportedLocales` にja-JPが含まれることを確認したのみで、文字起こし自体は未実施** |
+| Windows | Windows AI APIs Speech Recognition(`BatchRecognition`)+ Media Foundation変換 | Windows 11 24H2 (build 26100) / WinAppSDK 1.7.1 以上。加えて **MSIXパッケージ化が必須** | **未検証**。設計上は非実時間のバッチ認識だが、一度も実行していないため実測値が無い | **未検証**。Windows実機がそもそも存在しない。加えて**ロケール指定APIが存在しない**ため、ja-JPを指定する手段自体が無い(後述の「Windows: `locale` は無視される」参照) |
+| Web | Chrome オンデバイス Web Speech(`processLocally: true`)+ Web Audio | Chrome 142 以上(オンデバイスWeb Speechのリグレッション修正済みバージョン)。実機検証は Chrome 153 | **実時間**。Chrome 153で9.56秒の音声に9,676ms。`playbackRate` で短縮できるが精度が落ちる(後述) | **不成立**。Chrome 153で jaJP_10s(1.0x)66.7%(4/6) |
+
+Linuxは対象外である(OSネイティブのASR APIが存在しないため。requirements.md §3)。
+
+### 検証に使った環境(実測値の出どころ)
+
+| プラットフォーム | 検証環境 |
+|---|---|
+| Android | Pixel 6(`oriole`、Android 17 / API 37、ブートローダーはロック済み) |
+| macOS | macOS 26.5.1 (build 25F80) / Apple Silicon |
+| iOS | iPhone 17 / iOS 27.0。**requirements.md NFR-4 が定める下限は iOS 26 だが、iOS 26 実機での確認は未実施である**(Issue #7)。`supportedLocales` はOSバージョンで件数・内容が異なることが実測で判明しており(macOS 26.5.1: 30件、iOS 27.0: 45件)、iOS 27.0の結果をiOS 26へ外挿することはできない |
+| Windows | **無し。** このプロジェクトにWindows実機は存在せず、Windowsでの実行は一度も行われていない |
+| Web | Chrome 153.0.8010.48 / macOS 26.5.1、localhost配信 |
+
+### 精度について(重要)
+
+**現時点で design.md §7 のしきい値(クリーン基準音声: ja-JP 90%以上、en-US 95%以上)を満たしたプラットフォームは1つも無い。**
+
+- Darwin(macOS 26.5.1)・Web(Chrome 153)・Android(Pixel 6)の3つはいずれも、同一の基準音声 `jaJP_10s` で**ちょうど 66.7%(4/6)**という同率だった。
+- 3プラットフォームすべてが `株式会社モーンギフト` を落としている(Darwin「モーギフト」、Web「ムーンギフト」、Android「モンギフト」)。
+- **この不成立の原因は未確定である。** 基準音声がTTS合成音声であること、キーワード選定と正規化規則が表記差を吸収できていないこと、認識モデル自体の精度、(Darwinでは)プリセット選択、のいずれが支配的かを分離する対照実験を行っていない。したがって「認識品質が低い」とも「基準音声の設計の問題」とも断定しない。詳細は design.md §7 の注記と各 `RESULTS.md` を参照。
+- Darwinでは `SpeechTranscriber.Preset` の違いだけで包含率が最大20ポイント以上動く(`enUS_10s` は `.transcription` で100%に達した)ことが実測されており、包含率という指標自体が条件に強く依存する。
+
+ja-JP以外では、Darwinのみ en-US を実測している(`enUS_10s` 80.0% / `enUS_3m` 44.0%、いずれも不成立)。Web・Android・Windowsの en-US は未検証である。
+
+### 再生速度オプション(`playbackRate`)
+
+`transcribeFile()` の `playbackRate`(既定 1.0)は**Web専用オプション**である。Darwin・Windowsはバッチ認識であり速度という概念が無いため無視される。Androidは実時間ポンプ方式のため理論上は適用余地があるが未実装・未検証である。
+
+Chrome 153 での jaJP_10s 実測では、所要時間は短縮される一方で**精度は 1.0x → 1.5x → 2.0x と単調に低下**した(66.7% → 50.0% → 33.3%)。`AudioBufferSourceNode.playbackRate` はピッチも同倍率で変えるためである。所要時間と精度のトレードオフを理解したうえで使うこと。
+
+### 実機E2Eの状況
+
+認識のE2E(実際に音声ファイルが正しく文字起こしされること)はCIでは検証していない(理由は後述の「CI」節)。リリース前の手動チェックリストで運用する。**チェックリスト群の入口(なぜCIに載せないのか・共通の前提・基準音声・包含率の算出方法)は [E2E_CHECKLIST.md](./E2E_CHECKLIST.md) にある**(Issue #66)。
+
+| プラットフォーム | 実装E2Eの状況 |
+|---|---|
+| Web | 手動チェックリストあり([packages/offline_stt_web/E2E_CHECKLIST.md](./packages/offline_stt_web/E2E_CHECKLIST.md))。本番実装での再測定は未実施 |
+| Darwin | 未実施(Issue #40) |
+| Android | 未実施(Issue #50) |
+| Windows | 未実施(Issue #58)。実機が無いため、MSIX生成・インストール・認識のいずれも一度も行っていない |
+
+上の表の「ja-JP検証結果」はいずれも**M0スパイク実装での実測値**であり、本リポジトリの実装パッケージで取り直したものではない。
+
+## アプリ側に必要な対応
+
+ライブラリを依存に足すだけでは完結しない事項がある。プラットフォームごとに次の対応がアプリ側の責務となる。
+
+### 共通: モデルダウンロードの同意ダイアログ
+
+全プラットフォームで、**ライブラリは暗黙にモデルをダウンロードしない**(requirements.md FR-2 / §8、design.md §3)。`checkModel()` が `downloadable` を返したら、アプリが同意UIを出し、同意が得られてから `downloadModel()` を呼ぶ。文言は具体的なモデル名・ベンダー名を出さず「音声認識モデル」のような一般名称で呼ぶ。参照実装は [`apps/example/lib/src/download_consent_dialog.dart`](./apps/example/lib/src/download_consent_dialog.dart) にある。
+
+### Windows: MSIXパッケージ化(依存を書くだけでは動かない唯一のプラットフォーム)
+
+- アプリを **MSIXでパッケージ化**し、`Package.appxmanifest` に `systemAIModels` capability を宣言する必要がある。`flutter build windows` が生成するのはパッケージ化されていない素のWin32 EXEであり、capabilityを宣言する場所が無い。
+- さらに、**このプラグインのビルド自体が `winapp` CLI(`winapp init`)を必要とする**。`winapp init` が展開する `.winapp/include` にWinAppSDKのC++/WinRTプロジェクションヘッダーが含まれており、プラグインの `windows/CMakeLists.txt` はこれを検出してWindows AI実装をビルドする。見つからない場合、すべてのAPI呼び出しが「`winapp init` を実行せよ」という明示的なエラーで失敗する(黙って `unavailable` を返すフォールバックはしない)。
+- `MaxVersionTested` を `10.0.26226.0` 以降にしておくこと。
+- 手順・マニフェスト記載例・再同意フロー・既知の制約はすべて [packages/offline_stt_windows/README.md](./packages/offline_stt_windows/README.md) にある。ここでは重複させない。**同ドキュメントの手順は一度も実行して確認していない**(Windows実機が無いため。Issue #58)。
+
+### Windows: `locale` は無視される
+
+Windows AI の `Microsoft.Windows.AI.Speech` 名前空間には**ロケール・言語を指定するAPIが1つも存在しない**ことをドキュメント調査で確定している(design.md §8 未決事項2)。したがって `transcribeFile(path, locale)` の `locale` 引数はWindowsでは無視され、認識言語はOS側の設定に従う。OS表示言語に連動するのか既定入力言語に連動するのかは**未確認**である。
+
+この帰結として、**Windowsでは `LocaleUnsupportedException` が発生しない**。ロケール依存の分岐をアプリ側に書く場合、Windowsだけはその分岐が働かない前提で設計すること。
+
+### Android: `checkModel()` を先に呼ぶ
+
+Androidのオンデバイス認識は、対象ロケールの言語パックが端末にダウンロードされていなければ動かない。Pixel 6実機での実測では、初期状態の `installedOnDeviceLanguages` は `[en-US]` のみで ja-JP は含まれていなかった。そのため**必ず `checkModel(locale)` を先に呼び、`downloadable` なら同意のうえ `downloadModel()` を呼ぶ**。
+
+加えて、`SpeechRecognizer.triggerModelDownload()` の `ModelDownloadListener` は**ダウンロード完了を確実には通知しない**ことが実測で判明している(Pixel 6実機で `onSuccess()` を一度も観測できないまま、実際にはダウンロードが完了していた)。完了判定は `checkRecognitionSupport()` の `installedOnDeviceLanguages` の再照会によってのみ確実に行える。本プラグインはこの方式で実装している。
+
+> **注意: AICore / ML Kit GenAI は使っていない。**
+> 初期の設計(requirements.md / design.md の旧記述)はML Kit GenAI Speech Recognition(AICore)を前提としていたが、**M0検証の結果この方針は破棄した**。Pixel 6実機の `com.google.android.aicore` は `versionName = 0.stub.stub_aicore_...` という実体の無いstub版であり、Google Play ストア自身が「このアプリはお使いのデバイスに対応しなくなりました」と表示する。`checkStatus()` / `startRecognition()` はいずれも `PERMISSION_DENIED: Api access revoked.` を返した。端末側の制約であり回避策が無いため、標準 `android.speech.SpeechRecognizer` に差し替えてある。**「AICoreの初期化を待つ」といったアプリ側対応は不要である。**
+
+### Web: ユーザー操作起点とChrome以外の扱い
+
+- ファイル選択はユーザー操作起点(File / Blob)であること。
+- **localhost または https 配信であること。** `on-device-speech-recognition` Permissions Policy の既定値が `'self'` であるため、`file://` で直接開いても動作しない。
+- **Chrome以外のブラウザでは `checkModel()` が `unavailable` を返す。** Web Speech API のオンデバイス認識(`SpeechRecognition.available()` / `install()` / `start(audioTrack)` + `processLocally`)は現時点でChrome系の機能であり、それ以外のブラウザでは機能検出の時点で成立しない。アプリ側は `unavailable` を「この環境では使えない」として提示する導線を用意すること。ライブラリはサーバー認識へフォールバックしない(NFR-2)。
+- 言語パックは約60MBあり、`install()` に8.7秒(Chrome 153実測)かかった。`install()` は進捗イベントを持たず `Promise<boolean>` を返すだけなので、進捗は不定進捗として扱われる。
+- 確定(final)結果は形態素単位で空白区切りされる(`東京 都 渋谷 で ...`)。
+
+## モデル同梱型の代替(sherpa-onnx / whisper.cpp / Vosk)との使い分け
+
+`offline_stt` は「**モデルを一切同梱せず、OSが持つ認識エンジンだけを使う**」という一点に特化している(requirements.md §2 / NFR-3)。この選択には裏返しの制約が多い。**用途によっては、モデル同梱型のライブラリを選ぶほうが適切である。**
+
+### `offline_stt` を選ぶ理由になるもの
+
+- **アプリサイズが増えない。** モデルも推論エンジンも同梱しないため、各パッケージはブリッジコードのみである。
+- **モデルの取得・更新・削除をOSが管理する。** 自前でモデル配布基盤を用意しなくてよい。
+- **音声も書き起こし結果もネットワークに出ない**(NFR-2)。Webでは `processLocally = true` を強制し、サーバー認識へのサイレントフォールバックを禁止している。
+- Web(Chrome)を含む4プラットフォームを**同一のDart APIで**扱える。
+
+### `offline_stt` の不利な点(先に読むこと)
+
+- **モデルを同梱しないということは、初回利用時にモデルが端末に無い可能性があるということである。** ダウンロードの同意UIと待ち時間、そして「端末の都合で使えない」という状態(`unavailable`)をアプリ側で扱う必要がある。モデル同梱型にはこの状態が存在しない。
+- **最低OSバージョンが高い。** iOS 26 / macOS 26 / Android 12(API 31)/ Windows 11 24H2 / Chrome 142。特にiOS・macOSの下限は、現時点で採用できるユーザー母数を大きく制限する(requirements.md §9 のリスク表にも記載がある)。
+- **精度がしきい値に届いていない。** 上記「精度について」のとおり、検証できた3プラットフォームすべてで design.md §7 のしきい値を下回った(ja-JP 66.7%)。原因は未確定だが、**「OSネイティブだから十分な精度が出る」と期待して採用してはいけない**段階である。
+- **Windowsでは認識言語を指定できない。** OS設定に従う。多言語を扱うアプリでは致命的になりうる。
+- **WindowsはMSIXパッケージ化が必須**であり、`winapp` CLI を含むビルド手順の追加が要る。素のFlutter Windowsビルドでは動かない。
+- **Windowsは一度も動かしていない。** 実機が無い。
+- **Linuxは対象外**である。
+- **マイク入力のリアルタイム認識は対象外**である(v1はファイル入力専用)。
+- **土台のOS APIがalpha / Experimental段階**のものを含むため、ライブラリは0.x系で公開している(NFR-5)。
+
+### モデル同梱型(sherpa-onnx / whisper.cpp / Vosk 等)を選ぶべき場合
+
+次のいずれかに当てはまるなら、モデル同梱型を検討したほうがよい。
+
+- **古いOSバージョンを含む幅広い端末を対象にしたい。** `offline_stt` のOSバージョン下限は妥協できない制約である。モデル同梱型はOSの音声認識機能に依存しないため、この制約から自由になる。
+- **認識に使うモデルを自分で選び、固定したい。** `offline_stt` はモデルをOSに委ねるため、モデルの種類も更新タイミングも選べず、OS更新で認識結果が変わりうる。再現性が要るなら不向きである。
+- **認識言語をアプリ側で明示的に決めたい。** Windowsで `locale` が効かないことが問題になる場合。
+- **Linuxを対象にしたい。**
+- **初回起動時のモデルダウンロードや同意ダイアログを避けたい。** アプリに同梱してあればその導線自体が不要になる。
+
+逆に、**アプリサイズを抑えることが最優先で、対象端末を新しめのOSに絞れて、モデルの選択権を必要としない**なら `offline_stt` が噛み合う。
+
+> 代替ライブラリ側の個別の性能・対応言語・ライセンス・Flutterバインディングの有無については、本READMEでは断定しない。実測していないためである。採用判断の際はそれぞれの公式ドキュメントで最新の情報を確認すること。ここで示したのは**比較すべき軸**(モデル同梱の有無 / OSバージョン下限 / モデル選択権 / 言語指定 / 対象プラットフォーム / アプリサイズ)である。
 
 ## モノレポ構成
 
@@ -14,7 +141,7 @@ offline_stt/
 ├── packages/
 │   ├── offline_stt/                      … エントリパッケージ(利用者はこれのみに依存)
 │   ├── offline_stt_platform_interface/   … 共通抽象・データ型・例外(純Dart)
-│   ├── offline_stt_android/              … Kotlin実装(ML Kit GenAI Speech Recognition)
+│   ├── offline_stt_android/              … Kotlin実装(標準 android.speech.SpeechRecognizer)
 │   ├── offline_stt_darwin/               … Swift実装(iOS/macOS共用、SpeechAnalyzer)
 │   ├── offline_stt_windows/              … C++/WinRT実装(Windows AI Speech Recognition)
 │   └── offline_stt_web/                  … Dart JS interop実装(Web Speech API)
@@ -61,7 +188,7 @@ melos run format
 **CIが検証しないこと(design.md §7 の方針)**: 認識E2E(実際の音声ファイルが正しく文字起こしされるか)。以下のとおり実機依存であることが実測済みであり、CI環境では原理的に再現できないため、リリース前の手動チェックリストで運用する。
 
 - iOS: シミュレータでは `SpeechTranscriber.isAvailable` が `false` になり、SpeechAnalyzerによる認識自体が利用できない(`spikes/darwin/RESULTS.md`)
-- Android: エミュレータでは `checkStatus()` が `UNAVAILABLE` になる(AICore非搭載。`spikes/android/RESULTS.md`)
+- Android: オンデバイス認識には実機と、対象ロケールの言語パックが端末にダウンロード済みであることが必要である(`spikes/android/RESULTS.md`)
 - Web: ブラウザの言語パック(約60MB)取得と実ブラウザ環境が必要であり、ヘッドレスCIでは再現しない(`spikes/web/RESULTS.md`)
 
 **ランナー・SDKバージョンの調査結果**(2026-09時点):

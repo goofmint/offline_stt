@@ -173,8 +173,8 @@ AVAudioFile(任意フォーマット読込)
 
 ```
 入力ファイル
-  → MediaExtractor + MediaCodec でデコード
-  → リサンプリング(16kHz・モノラル・16-bit PCM)
+  → MediaExtractor + MediaCodec でデコード(チャンク単位)
+  → リサンプリング(16kHz・モノラル・16-bit PCM、チャンク単位)
   → ParcelFileDescriptor.createPipe()
   → 書き込み側: 実時間ポンプ(毎秒約32KB、コルーチンで供給)
   → Intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE, 読み取り側)
@@ -192,6 +192,10 @@ AVAudioFile(任意フォーマット読込)
 - **`onResults()` の確定結果(`RESULTS_RECOGNITION`)が `null` になり、確定テキストが得られない。** Pixel 6実機での2回の独立実行いずれでも再現した。ログの時系列上、`onResults` は**パイプ(書き込み側)を閉じた直後、`stopListening()` を呼ぶ*前*に発火している**。すなわち入力終了は `stopListening()` ではなくパイプのcloseによって検出されており、`stopListening()` の有無に関わらずこの挙動が生じる。なお `onResults` の後に遅れて `stopListening()` を呼ぶと `ERROR_CLIENT`(5)が誘発されるだけであった(実測)。一方で完全なテキストは `onPartialResults()` 側に逐次emitされ、最長のpartial(例: 「東京都渋谷で2024年11月3日午後3時株式会社モンギフトが新製品を発表しました来場者は128名でした」)が実質的な文字起こし結果になっていた。**そのため本実装では、`onResults()` のtexts が null の場合は直前の `onPartialResults()` の最上位候補を確定結果として採用する**(Webで `isFinal` が立たない場合に末尾interimを採用したのと同じ構図。spikes/android/RESULTS.md 参照)。原因(オンデバイスエンジン側の挙動か `EXTRA_AUDIO_SOURCE` 経由特有の終端処理かなど)は特定できておらず、M3実装時に追加調査が必要である
 - リサンプリング: **必須(M0スパイクで実測確定。この結論はバックエンド差し替えの影響を受けない)**。MediaCodecはコーデックのデコードのみを行い、サンプルレート変換・チャンネルのダウンミックスは一切行わないことを実測で確認した。実環境相当の音源7ファイル(44.1kHz/48kHzステレオのwav・m4a・mp3、22.05kHzモノラル、8kHzモノラル)全てで出力`MediaFormat`のサンプルレート・チャンネル数が入力側と完全に一致し、16kHz・モノラルへの変換は起きなかった(resampleNeeded=true、7/7。spikes/android/RESULTS.md 参照)。よって線形補間ではなくAudioResampler相当のサンプルレート変換 + ステレオ→モノラルのダウンミックス処理をM3で実装する。MediaCodecのこの挙動は認識バックエンドとは無関係なAndroidフレームワークAPI(`MediaExtractor`/`MediaCodec`)の仕様であるため、ML Kit GenAI Speech Recognitionから標準SpeechRecognizerへの差し替えによってこの結論が変わることはない。なお本結果はエミュレータ単一環境での実測であり、実機での追試が引き続き望ましい
 - モデル管理・状態確認: `SpeechRecognizer.checkRecognitionSupport(intent, executor, RecognitionSupportCallback)` が返す `RecognitionSupport` の `supportedOnDeviceLanguages` / `installedOnDeviceLanguages` / `pendingOnDeviceLanguages` / `onlineLanguages` を突き合わせてFR-1の4値へ写像する(写像方針の詳細はrequirements.md FR-1参照)。モデル取得は `SpeechRecognizer.triggerModelDownload(intent, executor, ModelDownloadListener)` を用いるが、**`ModelDownloadListener` のコールバックはダウンロード完了時に発火しない実測がある**(Pixel 6実機でja-JP言語パック取得を試みた際、`onScheduled()` のみ発火し以降60秒間他のコールバックが到達しなかったが、実際にはダウンロードは完了していた)。そのため完了判定はコールバックではなく `checkRecognitionSupport()` の再照会(`installedOnDeviceLanguages`)で行う(spikes/android/RESULTS.md 参照)
+- **API 31/32 は `unavailable` に倒す。** `checkRecognitionSupport()` は API 33(TIRAMISU)で追加されたAPIであり、API 31/32 では4リストを取得する手段がそもそも無い。Darwin が OS 26 未満で `unavailable` を返すのと同じOSバージョンゲートである(§4.2 と揃えている)
+- **デコード・リサンプリング・送出はチャンク単位でストリーミング処理する。** 全量を配列に materialize すると、48kHz・ステレオ・16-bit・60分の入力でピーク約1.73 GB に達して OOM になる。ストリーミングにより、同時に生存するバッファは音声長に依存しなくなる
+- リサンプリングの実装は、全チャンネルの単純平均によるモノラル化と線形補間による 16kHz への変換の2段構成とする。線形補間はローパスフィルタを持たないためダウンサンプリング時のエイリアシングを理論上抑制できない。これは意図的な設計判断であり、将来 windowed-sinc 等へ置き換える余地がある
+- エラー写像は `SpeechRecognizer.ERROR_*` 定数に対して行う(§5 参照)
 
 ### 4.4 Windows(<name>_windows)
 
@@ -218,12 +222,13 @@ AVAudioFile(任意フォーマット読込)
 
 | 共通例外 | Android | Darwin | Windows | Web |
 |---|---|---|---|---|
-| ModelUnavailable | `checkRecognitionSupport()` で対象ロケールが `supportedOnDeviceLanguages` に無い / `ERROR_LANGUAGE_UNAVAILABLE` | アセット取得不可 | NotReady / EnsureNeeded で未同意 | available() = unavailable |
-| LocaleUnsupported | `ERROR_LANGUAGE_NOT_SUPPORTED` | supportedLocales外 | (M0確認後に確定) | language-not-supported |
+| ModelUnavailable | `supportedOnDeviceLanguages` にのみ含まれる / いずれのリストにも無い | アセット取得不可 | NotReady / EnsureNeeded で未同意 | available() = unavailable |
+| LocaleUnsupported | `ERROR_LANGUAGE_NOT_SUPPORTED` / `ERROR_LANGUAGE_UNAVAILABLE` | supportedLocales外 | (M0確認後に確定) | language-not-supported |
 | DecodeFailed | MediaCodecエラー | AVAudioFileエラー | Media Foundation失敗 | decodeAudioData reject |
-| DeviceUnsupported | API<31(NFR-4) / `ERROR_CANNOT_CHECK_SUPPORT` | OS 26未満 | NotSupportedOnCurrentSystem | 非Chrome系 |
-| Cancelled | `stopListening()`/`cancel()` 呼び出しに伴うセッション終了 | Task cancel | 認識中断 | stop/abort |
+| DeviceUnsupported | `ERROR_CANNOT_CHECK_SUPPORT`(API 31/32 は `checkModel()` が `unavailable` を返すためこの例外にはならない) | OS 26未満 | NotSupportedOnCurrentSystem | 非Chrome系 |
+| Cancelled | コルーチンcancel → パイプclose | Task cancel | 認識中断 | stop/abort |
 
+- 注記: Android列は ML Kit GenAI(AICore)前提から `android.speech.SpeechRecognizer` 前提へ書き換えたものである(§4.3 の冒頭参照)。**`ERROR_*` 定数の対応表は暫定である。** 上記3つのみ個別に分類し、残りは `PlatformError` へ倒している。実機で実際に発火させた確認は行っていないため、Issue #50 の実機E2Eで確定させる必要がある。
 - 注記: Darwin列のうち DecodeFailed(AVAudioFileエラー)と LocaleUnsupported(supportedLocales外)は、macOS 26.5.1実機でエラーを実発火させ動作を確認済みである(spikes/darwin/RESULTS.md 参照)。
 - 注記(採用しなかったバックエンドに関する記録): Android列が言及していた「AICore 606」のような数値エラーコードは、ML Kit GenAI Speech Recognitionの `GenAiException.ErrorCode`(`genai-common:1.0.0-beta3` をjavapで確認)の実際の定数一覧には含まれていなかった。同ライブラリが公開する定数は UNKNOWN / REQUEST_PROCESSING_ERROR / CANCELLED / NOT_AVAILABLE / BUSY / RESPONSE_PROCESSING_ERROR / REQUEST_TOO_LARGE / REQUEST_TOO_SMALL / RESPONSE_GENERATION_ERROR / PER_APP_BATTERY_USE_QUOTA_EXCEEDED / BACKGROUND_USE_BLOCKED / NOT_ENOUGH_DISK_SPACE / NEEDS_SYSTEM_UPDATE / AICORE_INCOMPATIBLE / INVALID_INPUT_IMAGE / CACHE_PROCESSING_ERROR であった(spikes/android/RESULTS.md 参照)。ML Kit GenAI Speech Recognitionを不採用としたため、この対応付けはもはや必要ない。
 - 注記(採用しなかったバックエンドに関する記録): Pixel 6実機(API 37、ブートローダーロック済み)でのML Kit GenAI Speech Recognitionの実測では、`checkStatus()`/`startRecognition()` が `PERMISSION_DENIED: Api access revoked.`(AICoreがGoogle Playストアからも「対応しなくなりました」と明示されるstub版であることが原因)を、`MODE_ADVANCED` 指定時には `UNAVAILABLE: Peer process crashed, exited or was killed (binderDied)` を返すことを確認していた(spikes/android/RESULTS.md 参照)。この実測結果自体がAndroid標準SpeechRecognizerへの差し替えの根拠になったが、上表のAndroid列はすでに新バックエンドの `ERROR_*` 定数に置き換え済みであり、これらのML Kit固有エラーコードの写像は不要になった。
@@ -233,7 +238,7 @@ AVAudioFile(任意フォーマット読込)
 
 ## 6. 並行性・スレッディング
 
-- Android: デコードポンプはDispatchers.IO。`SpeechRecognizer` はコールバック(`RecognitionListener`)ベースであり、生成と `startListening()` / `stopListening()` / `destroy()` はメインスレッドから呼ぶ必要がある。`RecognitionListener` のコールバックもメインスレッドへ届くため、EventChannelへの転送はそのまま行える
+- Android: デコード・リサンプリング・実時間ポンプはDispatchers.IO上で1本のJobとして連結する。`SpeechRecognizer`はメインスレッドから生成・操作する契約であり、`RecognitionListener`と`checkRecognitionSupport()`のコールバックもメインスレッドのExecutorで受ける。EventChannelへの転送はメインスレッドへpost
 - Darwin: SpeechAnalyzerのAsyncSequenceをTaskで消費、FlutterEventSinkへはmain actor経由
 - Windows: WinRT asyncをcoroutine(C++/WinRT)で待機、結果はplatform threadへdispatch
 - Web: シングルスレッド。長時間ファイルでもdecodeAudioDataは非同期なのでUIブロックなし
@@ -265,11 +270,17 @@ AVAudioFile(任意フォーマット読込)
 
 しきい値は以下のとおり。
 
-| 条件 | 言語 | 合格しきい値 | 備考 |
+> **Issue #20 での是正**: 以前の表は ja-JP の「合格しきい値」を 90%以上と書きながら、同じ行の備考で「90〜94%は条件付き合格」としており、90〜94% が合格なのか条件付き合格なのかが読めなかった。3区分へ分けて解消した。なお `spikes/darwin/RESULTS.md` / `spikes/web/RESULTS.md` / `spikes/android/RESULTS.md` はいずれも ja-JP を 95%以上で判定しており、**是正後の本表と一致する**。実測はすべて 66.7% 以下であり、どちらの読み方でも判定は「不成立」で変わらない。
+
+
+| 条件 | 言語 | 区分 | 判定 |
 |---|---|---|---|
-| クリーン基準音声 | ja-JP | 90%以上 | 90〜94%は「条件付き合格 / 要確認」の中間区分とする |
-| クリーン基準音声 | en-US | 95%以上 | - |
-| クリーン基準音声(共通) | - | 上記未満 | 「不成立」。tasks.mdの「M0 出口判定」で対象外化または構成変更の検討対象とする |
+| クリーン基準音声 | ja-JP | 95%以上 | 合格 |
+| クリーン基準音声 | ja-JP | 90〜94% | 条件付き合格 / 要確認 |
+| クリーン基準音声 | ja-JP | 90%未満 | 不成立 |
+| クリーン基準音声 | en-US | 95%以上 | 合格 |
+| クリーン基準音声 | en-US | 95%未満 | 不成立 |
+| クリーン基準音声(共通) | - | 不成立の場合 | tasks.mdの「M0 出口判定」で対象外化または構成変更の検討対象とする |
 | 実環境(ノイズあり、参考値) | ja-JP / en-US | 上記しきい値から一律5ポイント程度緩和した値を参考とする | 後続のE2E回帰でも同一の算出式・正規化ルールを再利用する |
 
 ### 注記: Darwin M0スパイクでのキーワード包含率実測結果
@@ -293,7 +304,7 @@ Webでも同じ基準音声 jaJP_10s(1.0x再生)で実測したところ、包�
 
 1. Windows: RecognizeFromFileの対応フォーマットとロケール指定可否
    - ロケール指定可否: **確定**。下記未決事項2参照
-   - 対応フォーマット: **未確定**。`BatchRecognition.RecognizeFromFile` の公式APIリファレンスページ(および周辺ページ・名前空間全体)に、対応するコンテナ・コーデックの一覧や制約に関する記載が見つからなかった。wav / m4a / mp3 が受理されるかはWindows実機での確認が必須である(Windows機が無いため未実施。spikes/windows/RESULTS.md 参照)
+   - 対応フォーマット: **未確定のまま。M4では「常に変換する」という処置で回避した。** `BatchRecognition.RecognizeFromFile` は Media Foundation で 16kHz・モノラル・16-bit PCM の RIFF WAVE へ変換してから渡す。素通しして失敗したら変換する方式は「どのエラーがフォーマット拒否か」を知っている必要があり、それ自体が未確定の当の対象であるうえ、フォールバックそのものになるため採らなかった。**出力形式(16kHz・モノラル)の選定も推定である**(Windows AI 側の要求サンプルレートは非公開)。Issue #58 で確定させる。以下は調査時点の記録である。`BatchRecognition.RecognizeFromFile` の公式APIリファレンスページ(および周辺ページ・名前空間全体)に、対応するコンテナ・コーデックの一覧や制約に関する記載が見つからなかった。wav / m4a / mp3 が受理されるかはWindows実機での確認が必須である(Windows機が無いため未実施。spikes/windows/RESULTS.md 参照)
 2. Windows: ja-JP対応可否
    - ロケール指定APIの有無: **確定**。`Microsoft.Windows.AI.Speech` 名前空間の全クラス・全メンバー(`SpeechRecognitionModel`・`BatchRecognition`・`AudioConfiguration`等)を公式APIリファレンスで突き合わせた結果、ロケール・言語を指定する引数・プロパティ・メソッドは1件も存在しないことをドキュメント調査で確定した(spikes/windows/RESULTS.md 参照)。ロケール指定ができない以上、design.md §4.4にある「指定不能ならOS言語依存としてREADME明記」という方針が確定した前提となる
    - ja-JP書き起こし可否: **未確定のまま**。ロケール指定APIが無い場合に実際にどの言語で認識されるか(OS表示言語連動か、既定入力言語連動か等)、およびja-JP音声が実際に高精度で認識されるかは、ドキュメントに記載が無くWindows実機でのみ確認可能である(Windows機が無いため未実施。spikes/windows/RESULTS.md 参照)
@@ -307,6 +318,10 @@ Webでも同じ基準音声 jaJP_10s(1.0x再生)で実測したところ、包�
 6. Android: リサンプリング実装の要否(実ファイルのMediaCodec出力レート調査)
    - **確定: リサンプリングは必須**。MediaCodecはコーデックのデコードのみを行い、サンプルレート変換・チャンネルのダウンミックスは一切行わないことを実測で確認した。実環境相当の音源7ファイル(44.1kHz/48kHzステレオのwav・m4a・mp3、22.05kHzモノラル、8kHzモノラル)全てで`resampleNeeded=true`となった(spikes/android/RESULTS.md 参照)。エミュレータ(`sdk_gphone64_arm64`, Android 16/API 36)単一環境での実測であり、実機での追試は引き続き望ましい。この結論は認識バックエンド(ML Kit GenAI Speech Recognition / 標準SpeechRecognizer)とは無関係なMediaCodecの挙動であり、バックエンド差し替えの影響を受けない
 7. Web: 再生速度オプション(`playbackRate`)の上限値と、精度低下に関する利用者への提示方法(M1で決定。§4.1参照)
+   - **確定: 利用者が指定できるAPIオプションとして公開する**。`TranscribeRequest.playbackRate`(既定 1.0)であり、範囲外の値は `ArgumentError` で明確に失敗させる。上限は設けていない
+   - Chrome 153 実機での実測(jaJP_10s、spikes/web/RESULTS.md): 1.0x で 66.7%、1.5x で 50.0%、2.0x で 33.3% と**単調に低下する**。1.1x / 1.25x も測定し、この範囲は選択肢に入りうると判断した
+   - **注意**: `spikes/web/RESULTS.md` は M0 時点で「実用的なスループット向上の余地はない。倍速再生は非対応の方針とする」と結論していたが、**その後の判断でこれを覆し、利用者が速度を指定できるようにする方針が採られた**。ライブラリが勝手に速度を選ぶのではなく、トレードオフを提示したうえで利用者に選ばせるという整理である。RESULTS.md の当該結論は M0 時点の記録として残っている
+   - Web専用オプションであり、他プラットフォームは無視する(§2.2)
 8. Android: 標準SpeechRecognizerのPixel 6以外の端末での動作、および `onResults()` が `null` になる挙動が全端末共通かどうか
    - **未確定。M3で確認する必要がある。** §4.3記載のとおり、ja-JPオンデバイス言語パックの取得・`EXTRA_AUDIO_SOURCE`経由のファイル入力受理・`onResults()`が`null`になる挙動は、いずれもPixel 6(API 37、ブートローダーロック済み)単一機種での実測にとどまる(spikes/android/RESULTS.md「限界」参照)。他機種(特にja-JPのオンデバイス言語パックが最初から導入済みの機種や、`supportedOnDeviceLanguages`自体にja-JPを含まない機種)での挙動、および`onResults()`が`null`になる挙動がAndroidバージョン・機種によらず一貫するかは未検証である
 

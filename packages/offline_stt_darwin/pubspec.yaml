@@ -3,7 +3,9 @@ description: >-
   offline_stt のiOS/macOS共用実装(Swift、SpeechAnalyzer + AVFoundation、
   design.md §4.2)。
 version: 0.1.0
-publish_to: none
+homepage: https://github.com/goofmint/offline_stt
+repository: https://github.com/goofmint/offline_stt
+issue_tracker: https://github.com/goofmint/offline_stt/issues
 
 environment:
   sdk: ^3.9.0
