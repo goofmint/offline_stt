@@ -26,14 +26,9 @@ import android.speech.RecognitionSupport
 import android.speech.RecognitionSupportCallback
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
-import java.util.concurrent.Executors
 import kotlinx.coroutines.suspendCancellableCoroutine
 
 object ModelAvailability {
-    // checkRecognitionSupport()のコールバック用executor。ネイティブ層の
-    // 呼び出しは短時間かつ低頻度(モデル状態確認・ダウンロード完了ポーリング)
-    // であるため、単一スレッドの使い回しで十分である。
-    private val callbackExecutor = Executors.newSingleThreadExecutor()
 
     /** requirements.md FR-1。`OfflineSttApiImpl.checkModel`から呼ばれる。 */
     suspend fun checkModel(context: Context, locale: String): ModelState {
@@ -69,7 +64,15 @@ object ModelAvailability {
                 val recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
                 recognizer.checkRecognitionSupport(
                     buildRecognizerIntent(locale),
-                    callbackExecutor,
+                    // メインスレッドのExecutorを使う。`SpeechRecognizer` は
+                    // メインスレッドから操作する契約であり、コールバック内で
+                    // `recognizer.destroy()` を呼ぶため、専用スレッドの
+                    // Executorでは契約違反になる。違反が例外になった場合
+                    // 下の `runCatching` が握り潰すため、SpeechRecognizerと
+                    // サービス接続の解放が保証できなくなる。ダウンロード完了
+                    // ポーリングは2秒間隔で最大10分続くので、取りこぼしが
+                    // 反復するとインスタンスが積み上がる。
+                    context.mainExecutor,
                     object : RecognitionSupportCallback {
                         override fun onSupportResult(recognitionSupport: RecognitionSupport) {
                             runCatching { recognizer.destroy() }

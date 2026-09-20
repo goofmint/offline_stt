@@ -71,6 +71,13 @@ Stream<DownloadProgress> downloadModel(
       controller.addError(mapPlatformException(e), st);
       await nativeSubscription.cancel();
       await controller.close();
+    } catch (e, st) {
+      // PlatformException以外(例: プラグイン未登録の`MissingPluginException`)
+      // をここで拾わないと、未処理の非同期エラーになるだけでcontrollerは
+      // エラーも完了も受け取らない。購読側は失敗を検知できないまま待ち続ける。
+      controller.addError(e, st);
+      await nativeSubscription.cancel();
+      await controller.close();
     }
   }());
 

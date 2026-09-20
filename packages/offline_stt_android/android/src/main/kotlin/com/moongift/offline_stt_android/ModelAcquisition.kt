@@ -19,7 +19,6 @@ package com.moongift.offline_stt_android
 import android.content.Context
 import android.speech.ModelDownloadListener
 import android.speech.SpeechRecognizer
-import java.util.concurrent.Executors
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -79,7 +78,13 @@ object ModelAcquisition {
                 val recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
                 recognizer.triggerModelDownload(
                     ModelAvailability.buildRecognizerIntent(locale),
-                    Executors.newSingleThreadExecutor(),
+                    // メインスレッドのExecutorを使う。`Executors.newSingleThreadExecutor()`
+                    // は非デーモンスレッドを1本作り、`shutdown()` を呼ばないため
+                    // `downloadModel()` を呼ぶたびにスレッドがプロセス終了まで
+                    // 残り続ける。下のコールバックはいずれも空であり(完了判定は
+                    // 呼び出し元のポーリングが担う)、専用スレッドを用意する
+                    // 理由が無い。
+                    context.mainExecutor,
                     object : ModelDownloadListener {
                         // design.md §4.3(wt73版)のとおりこれらのコールバックは
                         // 完了時に発火しない実測があるため、完了判定には使わず

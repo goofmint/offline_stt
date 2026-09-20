@@ -84,6 +84,12 @@ object RecognitionSession {
                 // うる)。エラーとして扱わず黙って終える。
             }
         }
+        // 本体(`launch`のブロック)が一度も実行されないまま親スコープが
+        // キャンセルされた場合、`use`に入らないため書き込み側FDが閉じられない。
+        // `invokeOnCancellation`は読み取り側しか閉じないので、開始直後に
+        // キャンセルされるとパイプの書き込み側FDが残る。Jobの完了フックで
+        // 確実に閉じる(二重closeは`runCatching`で無害に握る)。
+        pumpJob.invokeOnCompletion { runCatching { writeSide.close() } }
 
         // design.md §4.3(wt73版)注記9: SpeechRecognizerはメインスレッドから
         // 生成・操作する必要がある。本関数はOfflineSttApiImpl経由で

@@ -13,9 +13,21 @@ package com.moongift.offline_stt_android
 
 sealed class AndroidTranscribeError(open val detailMessage: String?) : Exception() {
     /**
-     * API 31/32(`checkRecognitionSupport()`未対応、requirements.md NFR-4は
-     * API 31以上だが同APIはAPI 33〈TIRAMISU〉から追加)、または
      * `ERROR_CANNOT_CHECK_SUPPORT`。
+     *
+     * **API 31/32 はここに含まれない。** `checkRecognitionSupport()` は
+     * API 33(TIRAMISU)で追加されたAPIであり、API 31/32 では FR-1 の4値を
+     * 決める手段そのものが無い。そのため `ModelAvailability.checkModel()` は
+     * `ModelState.UNAVAILABLE` を返す。これは Darwin が OS 26 未満で
+     * `unavailable` を返すのと同じ「OSバージョンゲート」であり、
+     * design.md §4.2 の扱いと揃えている。
+     *
+     * 結果として API 31/32 の利用者が Dart 側で受け取るのは
+     * `DeviceUnsupportedException` ではなく、`checkModel()` の戻り値
+     * `ModelState.unavailable`(および `transcribeFile()` 時の
+     * `ModelUnavailableException`)である。ダウンロード導線も出ない。
+     * 端末が対応していないという事実は同じであり、`unavailable` は
+     * requirements.md FR-1 の定義どおり終端状態である。
      */
     data class DeviceUnsupported(override val detailMessage: String) :
         AndroidTranscribeError(detailMessage)
