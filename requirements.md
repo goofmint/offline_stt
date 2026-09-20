@@ -161,7 +161,7 @@ abstract class OfflineTranscriber {
 | ML Kit GenAI (alpha) の破壊的変更 | Android実装の書き直し | バージョン固定 + 0.x運用、CHANGELOG追従 |
 | Chrome オンデバイスWeb Speechの不安定さ(過去に一時無効化の実績) | Web実装が突然動かなくなる | `available()` を毎回確認、機能検出ベースで劣化 |
 | iOS SpeechAnalyzer / Windows AI の日本語対応が未確認 | 主要ユースケース不成立 | 実装前に4プラットフォームでja-JP実機検証(マイルストーン0)。macOS 26.5.1実機では`supportedLocales`にja-JPを含むことを確認済み(spikes/darwin/RESULTS.md 参照)。iOS実機での確認は残課題 |
-| `start(audioTrack)` + `processLocally` の組み合わせ動作が未検証 | Web実装不成立 | マイルストーン0で検証。Chrome 153実機で確認済み: 併用動作は成立(source.onendedの後にrecognition.stop()を呼ぶことでisFinal結果とonendが発火する。spikes/web/RESULTS.md 参照) |
+| `continuous = true` では `source.onended` 後に明示的に `recognition.stop()` を呼ばないと `onend` が発火せず、セッションが終了しない(終了検出の実装漏れ) | Web実装がアプリ側の実装ミスで無応答になる(transcribeFile()のStreamが完了しない) | design.md §4.1 に必須手順として明記済み。Chrome 153実機で `onended` 内の `stop()` 呼び出しにより `isFinal` 結果と `onend` が発火することを確認済み(spikes/web/RESULTS.md 参照) |
 | Advanced→Basicフォールバック挙動が未検証 | Android品質のばらつき | 実機検証 + preferredModeの挙動をドキュメント化 |
 | 最低OSバージョンが高くユーザー母数が限られる | 採用が進まない | READMEに前提を明記、モデル同梱型代替(sherpa-onnx等)への誘導を記載 |
 

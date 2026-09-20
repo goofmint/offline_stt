@@ -2,9 +2,9 @@
 
 対応 Issue: #3 / #4 / #5 / #6。対応する設計: design.md §4.1 Web、§8 未決事項4。
 
-**このファイルは Web M0 スパイクの実機検証結果である。** `available()` / `install()`(Issue #3 / #4)に加え、`start(audioTrack)` + `processLocally: true` の併用動作(Issue #5)と基準音声での精度確認(Issue #6)も、Chrome 153 の通常の対話的な Chrome セッション(ユーザーの通常 Chrome プロファイル、localhost 配信)で実測済みである。ただし精度確認(Issue #6)は基準音声 `jaJP_10s`(wav、1.0x/1.5x/2.0x)のみが実施範囲であり、`jaJP_3m` / `enUS_*` / m4a形式は本ラウンドでは未実施である(該当箇所は `(未実施)` と明示している)。
+**このファイルは Web M0 スパイクの実機検証結果である。** Issue #3 / #4(`available()` / `install()`)と Issue #5 / #6(`start(audioTrack)` + `processLocally: true` の併用動作、基準音声での精度確認)は、**それぞれ異なる実行条件で実施した**(詳細は各節冒頭の検証環境表を参照)。Issue #3 / #4 は CDP(Chrome DevTools Protocol)管理下のクリーンな一時プロファイルで、言語パック未取得の状態から実施した。Issue #5 / #6 は、後述のとおり一時プロファイルではオーディオレンダリングが動作しなかったため、ユーザーの通常の Chrome プロファイルでの対話的な実行に切り替え、ja-JP言語パック取得済みの状態で実施した。いずれも Chrome 153.0.8010.48、localhost配信、実行日時 2026-09-20(JST)である。ただし精度確認(Issue #6)は基準音声 `jaJP_10s`(wav、1.0x/1.5x/2.0x)のみが実施範囲であり、`jaJP_3m` / `enUS_*` / m4a形式は本ラウンドでは未実施である(該当箇所は `(未実施)` と明示している)。
 
-## 検証環境
+## 検証環境(Issue #3 / #4: 可用性チェック・言語パック取得)
 
 | 項目 | 値 |
 |---|---|
@@ -13,8 +13,8 @@
 | ブラウザUA | `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36` |
 | OS | macOS 26.5.1 (build 25F80), arm64 |
 | 配信方法(localhost / https、URLも記載) | localhost(`http://localhost:8765/spikes/web/index.html`、リポジトリルートを `python3 -m http.server 8765` で配信) |
-| 実行方法 | Chrome DevTools Protocol 経由でクリーンな一時プロファイル(新規 user-data-dir)を使用 |
-| 言語パック状態(実行開始時点) | 未取得(クリーンプロファイルのため) |
+| 実行方法 | Chrome DevTools Protocol 経由でクリーンな一時プロファイル(`--user-data-dir` に新規ディレクトリを指定して起動) |
+| 言語パック状態(実行開始時点) | 未取得(クリーンプロファイルのため)。`available()` が `downloadable` を返すことと、`install()` により `available` へ遷移することをこの節で確認した |
 
 ## `available()` 戻り値(Issue #3)
 
@@ -38,6 +38,17 @@
 | 所要時間 | 8743 ms(約8.7秒) |
 | 実行後の `available()` 戻り値 | `"available"` |
 | 言語パック取得の成功条件(install後に `available` を返すか)を満たしたか | 満たした |
+
+## 検証環境(Issue #5 / #6: audioTrack併用動作・精度確認)
+
+| 項目 | 値 |
+|---|---|
+| 実行日時 | 2026-09-20(JST) |
+| Chromeバージョン | 153.0.8010.48 |
+| OS | macOS 26.5.1 (build 25F80), arm64 |
+| 配信方法 | localhost(`http://localhost:8765/spikes/web/index.html`、リポジトリルートを `python3 -m http.server 8765` で配信) |
+| 実行方法 | ユーザーの通常の Chrome プロファイルでの対話的な実行(CDP管理下の一時プロファイルではオーディオレンダリングが動作しなかったため。詳細は本ファイル末尾「実行環境の制約」参照) |
+| 言語パック状態(実行開始時点) | 取得済み。ja-JPを `install()` により取得済みで、`available()` が `available` を返す状態から開始した |
 
 ## `start(audioTrack)` + `processLocally: true` 併用動作(Issue #5、design.md §8 未決事項4)
 

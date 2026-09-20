@@ -395,6 +395,29 @@ function runRecognitionSession(recognition, source, audioTrack, retained) {
       }
     };
 
+    /**
+     * 再生開始前 (source.start() 失敗時、または onstart タイムアウト時) の失敗経路専用。
+     * finish() はエラーを返すだけで認識セッション/音声トラックを終了させないため、
+     * ここで recognition.abort() と audioTrack.stop() を試みてから finish() を呼ぶ。
+     * 個々の呼び出し失敗は握りつぶさずログに残す。
+     */
+    const failBeforePlayback = (error) => {
+      log('再生開始前に失敗したため、認識セッションと音声トラックを終了させる。', 'warn');
+      try {
+        recognition.abort();
+        log('recognition.abort() を呼び出した。', 'ok');
+      } catch (abortErr) {
+        log(`recognition.abort() 呼び出しでエラー: ${abortErr && abortErr.message}`, 'ng');
+      }
+      try {
+        audioTrack.stop();
+        log('audioTrack.stop() を呼び出した。', 'ok');
+      } catch (stopErr) {
+        log(`audioTrack.stop() 呼び出しでエラー: ${stopErr && stopErr.message}`, 'ng');
+      }
+      finish(null, error);
+    };
+
     recognition.onresult = (event) => {
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
@@ -489,14 +512,13 @@ function runRecognitionSession(recognition, source, audioTrack, retained) {
         source.start();
         log('AudioBufferSourceNode.start() を呼び出した。再生を開始する。');
       } catch (err) {
-        finish(null, err);
+        failBeforePlayback(err);
       }
     };
 
     const onstartTimer = setTimeout(() => {
       if (!startedSource && !sessionEnded) {
-        finish(
-          null,
+        failBeforePlayback(
           new Error('recognition.start(audioTrack) 後 5000ms 以内に onstart が発火しなかった。')
         );
       }
@@ -515,7 +537,9 @@ function runRecognitionSession(recognition, source, audioTrack, retained) {
     } catch (err) {
       clearTimeout(onstartTimer);
       log(`recognition.start(audioTrack) 呼び出しで例外: ${err && err.message}`, 'ng');
-      finish(null, err);
+      // start() 自体が失敗した経路でも audioTrack は live のまま残るため、
+      // 他の失敗経路と同様に確実に停止させてから終了する。
+      failBeforePlayback(err);
     }
   });
 }
@@ -566,7 +590,14 @@ async function runTranscription() {
   // (同意UXをアプリ側に強制するため)。ハーネスも同じ契約に従う。
   // このチェックが無いと、言語パック未取得のまま start() が呼ばれ、
   // Chrome が "aborted" / "language-not-supported" を返して原因が分かりにくくなる。
-  const availability = await SR.available({ langs: [clip.locale], processLocally: true });
+  const availabilityCheck = await checkAvailability(SR, clip.locale);
+  if (!availabilityCheck.ok) {
+    const msg = `${availabilityCheck.errorName}: ${availabilityCheck.errorMessage}`;
+    log(`available() の失敗により文字起こしを中止する (locale=${clip.locale})。`, 'ng');
+    setStatus('transcribe-status', `エラー: ${msg}`);
+    return;
+  }
+  const availability = availabilityCheck.result;
   log(`文字起こし前の available({langs:["${clip.locale}"], processLocally:true}) = ${availability}`);
   if (availability !== 'available') {
     if (availability === 'downloadable') {
