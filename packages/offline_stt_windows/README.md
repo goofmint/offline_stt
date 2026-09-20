@@ -50,7 +50,7 @@ requirements.md NFR-4 および公式ドキュメント(最終更新 2026-07-07)
 
 ## 3. `Package.appxmanifest` の記載例
 
-`flutter create` は `Package.appxmanifest` を生成しない。以下を自分で用意する。実際に動くファイルとしては [`apps/example/windows/packaging/Package.appxmanifest`](../../apps/example/windows/packaging/Package.appxmanifest) をそのまま雛形にできる。
+`flutter create` は `Package.appxmanifest` を生成しない。以下を自分で用意する。実際に動くファイルとしては [`apps/example/windows/packaging/Package.appxmanifest`](https://github.com/goofmint/offline_stt/blob/main/apps/example/windows/packaging/Package.appxmanifest) をそのまま雛形にできる。
 
 既定の Desktop Bridge マニフェストからの**差分は次の4点だけ**である。
 
@@ -208,7 +208,7 @@ checkModel(locale)
 
 文言ガイドライン(requirements.md §8 と公式ドキュメントの両方が同じことを言っている): **具体的なモデル名やベンダー名を出さず**、「音声認識モデル」「オプションの AI モデル」といった一般名称で呼ぶこと。
 
-参照実装は [`apps/example/lib/src/download_consent_dialog.dart`](../../apps/example/lib/src/download_consent_dialog.dart) にある。Windows では上記4点を含む Windows 専用の文面に切り替えている。
+参照実装は [`apps/example/lib/src/download_consent_dialog.dart`](https://github.com/goofmint/offline_stt/blob/main/apps/example/lib/src/download_consent_dialog.dart) にある。Windows では上記4点を含む Windows 専用の文面に切り替えている。
 
 ## 6. 再同意フロー(モデルが削除されたとき)
 

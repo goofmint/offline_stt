@@ -46,6 +46,19 @@ melos:
         find . -name '*.dart' -not -name '*.g.dart'
         -not -path '*/.dart_tool/*' -not -path '*/build/*'
         -print0 | xargs -0 dart format --output=none --set-exit-if-changed
+    doc:
+      description: >-
+        公開パッケージ6つで dart doc を実行し、APIドキュメントが生成できる
+        ことを検証する(Issue #63)。`--validate-links` により、docコメント
+        中の `[...]` 参照切れとREADMEの相対リンク切れを検出する。出力先の
+        `doc/api/` は .gitignore 済み。apps/example は公開しないため除外
+        する。
+      exec:
+        command: dart doc --validate-links --output doc/api
+        concurrency: 1
+      packageFilters:
+        ignore:
+          - example
     pigeon:android:
       description: >-
         pigeons/offline_stt_events.dart から offline_stt_android 向けの

@@ -14,6 +14,8 @@ sealed class TranscribeException implements Exception {
 /// として返す。内部で暗黙的にダウンロードを開始することはない(ダウン
 /// ロード同意UXをライブラリ利用者側に強制するため)。
 class ModelUnavailableException extends TranscribeException {
+  /// 付随情報を持たない例外であるため `const` コンストラクタとし、
+  /// 送出側は常に同一インスタンスを使い回す(`const ModelUnavailableException()`)。
   const ModelUnavailableException();
 
   @override
@@ -22,6 +24,8 @@ class ModelUnavailableException extends TranscribeException {
 
 /// 指定されたロケールにOS/ブラウザが対応していない場合に送出される。
 class LocaleUnsupportedException extends TranscribeException {
+  /// 付随情報を持たない例外であるため `const` コンストラクタとし、
+  /// 送出側は常に同一インスタンスを使い回す(`const LocaleUnsupportedException()`)。
   const LocaleUnsupportedException();
 
   @override
@@ -30,6 +34,8 @@ class LocaleUnsupportedException extends TranscribeException {
 
 /// 音声ファイルのデコードに失敗した場合に送出される。
 class DecodeFailedException extends TranscribeException {
+  /// 付随情報を持たない例外であるため `const` コンストラクタとし、
+  /// 送出側は常に同一インスタンスを使い回す(`const DecodeFailedException()`)。
   const DecodeFailedException();
 
   @override
@@ -40,6 +46,8 @@ class DecodeFailedException extends TranscribeException {
 ///
 /// 例: Androidのブートローダーアンロック端末(design.md §4.3)。
 class DeviceUnsupportedException extends TranscribeException {
+  /// 付随情報を持たない例外であるため `const` コンストラクタとし、
+  /// 送出側は常に同一インスタンスを使い回す(`const DeviceUnsupportedException()`)。
   const DeviceUnsupportedException();
 
   @override
@@ -48,6 +56,8 @@ class DeviceUnsupportedException extends TranscribeException {
 
 /// 文字起こし・ダウンロードがキャンセルされた場合に送出される。
 class CancelledException extends TranscribeException {
+  /// 付随情報を持たない例外であるため `const` コンストラクタとし、
+  /// 送出側は常に同一インスタンスを使い回す(`const CancelledException()`)。
   const CancelledException();
 
   @override
@@ -64,6 +74,9 @@ class CancelledException extends TranscribeException {
 // からの逸脱を意図的に許容する(理由は上記docコメントを参照)。
 // ignore: camel_case_types
 class PlatformException_ extends TranscribeException {
+  /// [code] にはプラットフォーム側のエラーコードをそのまま入れる。
+  /// design.md §2.2 の共通分類へ丸めずに元の値を保持することが、
+  /// この型の存在意義である(requirements.md FR-6)。
   const PlatformException_({required this.code, this.message});
 
   /// プラットフォーム側のエラーコード。
@@ -72,6 +85,11 @@ class PlatformException_ extends TranscribeException {
   /// プラットフォーム側のエラーメッセージ(存在する場合)。
   final String? message;
 
+  /// 値等価。
+  ///
+  /// この型はプラットフォームチャネル越しのエラーコードから毎回新しく
+  /// 生成されるため、同じエラーでもインスタンスは常に別物になる。
+  /// 同一性比較では一致しようがないため、値等価を定義している。
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -80,6 +98,7 @@ class PlatformException_ extends TranscribeException {
         other.message == message;
   }
 
+  /// `==` を上書きしたため対で上書きする(Dartの等価契約)。
   @override
   int get hashCode => Object.hash(code, message);
 

@@ -3,7 +3,9 @@ description: >-
   offline_stt の共通プラットフォームインターフェース。抽象クラス・データ型・
   例外階層を定義する純Dartパッケージ(プラグインではない)。
 version: 0.1.0
-publish_to: none
+homepage: https://github.com/goofmint/offline_stt
+repository: https://github.com/goofmint/offline_stt
+issue_tracker: https://github.com/goofmint/offline_stt/issues
 
 environment:
   sdk: ^3.9.0

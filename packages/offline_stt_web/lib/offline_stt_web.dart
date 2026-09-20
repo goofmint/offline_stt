@@ -1,3 +1,22 @@
+/// `offline_stt` のWeb実装パッケージ。
+///
+/// **利用者がこのパッケージへ直接依存することはない**(requirements.md §6)。
+/// アプリは `offline_stt` にのみ依存すれば、エントリパッケージの
+/// `flutter.plugin.platforms.web.default_package` によってこの実装が
+/// 自動的に選択される(design.md §1 のfederated plugin構成)。
+///
+/// 認識バックエンドはChromeのオンデバイスWeb Speech
+/// (`SpeechRecognition.available/install/start`)、デコードは Web Audio の
+/// `AudioContext` である(design.md §4.1)。Pigeonは使わず
+/// `package:web` + `dart:js_interop` のみで構成している(design.md §2.3)。
+/// Chrome 142以上のデスクトップ版、かつ localhost または https 配信で
+/// なければ動作しない(requirements.md NFR-4)。手動E2E手順は同パッケージの
+/// `E2E_CHECKLIST.md` にある。
+///
+/// 公開APIは [OfflineSttWeb] 1クラスのみであり、残りは `src/` 配下の
+/// 非公開実装である。実装の分担は同クラスのdocコメントを参照すること。
+library;
+
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:offline_stt_platform_interface/offline_stt_platform_interface.dart';
 // offline_stt_platform_interfaceのdocコメント(lib/src/session_guard.dart)が

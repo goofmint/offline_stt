@@ -11,6 +11,9 @@ import 'pigeon.g.dart' as pigeon;
 /// [WindowsStreamRouter]が黙って捨てるのではなく無視した理由が分かるよう
 /// にする(下記`onSegment`実装のコメント参照)。
 class WindowsStreamRoute {
+  /// `onError` / `onDone` は両方のストリームが使うため必須、
+  /// `onSegment` / `onDownloadProgress` はどちらか一方だけを渡す
+  /// (クラスのdocコメント参照)。
   WindowsStreamRoute({
     required this.onError,
     required this.onDone,
