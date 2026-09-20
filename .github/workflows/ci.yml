@@ -136,6 +136,20 @@ jobs:
         working-directory: apps/example
         run: flutter create . --platforms=${{ matrix.platform }} --org com.moongift
 
+      - name: Android minSdk を 31 に引き上げる(offline_stt_android 要件)
+        # flutter create が生成する既定の minSdk(24)は
+        # offline_stt_android の minSdk 31(requirements.md NFR-4:
+        # Android 12 / API 31 以上)より低く、マニフェストのマージが
+        # 「uses-sdk:minSdkVersion 24 cannot be smaller than version 31
+        # declared in library [:offline_stt_android]」で失敗する。
+        # 実際に CI で発生した失敗への対処である。
+        if: matrix.platform == 'android'
+        working-directory: apps/example
+        run: |
+          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 31/' android/app/build.gradle.kts || true
+          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 31/' android/app/build.gradle || true
+          grep -rn "minSdk" android/app/build.gradle.kts android/app/build.gradle 2>/dev/null || true
+
       - name: macOS Deployment Target を 26.0 に引き上げる(offline_stt_darwin.podspec要件)
         # flutter create が生成する既定の macOS Deployment Target(10.15)は
         # offline_stt_darwin.podspec の `s.osx.deployment_target = '26.0'`
