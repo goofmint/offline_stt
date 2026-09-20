@@ -39,8 +39,14 @@ public class OfflineSttDarwinPlugin: NSObject, FlutterPlugin {
     )
     // EventChannel自体がキャンセルされた場合の保険(EventChannelWrappers.swift
     // 参照)。
-    segmentsWrapper.onCancelHandler = { [weak api] in api?.cancelFromEventChannel() }
-    downloadProgressWrapper.onCancelHandler = { [weak api] in api?.cancelFromEventChannel() }
+    // 2本のEventChannelは独立しているため、キャンセル対象も分離する。
+    // 片方の購読解除でもう片方のTaskを巻き添えにしてはならない。
+    segmentsWrapper.onCancelHandler = { [weak api] in
+      api?.cancelTranscriptionFromEventChannel()
+    }
+    downloadProgressWrapper.onCancelHandler = { [weak api] in
+      api?.cancelDownloadFromEventChannel()
+    }
 
     self.api = api
     self.segmentsWrapper = segmentsWrapper

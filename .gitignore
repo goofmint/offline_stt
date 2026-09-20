@@ -1,3 +1,6 @@
+<<<<<<< HEAD
+.DS_Store
+=======
 # Dart / Flutter
 .dart_tool/
 .packages
@@ -41,3 +44,4 @@ melos_*.iml
 
 # 一時設計ノート
 .tmp/
+>>>>>>> origin/main

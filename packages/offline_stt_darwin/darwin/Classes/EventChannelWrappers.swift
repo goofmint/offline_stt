@@ -31,7 +31,7 @@ import Foundation
 final class SegmentsEventWrapper: SegmentsStreamHandler {
   private var sink: PigeonEventSink<TranscriptSegment>?
 
-  /// EventChannel自体がキャンセルされた(Flutter側の購読解除・エンジン
+  /// 当該EventChannel自体がキャンセルされた(Flutter側の購読解除・エンジン
   /// 破棄等)場合に呼ばれる。design.md §3の「2. 2本目のセッションの拒否
   /// 方法」等はDart側(`recognition_session.dart`)が明示的に`cancel()`
   /// HostApiを呼ぶことで担保しているが、Dart側の後始末が何らかの理由で
