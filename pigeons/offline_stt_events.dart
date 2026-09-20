@@ -113,12 +113,35 @@ enum TranscribeErrorCode {
 @HostApi()
 abstract class OfflineSttHostApi {
   /// 対象ロケールのモデル状態を確認する(requirements.md FR-1)。
+  ///
+  /// ## `@async` を付与する理由
+  /// Darwin実装は `AssetInventory.status(forModules:)` /
+  /// `SpeechTranscriber.supportedLocale(equivalentTo:)` という
+  /// Swift ConcurrencyのasyncAPIを呼ばなければ戻り値の `ModelState` を
+  /// 確定できない(`ModelAvailability.swift` 参照)。`@async` を付けない
+  /// 場合、Pigeonが生成するSwiftプロトコルは同期シグネチャ
+  /// (`throws -> ModelState`)になり、非同期APIの結果を得るには
+  /// `DispatchSemaphore` 等でFlutterのプラットフォームスレッドを
+  /// ブロックする回避策が必要になってしまう(ANR・デッドロックの危険が
+  /// あり不可)。`@async` を付けることでPigeonは `completion:` クロージャ
+  /// 形式の非同期シグネチャを生成し、スレッドをブロックせずに
+  /// `async`/`await` へ素直に橋渡しできる。
+  @async
   ModelState checkModel(String locale);
 
   /// モデルダウンロードを開始する(requirements.md FR-2)。
   ///
   /// 進捗は `OfflineSttStreamEvents.downloadProgress()` のEventChannelで
   /// 配信される。本メソッド自体は開始要求のみを表し、値を返さない。
+  ///
+  /// ## `@async` を付けない理由
+  /// このメソッドは「開始要求のみ」を表す契約であり、実装は非同期APIの
+  /// 完了を待たずに `Task` を起動して直ちに制御を返せる(Swift実装では
+  /// `Task.cancel()` と新規 `Task { ... }` の生成のみを行い、いずれも
+  /// 同期処理である。`OfflineSttApiImpl.downloadModel` 参照)。非同期APIの
+  /// 実行結果自体は `downloadProgress` のEventChannelで別途配信されるため、
+  /// 本メソッドの戻り値(`void`)を得るために非同期処理の完了を待つ必要が
+  /// ない。
   void downloadModel(String locale);
 
   /// 音声ファイルの文字起こしを開始する(requirements.md FR-3)。
@@ -129,6 +152,11 @@ abstract class OfflineSttHostApi {
   /// design.md §3 のとおり、`checkModel()` が `ModelState.available` 以外
   /// を返す状態でこのメソッドが呼ばれた場合、ネイティブ側は即座にエラーを
   /// 返さなければならない(内部で暗黙的にダウンロードを開始してはならない)。
+  ///
+  /// ## `@async` を付けない理由
+  /// `downloadModel` と同様に「開始要求のみ」の契約であり、`Task` を
+  /// 起動して直ちに制御を返せる同期的な実装で足りる
+  /// (`OfflineSttApiImpl.transcribeFile` 参照)。
   void transcribeFile(TranscribeRequest request);
 
   /// 実行中のダウンロード、または文字起こしセッションをキャンセルする
@@ -137,6 +165,10 @@ abstract class OfflineSttHostApi {
   /// design.md §3 のとおり同時セッションはv1では1本に制限されるため、
   /// キャンセル対象を明示するパラメータは持たない(実行中の1本のみが
   /// 対象になる)。
+  ///
+  /// ## `@async` を付けない理由
+  /// `Task.cancel()` の呼び出しのみを行う完全に同期的な処理であり、
+  /// 非同期APIを一切呼ばない(`OfflineSttApiImpl.cancel` 参照)。
   void cancel();
 }
 

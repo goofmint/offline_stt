@@ -30,6 +30,15 @@ melos_*.iml
 **/ios/Pods/
 **/ios/.symlinks/
 **/macos/Pods/
+# Flutter が生成する成果物。絶対パス(/Users/...)やローカル symlink を含むため
+# 追跡してはならない。`flutter build` / `pod install` が毎回再生成する。
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Flutter/ephemeral/
+**/ios/Runner/GeneratedPluginRegistrant.*
+**/macos/Flutter/ephemeral/
+**/macos/Flutter/GeneratedPluginRegistrant.swift
 **/windows/flutter/ephemeral/
 **/linux/flutter/ephemeral/
 

@@ -643,14 +643,15 @@ void OfflineSttHostApi::SetUp(
             return;
           }
           const auto& locale_arg = std::get<std::string>(encodable_locale_arg);
-          ErrorOr<ModelState> output = api->CheckModel(locale_arg);
-          if (output.has_error()) {
-            reply(WrapError(output.error()));
-            return;
-          }
-          EncodableList wrapped;
-          wrapped.push_back(CustomEncodableValue(std::move(output).TakeValue()));
-          reply(EncodableValue(std::move(wrapped)));
+          api->CheckModel(locale_arg, [reply](ErrorOr<ModelState>&& output) {
+            if (output.has_error()) {
+              reply(WrapError(output.error()));
+              return;
+            }
+            EncodableList wrapped;
+            wrapped.push_back(CustomEncodableValue(std::move(output).TakeValue()));
+            reply(EncodableValue(std::move(wrapped)));
+          });
         } catch (const std::exception& exception) {
           reply(WrapError(exception.what()));
         }
