@@ -15,7 +15,7 @@
 // なる。Issue #58 で確定させること。
 //
 // 本ヘッダーを include してよいのは、`windows/CMakeLists.txt` の
-// `OFFLINE_STT_WINDOWS_ENABLE_WINDOWS_AI` が ON のときだけコンパイルされる
+// WinAppSDK のヘッダーが見つかったときだけコンパイルされる
 // ファイル(`model_availability.cpp` / `model_acquisition.cpp` /
 // `recognition_session.cpp` / `speech_backend_winrt.cpp`)に限る。
 #ifndef OFFLINE_STT_WINDOWS_WINRT_INCLUDES_H_

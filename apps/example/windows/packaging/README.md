@@ -21,7 +21,21 @@ packaging/
 
 CI の `flutter build windows --debug` は**コンパイルが通ることしか検証していない**。MSIX 化と実際の認識動作は Issue #58 の実機検証の対象である。
 
-## 手順(未検証)
+## 推奨手順: winapp CLI(未検証)
+
+Microsoft は Flutter 向けの公式手順を用意している(`packages/offline_stt_windows/README.md` §4.0)。**このプラグインは `winapp init` が展開する `.winapp/include` を自動検出して Windows AI 実装をビルドするため、`winapp init` を実行しないと example app でも音声認識は動かない**(すべての API 呼び出しが明示的なエラーになる)。
+
+```powershell
+cd apps\example
+winget install Microsoft.winappcli --source winget
+winapp init          # プロンプトの「Setup SDKs」で "Stable SDKs" を選ぶ
+flutter build windows --release
+winapp run .\build\windows\x64\runner\Release   # 開発時: 識別だけ与えて起動
+```
+
+`winapp init` は `Package.appxmanifest` も生成する。その場合、本ディレクトリの `Package.appxmanifest` から **`systemAIModels` capability の宣言(`xmlns:systemai` / `IgnorableNamespaces` / `<systemai:Capability>`)と `MaxVersionTested`** を生成物へ移すこと。これらが無いとモデルにアクセスできない。
+
+## 手順: MakeAppx で手動パッケージングする場合(未検証)
 
 ```powershell
 cd apps\example

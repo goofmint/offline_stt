@@ -8,63 +8,97 @@ set(PLUGIN_NAME "offline_stt_windows_plugin")
 # WinAppSDK(Microsoft.Windows.AI.Speech)の取り込みについて —— Issue #52
 # =============================================================================
 #
-# ## バージョンの齟齬は解消した
-# spikes/windows/RESULTS.md は「`Microsoft.Windows.AI.Speech` の API リファレンス
-# ページは `windows-app-sdk-2.0-experimental` モニカーでのみ存在し、
-# requirements.md NFR-4 の『WinAppSDK 1.7.1以上』と齟齬がある」と記録していた。
-#
-# M4 実装時点(2026-09)で公式ドキュメントを再確認したところ、
+# ## バージョン要件は確定している
+# 公式ドキュメント
 # https://learn.microsoft.com/en-us/windows/ai/apis/speech-recognition
-# (最終更新 2026-07-07、モニカー指定なしの本線ドキュメント)の Prerequisites に
-# 次のとおり明記されている:
+# (最終更新 2026-07-07、モニカー指定なしの本線ドキュメント)の Prerequisites:
 #
 #     - Windows version: Windows 11, version 24H2 (build 26100) or later
 #     - WinAppSDK version: Version 1.7.1 or later
 #
-# すなわち **requirements.md NFR-4 の「1.7.1以上」が正しい**。API は
-# experimental チャンネル限定ではなくなっている。RESULTS.md の記述は
-# M0 調査時点(API が experimental にしか無かった頃)のものである。
+# すなわち requirements.md NFR-4 の「WinAppSDK 1.7.1以上」が正しい。M0 調査
+# 時点では API リファレンスが `windows-app-sdk-2.0-experimental` モニカーでしか
+# 見つからず齟齬を疑っていたが、その疑いは解消した。
 #
-# ## 採用したバージョン
-# NuGet の `Microsoft.WindowsAppSDK` で「1.7.1」に相当するのは
-# `1.7.250401001` である。本プラグインは 1.7 系の最新サービシング
-# `1.7.260224002` を既定とする(上記の最低要件を満たしつつ 1.7 系の修正を
-# 取り込むため)。バージョンは `OFFLINE_STT_WINDOWS_APP_SDK_VERSION` という
-# 1箇所の cache 変数に集約してあり、差し替えはここだけで済む。
+# ## ヘッダーをどう手に入れるか —— CI で実際に失敗させて分かったこと
+# 当初は `VS_PACKAGE_REFERENCES` で Microsoft.WindowsAppSDK の NuGet
+# PackageReference を足せばよいと考えたが、**CI(windows-2025)で実際に
+# ビルドして失敗した**:
 #
-# なお `AIFeatureReadyState` の `CapabilityMissing` /
-# `NotCompatibleWithSystemHardware` / `OSUpdateNeeded` は WinAppSDK 2.0 以降で
-# 追加された値であり、1.7 系ではコンパイルできない。そのため
-# model_availability.cpp の switch は全バージョンに存在する値のみを明示列挙し、
-# 残りを `default` で受けている(同ファイルのコメント参照)。
+#     winrt_includes.h(37,10): error C1083: Cannot open include file:
+#     'winrt/Microsoft.Windows.AI.h': No such file or directory
 #
-# ## ビルドが壊れうる点(**すべて未検証**)
-# 本プラグインはこれまで WinAppSDK を何も宣言していなかったため、Windows の
-# CI ビルド(`flutter build windows --debug`)が通っていた。ここで NuGet 復元を
-# 有効にする以上、CI が壊れる可能性がある。**Windows 実機が無く、一度も
-# ビルドしていない。** CI が最初の検証である。特に次が未確認である:
-#   - CMake(Visual Studio ジェネレータ)が生成する .vcxproj への
-#     `VS_PACKAGE_REFERENCES` 経由の NuGet 復元が機能するか。
-#   - Microsoft.WindowsAppSDK の MSBuild ターゲットが C++/WinRT の
-#     プロジェクションヘッダー(`winrt/Microsoft.Windows.AI.Speech.h` 等)を
-#     生成するか。公式の統合手順は Visual Studio の C++ プロジェクトに対する
-#     ものであり、CMake 経由で同じことが成立する保証は無い。
-#     成立しない場合は runner 側 .vcxproj へ手を入れる等の別手段が要る。
+# `winrt/base.h` や `winrt/Windows.Foundation.h`(Windows SDK 同梱)は開けて
+# いるため、C++/WinRT 自体は使える。開けないのは **WinAppSDK の
+# プロジェクションヘッダー**である。これらは Windows SDK には含まれず、
+# NuGet パッケージ内の .winmd から `cppwinrt.exe` が生成するものであり、
+# CMake が生成する .vcxproj へ PackageReference を足すだけでは
+# 復元も生成も走らなかった。
 #
-# `OFFLINE_STT_WINDOWS_ENABLE_WINDOWS_AI=OFF` にすると WinAppSDK に触れずに
-# ビルドでき、`speech_backend_unavailable.cpp` がリンクされる。その場合
-# すべての API 呼び出しは「WinAppSDK 無しでビルドされている」という明示的な
-# エラーで失敗する(黙って `unavailable` を返すようなフォールバックはしない)。
-# これは配線を切り分けるための退避口であり、既定ではない。
+# ## 採用した方法: winapp CLI が用意する `.winapp/include` を使う
+# Microsoft は Flutter 向けの公式手順を用意している:
+# https://learn.microsoft.com/en-us/windows/apps/dev-tools/winapp-cli/guides/flutter
+# アプリ側で `winapp init` を実行すると、WinAppSDK のヘッダー一式が
+# `<app>/.winapp/include` に展開される。Flutter のランナー(C++)からは
+# そのディレクトリを include path に足し `WindowsApp.lib` をリンクするだけで
+# WinRT API を呼べる、というのが公式が示す手順である。
+#
+# **この手順はアプリ側で必ず必要になる。** Windows AI APIs はパッケージ
+# 識別(MSIX + systemAIModels capability)が無いと動かず、その識別を
+# 与えるのが winapp CLI だからである(packages/offline_stt_windows/README.md
+# 参照)。したがって「プラグインのためだけに増える手順」ではない。
+#
+# 本 CMakeLists は `.winapp/include` を自動検出する:
+#   - 見つかった場合  -> WinRT 実装(speech_backend_winrt.cpp 等)をビルドする。
+#   - 見つからない場合 -> speech_backend_unavailable.cpp をビルドする。
+#     全 API 呼び出しは「WinAppSDK ヘッダー無しでビルドされている。
+#     アプリ側で winapp init を実行せよ」という**明示的なエラー**で失敗する。
+#     黙って `unavailable` を返すようなフォールバックはしない。
+#   どちらになったかは構成時に message() で必ず出力する。
+#
+# CI は winapp CLI を持たないため常に後者になる。つまり **CI が検証するのは
+# WinRT に触れない部分(Pigeon 受け口・スレッド調停・エラー分類・Media
+# Foundation 変換)のコンパイルだけである。** WinRT 実装のコンパイルは
+# Issue #58 の実機検証でしか確認できない。
+#
+# `OFFLINE_STT_WINDOWS_WINAPP_INCLUDE_DIR` を明示的に指定すれば、自動検出の
+# 場所以外(NuGet を手で展開した先など)も使える。
 # =============================================================================
 
-option(OFFLINE_STT_WINDOWS_ENABLE_WINDOWS_AI
-  "Microsoft.Windows.AI.Speech (WinAppSDK) を使う実装をビルドする。OFF にすると全APIが明示的なエラーを返すだけになる(配線切り分け用の退避口)。"
-  ON)
+# アプリ側の `winapp init` が展開する WinAppSDK ヘッダーの場所。
+# 明示指定が無ければ自動検出する。
+set(OFFLINE_STT_WINDOWS_WINAPP_INCLUDE_DIR ""
+  CACHE PATH
+  "WinAppSDK の C++/WinRT プロジェクションヘッダーがあるディレクトリ(通常はアプリの .winapp/include)。空の場合は自動検出する。")
 
-set(OFFLINE_STT_WINDOWS_APP_SDK_VERSION "1.7.260224002"
-  CACHE STRING
-  "Speech Recognition API を含む Microsoft.WindowsAppSDK NuGet パッケージのバージョン。公式ドキュメントの要件は 1.7.1 以上(= NuGet の 1.7.250401001)であり、既定値は 1.7 系の最新サービシングである。理由は本ファイル冒頭のコメント。")
+if(OFFLINE_STT_WINDOWS_WINAPP_INCLUDE_DIR STREQUAL "")
+  # Flutter の Windows ビルドでは、このファイルは
+  # <app>/windows/flutter/ephemeral/.plugin_symlinks/<plugin>/windows/ から
+  # 読み込まれる。CMAKE_SOURCE_DIR はアプリの windows/ ディレクトリを指すため、
+  # その1つ上(= アプリのルート)に .winapp がある。
+  # 念のため、アプリの windows/ 直下も見る。
+  foreach(candidate
+      "${CMAKE_SOURCE_DIR}/../.winapp/include"
+      "${CMAKE_SOURCE_DIR}/.winapp/include")
+    if(EXISTS "${candidate}/winrt/Microsoft.Windows.AI.Speech.h")
+      set(OFFLINE_STT_WINDOWS_WINAPP_INCLUDE_DIR "${candidate}")
+      break()
+    endif()
+  endforeach()
+endif()
+
+if(NOT OFFLINE_STT_WINDOWS_WINAPP_INCLUDE_DIR STREQUAL "")
+  set(OFFLINE_STT_WINDOWS_HAVE_WINDOWS_AI TRUE)
+  message(STATUS
+    "offline_stt_windows: WinAppSDK ヘッダーを ${OFFLINE_STT_WINDOWS_WINAPP_INCLUDE_DIR} に発見した。Windows AI 実装をビルドする。")
+else()
+  set(OFFLINE_STT_WINDOWS_HAVE_WINDOWS_AI FALSE)
+  message(STATUS
+    "offline_stt_windows: WinAppSDK ヘッダー(winrt/Microsoft.Windows.AI.Speech.h)が見つからない。"
+    "音声認識は無効のままビルドする。有効にするにはアプリのルートで `winapp init` を実行するか、"
+    "OFFLINE_STT_WINDOWS_WINAPP_INCLUDE_DIR にヘッダーの場所を指定すること。"
+    "詳細は packages/offline_stt_windows/README.md を参照。")
+endif()
 
 # WinRT に触れないソース。ビルド構成によらず常にコンパイルされるため、
 # Windows CI はこれらのコンパイルエラーを検出できる。
@@ -77,19 +111,12 @@ set(PLUGIN_SOURCES
   "string_conversion.cpp"
   # Issue #54: Media Foundation による wav 変換。Media Foundation は
   # Windows SDK に含まれるため WinAppSDK には依存しない。したがって
-  # OFFLINE_STT_WINDOWS_ENABLE_WINDOWS_AI に関係なく常にビルドする。
+  # WinAppSDK ヘッダーの有無に関係なく常にビルドする。
   "audio_conversion.cpp"
   "pigeon.g.cpp"
 )
 
-if(OFFLINE_STT_WINDOWS_ENABLE_WINDOWS_AI)
-  if(OFFLINE_STT_WINDOWS_APP_SDK_VERSION STREQUAL "")
-    message(FATAL_ERROR
-      "OFFLINE_STT_WINDOWS_ENABLE_WINDOWS_AI=ON のときは "
-      "OFFLINE_STT_WINDOWS_APP_SDK_VERSION に Microsoft.WindowsAppSDK の "
-      "バージョンを指定すること(既定値を空にした場合の保険)。要件は 1.7.1 以上 "
-      "= NuGet の 1.7.250401001 である。")
-  endif()
+if(OFFLINE_STT_WINDOWS_HAVE_WINDOWS_AI)
   list(APPEND PLUGIN_SOURCES
     "speech_backend_winrt.cpp"
     "model_availability.cpp"
@@ -119,22 +146,25 @@ target_link_libraries(${PLUGIN_NAME} PRIVATE
   ole32
 )
 
-if(OFFLINE_STT_WINDOWS_ENABLE_WINDOWS_AI)
+if(OFFLINE_STT_WINDOWS_HAVE_WINDOWS_AI)
   # C++/WinRT のランタイム。WindowsApp.lib は Windows SDK 同梱である。
   target_link_libraries(${PLUGIN_NAME} PRIVATE WindowsApp)
 
-  # **未検証**: CMake の Visual Studio ジェネレータが生成する .vcxproj へ
-  # NuGet の PackageReference を追加する。Microsoft.WindowsAppSDK の
-  # MSBuild ターゲットが C++/WinRT のプロジェクションヘッダー
-  # (winrt/Microsoft.Windows.AI.Speech.h 等)を生成する、というのが
-  # 公式ドキュメント(get-started.md)が示す統合方法だが、それは
-  # Visual Studio の C++ プロジェクトに対する手順であり、CMake 経由で
-  # 同じことが成立するかは確認できていない。
-  # spikes/windows/README.md「ビルド方法(MSBuild を選択した理由)」に、
-  # CMake から cppwinrt.exe を回す公式手順が見つからなかった経緯を記録して
-  # いる。CI(windows-2025)が最初の検証である。
-  set_property(TARGET ${PLUGIN_NAME} PROPERTY VS_PACKAGE_REFERENCES
-    "Microsoft.WindowsAppSDK_${OFFLINE_STT_WINDOWS_APP_SDK_VERSION}")
+  # winapp CLI(あるいは手動展開)が用意した WinAppSDK のプロジェクション
+  # ヘッダー。公式の Flutter 向け手順もこのディレクトリを include path に
+  # 足すだけである(本ファイル冒頭のコメント参照)。
+  target_include_directories(${PLUGIN_NAME} PRIVATE
+    "${OFFLINE_STT_WINDOWS_WINAPP_INCLUDE_DIR}")
+
+  # C++/WinRT のコルーチンは C++20 の <coroutine> を使う。Flutter の既定
+  # (C++17)のままだと winrt/base.h が非推奨の <experimental/coroutine> へ
+  # 落ち、MSVC 14.51 が
+  #   error C2338: static assertion failed: 'error STL1011: ...
+  #   <experimental/coroutine> ... deprecated ... will be REMOVED SOON'
+  # で停止する。実際に CI(windows-2025)で発生したため C++20 を要求する。
+  # 非推奨警告を黙らせるマクロ(_SILENCE_EXPERIMENTAL_COROUTINE_...)は、
+  # 「SOON に削除される」と明言されているものを延命するだけなので使わない。
+  target_compile_features(${PLUGIN_NAME} PRIVATE cxx_std_20)
 
   target_compile_definitions(${PLUGIN_NAME} PRIVATE
     OFFLINE_STT_WINDOWS_ENABLE_WINDOWS_AI=1)

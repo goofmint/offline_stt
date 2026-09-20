@@ -8,7 +8,7 @@
 // C++/WinRT プロジェクションヘッダー(`winrt/Microsoft.Windows.AI.Speech.h`
 // 等)を Flutter の CMake ビルドへ取り込む配線は、本リポジトリでは
 // **一度も検証できていない**(Windows実機が無い)。そのため
-// `OFFLINE_STT_WINDOWS_ENABLE_WINDOWS_AI` が OFF の既定ビルドでも
+// WinAppSDK のヘッダーが無いビルドでも
 // プラグイン全体がコンパイル・リンクできるよう、WinRT に触れるコードを
 // 1ファイル(`speech_backend_winrt.cpp` とそこから呼ぶ3ファイル)に
 // 閉じ込め、それ以外(Pigeonの受け口・スレッド調停・Media Foundation変換)

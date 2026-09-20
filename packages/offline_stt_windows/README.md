@@ -92,7 +92,41 @@ requirements.md NFR-4 および公式ドキュメント(最終更新 2026-07-07)
 
 ## 4. MSIX パッケージ化の手段
 
-`flutter build windows` の出力を MSIX にする方法は複数ある。どれも本リポジトリでは実行していない。
+`flutter build windows` の出力を MSIX にする方法は複数ある。どれも本リポジトリでは実行していない(Windows 機が無いため)。
+
+### 0. winapp CLI(**Microsoft が Flutter 向けに公式手順を用意している。これを使うこと**)
+
+Microsoft は `winapp` CLI という開発者ツールを提供しており、**Flutter 専用の手順ページまで用意している**: <https://learn.microsoft.com/en-us/windows/apps/dev-tools/winapp-cli/guides/flutter>
+
+```powershell
+winget install Microsoft.winappcli --source winget
+
+# アプリのルート(pubspec.yaml のあるディレクトリ)で実行する。
+# Package.appxmanifest / Assets / winapp.yaml と、
+# WinAppSDK のヘッダー一式(.winapp/include)を生成する。
+# プロンプトの「Setup SDKs」で "Stable SDKs" を選ぶこと。
+winapp init
+
+flutter build windows
+
+# 署名も MSIX 化もせずに、パッケージ識別だけ与えて起動する(開発時)
+winapp run .\build\windows\x64\runner\Release
+
+# 配布用の MSIX を作る
+winapp cert generate --if-exists skip
+winapp pack .\dist --cert .\devcert.pfx
+winapp cert install .\devcert.pfx   # 管理者権限。証明書ごとに1回
+```
+
+**このプラグインにとって `winapp init` は MSIX 化のためだけの手順ではない。** `winapp init` が展開する `.winapp/include` には WinAppSDK の C++/WinRT プロジェクションヘッダー(`winrt/Microsoft.Windows.AI.Speech.h` 等)が含まれており、**プラグインの `windows/CMakeLists.txt` はこのディレクトリを自動検出して Windows AI 実装をビルドする**。見つからない場合、プラグインは音声認識を行わず、すべての API 呼び出しが「`winapp init` を実行せよ」という明示的なエラーで失敗する(黙って `unavailable` を返すようなフォールバックはしない)。
+
+したがって **`winapp init` を実行していないアプリでは、このプラグインは動かない。**
+
+ヘッダーを別の場所に用意している場合は CMake 変数 `OFFLINE_STT_WINDOWS_WINAPP_INCLUDE_DIR` でその場所を指定できる。
+
+> **なぜ NuGet の PackageReference ではないのか。** 当初はプラグインの CMake から `VS_PACKAGE_REFERENCES` で `Microsoft.WindowsAppSDK` を参照する方式を実装したが、CI(windows-2025)で実際にビルドしたところ `error C1083: Cannot open include file: 'winrt/Microsoft.Windows.AI.h'` で失敗した。WinAppSDK のプロジェクションヘッダーは Windows SDK には含まれず、NuGet パッケージ内の `.winmd` から `cppwinrt.exe` が生成するものであり、CMake が生成する `.vcxproj` に PackageReference を足すだけでは復元も生成も走らなかった。詳細は `windows/CMakeLists.txt` の冒頭コメントに記録してある。
+
+以下の A〜C は `winapp` CLI を使わない場合の代替手段である。
 
 ### A. Visual Studio の「Windows アプリケーション パッケージ プロジェクト」(.wapproj)
 
@@ -239,6 +273,9 @@ design.md §5 のエラーマッピング表 Windows 列に対応する。
 `systemAIModels` の宣言漏れ(`E_ACCESSDENIED`)は `PlatformException_` に分類される。`DeviceUnsupportedException` ではない点に注意する。これは「端末が非対応」ではなく「アプリのマニフェスト不備」であり、FR-1 の4値・FR-6 の6値にこれを表す専用の値が無いためである。原因に到達できるよう、メッセージに `systemAIModels` への言及を含めている(`windows/windows_transcribe_error.cpp`)。
 
 **HRESULT の分類は未検証である。** 各 API が実際にどの HRESULT を返すかは一度も観測できていない。現在の分類は公式ドキュメントの記述と Media Foundation の HRESULT ファシリティ規約(`MF_E_*` は `0xC00D....`)に基づく推定である。
+
+
+> **追記(CI で判明した事実)**: 下記のうち「CMake 経由の NuGet 復元と C++/WinRT プロジェクションヘッダー生成が成立するか」は、CI(windows-2025)で実際にビルドして **成立しないことが分かった**(`error C1083: Cannot open include file: 'winrt/Microsoft.Windows.AI.h'`)。そのため §4.0 の winapp CLI 方式へ切り替えてある。また `<experimental/coroutine>` の非推奨エラー(MSVC 14.51 の `error C2338: STL1011`)も同時に判明し、WinRT 実装のビルドでは C++20 を要求するようにした。**ただし WinRT 実装そのもののコンパイルは依然として一度も通っていない。** CI は winapp CLI を持たないため、WinRT 実装をビルドしないからである。
 
 ## 9. 未検証事項
 

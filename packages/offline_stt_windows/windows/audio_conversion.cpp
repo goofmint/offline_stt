@@ -150,9 +150,17 @@ AudioConversionResult ConvertToPcmWav(const std::string& input_path_utf8) {
   }
 
   // 音声ストリームだけを有効にする。
-  hr = reader->SetStreamSelection(MF_SOURCE_READER_ALL_STREAMS, FALSE);
+  //
+  // `MF_SOURCE_READER_ALL_STREAMS` / `MF_SOURCE_READER_FIRST_AUDIO_STREAM` は
+  // `MF_SOURCE_READER_CONTROL_FLAG` と同じヘッダーで定義された**符号付き**の
+  // 無名 enum であり、`IMFSourceReader` の各メソッドが取るのは `DWORD`
+  // (符号なし)である。MSVC は Flutter の既定設定(警告をエラー扱い)の下で
+  // これを C4245「signed/unsigned mismatch」として拒否する。実際に CI
+  // (windows-2025 / MSVC 14.51)で `error C2220` となったため、明示的に
+  // `static_cast<DWORD>` を書いている。値自体は変わらない。
+  hr = reader->SetStreamSelection(static_cast<DWORD>(MF_SOURCE_READER_ALL_STREAMS), FALSE);
   if (SUCCEEDED(hr)) {
-    hr = reader->SetStreamSelection(MF_SOURCE_READER_FIRST_AUDIO_STREAM, TRUE);
+    hr = reader->SetStreamSelection(static_cast<DWORD>(MF_SOURCE_READER_FIRST_AUDIO_STREAM), TRUE);
   }
   if (FAILED(hr)) {
     result.error = DecodeFailed("SetStreamSelection", hr);
@@ -184,7 +192,7 @@ AudioConversionResult ConvertToPcmWav(const std::string& input_path_utf8) {
     result.error = DecodeFailed("MFCreateMediaType", hr);
     return result;
   }
-  hr = reader->SetCurrentMediaType(MF_SOURCE_READER_FIRST_AUDIO_STREAM, nullptr,
+  hr = reader->SetCurrentMediaType(static_cast<DWORD>(MF_SOURCE_READER_FIRST_AUDIO_STREAM), nullptr,
                                    output_type.Get());
   if (FAILED(hr)) {
     // 要求した 16kHz モノラル 16-bit へ変換できない場合(入力に音声ストリーム
@@ -233,7 +241,7 @@ AudioConversionResult ConvertToPcmWav(const std::string& input_path_utf8) {
   for (;;) {
     DWORD stream_flags = 0;
     ComPtr<IMFSample> sample;
-    hr = reader->ReadSample(MF_SOURCE_READER_FIRST_AUDIO_STREAM, 0, nullptr,
+    hr = reader->ReadSample(static_cast<DWORD>(MF_SOURCE_READER_FIRST_AUDIO_STREAM), 0, nullptr,
                             &stream_flags, nullptr, sample.GetAddressOf());
     if (FAILED(hr)) {
       result.error = DecodeFailed("ReadSample", hr);

@@ -1,7 +1,7 @@
 // speech_backend_winrt.cpp
 //
 // `SpeechBackend` の本実装(Issue #52〜#56)。
-// `OFFLINE_STT_WINDOWS_ENABLE_WINDOWS_AI` が ON のときだけコンパイルされる
+// WinAppSDK のヘッダーが見つかったときだけコンパイルされる
 // (`windows/CMakeLists.txt` 参照)。
 //
 // 各APIの詳細と判断の根拠は model_availability.h / model_acquisition.h /
