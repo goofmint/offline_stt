@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>M0 検証スパイク — Web オンデバイス音声認識</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --border: #ccc;
+    --bg-panel: #f7f7f7;
+    --ok: #0a7d1f;
+    --ng: #b30000;
+    --warn: #a86a00;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", sans-serif;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 16px;
+    line-height: 1.5;
+  }
+  h1 { font-size: 1.3rem; }
+  h2 { font-size: 1.05rem; margin-top: 1.6em; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+  section { margin-bottom: 1.2em; }
+  .panel {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    background: var(--bg-panel);
+  }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0; }
+  dt { font-weight: bold; word-break: break-word; }
+  dd { margin: 0; word-break: break-word; }
+  button {
+    padding: 6px 14px;
+    margin-right: 8px;
+    margin-bottom: 8px;
+    cursor: pointer;
+  }
+  button:disabled { cursor: not-allowed; opacity: 0.5; }
+  #log {
+    height: 320px;
+    overflow-y: auto;
+    background: #111;
+    color: #ddd;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 12px;
+    padding: 8px;
+    border-radius: 6px;
+    white-space: pre-wrap;
+  }
+  .log-line { padding: 1px 0; }
+  .log-ok { color: #7CFC00; }
+  .log-ng { color: #ff6b6b; }
+  .log-warn { color: #ffd166; }
+  .log-info { color: #ddd; }
+  textarea#result-text {
+    width: 100%;
+    min-height: 140px;
+    box-sizing: border-box;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 13px;
+  }
+  #score-result { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 13px; }
+  .score-summary { font-weight: bold; margin-bottom: 4px; }
+  .note {
+    font-size: 0.85rem;
+    color: #666;
+  }
+  select { padding: 4px; }
+</style>
+</head>
+<body>
+
+<h1>M0 検証スパイク: Web オンデバイス音声認識 (Chrome Web Speech API)</h1>
+<p class="note">
+  対応 Issue: #3(可用性チェック)/ #4(言語パック取得)/ #5(audioTrack + processLocally併用)/ #6(キーワード包含率)。
+  詳細な実行手順は <code>spikes/web/README.md</code> を参照すること。ビルドツール・外部依存なしの素のHTML/JSで構成している。
+</p>
+
+<section>
+  <h2>実行環境情報</h2>
+  <div class="panel">
+    <dl>
+      <dt>User-Agent</dt><dd id="env-ua">(未取得)</dd>
+      <dt>location.protocol</dt><dd id="env-protocol">(未取得)</dd>
+      <dt>Chrome判定</dt><dd id="env-chrome">(未取得)</dd>
+    </dl>
+  </div>
+</section>
+
+<section>
+  <h2>(A) 可用性チェック / 言語パック取得 (Issue #3, #4)</h2>
+  <div class="panel">
+    <button id="btn-check-availability">可用性チェック</button>
+    <button id="btn-install" disabled>言語パック取得 (install)</button>
+    <dl>
+      <dt>available() 結果</dt><dd id="availability-result">(未実施)</dd>
+      <dt>install() Promise解決値</dt><dd id="install-result">(未実施)</dd>
+      <dt>install後の available()</dt><dd id="install-after-result">(未実施)</dd>
+    </dl>
+  </div>
+</section>
+
+<section>
+  <h2>(B) ファイル選択 / 文字起こし実行 (Issue #5)</h2>
+  <div class="panel">
+    <p>
+      <label for="file-input">音声ファイル選択 (ユーザー操作起点):</label><br>
+      <input type="file" id="file-input" accept="audio/*">
+    </p>
+    <p id="clip-guess" class="note">(未選択)</p>
+    <p>
+      <label for="clip-select">クリップID手動選択(自動推定できない場合):</label>
+      <select id="clip-select">
+        <option value="auto">自動推定を使う</option>
+        <option value="jaJP_10s">jaJP_10s</option>
+        <option value="jaJP_3m">jaJP_3m</option>
+        <option value="enUS_10s">enUS_10s</option>
+        <option value="enUS_3m">enUS_3m</option>
+      </select>
+    </p>
+    <button id="btn-transcribe">文字起こし実行</button>
+    <dl>
+      <dt>実行状態</dt><dd id="transcribe-status">(未実施)</dd>
+    </dl>
+    <p class="note">
+      NFR-1注記: Webの認識は実時間処理のため、所要時間はファイル長と同程度になる想定である
+      (10秒ファイルなら約10秒、3分ファイルなら約3分)。
+    </p>
+  </div>
+</section>
+
+<section>
+  <h2>結果テキスト</h2>
+  <textarea id="result-text" readonly placeholder="ここに確定(final)テキストが表示される。コピー可能。"></textarea>
+</section>
+
+<section>
+  <h2>(C) キーワード包含率スコア (Issue #6)</h2>
+  <div class="panel" id="score-result">(未実施)</div>
+</section>
+
+<section>
+  <h2>実行ログ</h2>
+  <div id="log"></div>
+</section>
+
+<script src="./spike.js"></script>
+</body>
+</html>

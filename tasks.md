@@ -16,8 +16,8 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」タ�
 
 ### Web
 
-- [ ] Chrome 142+ で `SpeechRecognition.available({langs: ['ja-JP'], processLocally: true})` の結果確認
-- [ ] `install()` での ja-JP 言語パック取得確認
+- [x] Chrome 142+ で `SpeechRecognition.available({langs: ['ja-JP'], processLocally: true})` の結果確認(結果: downloadable。spikes/web/RESULTS.md 参照)
+- [x] `install()` での ja-JP 言語パック取得確認(取得成功、約8.7秒で available へ遷移。spikes/web/RESULTS.md 参照)
 - [ ] `start(audioTrack)` + `processLocally: true` の併用動作確認(設計未決事項4)
 - [ ] 基準音声での書き起こし精度確認
 

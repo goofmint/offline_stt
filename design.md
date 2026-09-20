@@ -97,6 +97,8 @@ File/Blob → fetch/FileReader → ArrayBuffer
 ```
 
 - 初期化時に `SpeechRecognition.available({langs, processLocally: true})` を確認し、`downloadable` なら `install()` をFR-2のダウンロードとして扱う
+- `install()` は進捗イベントを持たず `Promise<boolean>` を返す(Chrome 153で実機確認済み)。そのため `DownloadProgress(fraction: null)` の不定進捗として写像する
+- `AudioContext.decodeAudioData` は入力が16kHzでも `AudioContext` の既定サンプルレートへ自動リサンプリングされる(実測環境では48kHz)
 - `processLocally = true` を常時設定。設定不能・失敗時はサーバーフォールバックせずエラー終了(NFR-2)
 - `continuous = true`、`interimResults = true` でpartialをTranscriptSegmentに写像
 - 終了検出: sourceの `onended` 後、`recognition.onend` をもってStream close
@@ -215,5 +217,8 @@ AVAudioFile(任意フォーマット読込)
 2. Windows: ja-JP対応可否
 3. Darwin: SpeechAnalyzerのja-JP対応可否とファイル処理速度
 4. Web: `start(audioTrack)` + `processLocally: true` の併用動作
+   - 進捗注記: `processLocally = true` の設定と読み戻しはChrome 153で可能であることを確認済み。併用動作そのものは未検証
 5. Android: MODE_ADVANCED指定時の非対応端末での自動フォールバック有無
 6. Android: リサンプリング実装の要否(実ファイルのMediaCodec出力レート調査)
+
+確定事項: `available()` / `install()` のja-JP実機確認結果(クリーンプロファイルで `downloadable` → `install()` で `available`。Chrome 153、spikes/web/RESULTS.md 参照)

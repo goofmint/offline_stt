@@ -21,7 +21,7 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」要�
 | Android | ML Kit GenAI Speech Recognition (Basic基本 + Advanced優先) | AICore / OS |
 | iOS / macOS | SpeechAnalyzer | OS (AssetInventory) |
 | Windows | Windows AI APIs Speech Recognition | OS (NPUプリインストール / Windows Update) |
-| Web | Chrome オンデバイスWeb Speech (processLocally) | Chrome (言語パック約60MB) |
+| Web | Chrome オンデバイスWeb Speech (processLocally) | Chrome (言語パック約60MB。ja-JP言語パックの取得はChrome 153で実機確認済み) |
 
 ### 対象外
 
@@ -48,6 +48,7 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」要�
 - `downloadModel(locale)` でOS管理のモデル取得をトリガーし、進捗をStreamで返す
 - ダウンロードはユーザー同意後に呼び出す前提とし、同意UIはライブラリ利用者(アプリ側)の責務とする(Windows AI推奨UXパターンに準拠)
 - Windowsは進捗APIの粒度が異なるため、進捗が取得できない場合は不定進捗として通知
+- Webの `install()` は進捗イベントを提供せず `Promise<boolean>` のみを返すため(Chrome 153で実機確認済み、spikes/web/RESULTS.md 参照)、Windowsと同様に不定進捗として扱う
 
 ### FR-3 ファイル文字起こし
 
@@ -69,7 +70,7 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」要�
 
 - BCP-47形式でロケールを指定
 - 対応ロケールはプラットフォーム・モードごとに異なるため、静的リストを持たず `checkModel(locale)` による実行時解決とする
-- 日本語(ja-JP)は全プラットフォームで動作検証を必須とする(検証済み事項: Android Basic = ja-JP beta、Android Advanced = ja-JP 高精度リスト掲載、Chrome オンデバイス = ja-JP対応。iOS SpeechAnalyzer と Windows AI の日本語対応は実機検証で確認)
+- 日本語(ja-JP)は全プラットフォームで動作検証を必須とする(検証済み事項: Android Basic = ja-JP beta、Android Advanced = ja-JP 高精度リスト掲載、Chrome オンデバイス = ja-JP対応。Chrome 153で `available()` が `downloadable`、`install()` 後に `available` へ遷移することを実機確認済み(spikes/web/RESULTS.md 参照)。iOS SpeechAnalyzer と Windows AI の日本語対応は実機検証で確認)
 
 ### FR-6 エラーモデル
 
