@@ -1,8 +1,0 @@
-com.moongift.offlinestt.spike.app-pngs-0 /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/build/generated/res/pngs/debug
-com.moongift.offlinestt.spike.app-updated_navigation_xml-1 /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/build/generated/updated_navigation_xml/debug
-com.moongift.offlinestt.spike.app-packageDebugResources-2 /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/build/intermediates/incremental/debug/packageDebugResources/merged.dir
-com.moongift.offlinestt.spike.app-packageDebugResources-3 /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/build/intermediates/incremental/debug/packageDebugResources/stripped.dir
-com.moongift.offlinestt.spike.app-debug-4 /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/build/intermediates/merged_res/debug/mergeDebugResources
-com.moongift.offlinestt.spike.app-debug-5 /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/debug/res
-com.moongift.offlinestt.spike.app-main-6 /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/res
-gradleHome-0 /Users/nakatsugawa/.gradle
