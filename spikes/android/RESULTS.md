@@ -541,6 +541,25 @@ startListening() を呼び出す (EXTRA_AUDIO_SOURCE 付き)。   ← 22:58:01.0
 挙動か、`EXTRA_AUDIO_SOURCE` 経由特有の終端処理の違いか、本実装のIntent設定の不足かは未検証)。
 **この点は本代替案をM3で採用する場合の要検証事項として残る。**
 
+**追加実験: 明示的な `stopListening()` 呼び出しは解決策にならなかった。** 「パイプを閉じるだけでは
+入力終了が伝わっていないのではないか」という仮説のもと、`RealtimePump` 完了直後に
+`recognizer.stopListening()` を明示的に呼び出す変更を加えて再実行した。結果は次のとおりである。
+
+```
+[RecognitionListener] onResults(texts=null)                ← 23:04:26.969 (ポンプ完了の150ms後、この時点で既にnull)
+stopListening() を呼び出した。                                ← 23:04:40.281 (resultsTextsがnullのまま20秒待った後)
+[RecognitionListener] onError(error=5, name=ERROR_CLIENT)   ← 23:04:40.307
+```
+
+**`onResults(texts=null)` は `stopListening()` を呼ぶより前に、パイプが閉じた直後の時点で既に
+発火していた。** つまり本実装の呼び出し順序（パイプclose → 約20秒待機 → stopListening()）では
+手遅れであり、`stopListening()` はセッション終了後の呼び出しとなって `ERROR_CLIENT`(5番)を
+誘発しただけだった。**`onResults` のテキストが `null` になる現象は、`stopListening()` の
+有無とは無関係に発生しており、パイプの読み取り終端(EOF)自体が確定テキスト無しの
+`onResults` を引き起こしていると考えられる。** 本当に試すべきなのは「`RealtimePump` が
+書き込みを終えてパイプをcloseした直後、間を置かずに `stopListening()` を呼ぶ」順序だが、
+これは時間の制約により本検証では実施できなかった。
+
 ### C: ja-JP の認識精度(実測。ただし「確定テキスト」ではなく最終部分認識テキストによる)
 
 B で確定テキスト(`onResults`)が `null` だったため、design.md §7 の「確定テキストで判定する」
