@@ -26,14 +26,10 @@ import android.speech.RecognitionSupport
 import android.speech.RecognitionSupportCallback
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
-import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.suspendCancellableCoroutine
 
 object ModelAvailability {
-    // checkRecognitionSupport()のコールバック用executor。ネイティブ層の
-    // 呼び出しは短時間かつ低頻度(モデル状態確認・ダウンロード完了ポーリング)
-    // であるため、単一スレッドの使い回しで十分である。
-    private val callbackExecutor = Executors.newSingleThreadExecutor()
 
     /** requirements.md FR-1。`OfflineSttApiImpl.checkModel`から呼ばれる。 */
     suspend fun checkModel(context: Context, locale: String): ModelState {
@@ -65,24 +61,53 @@ object ModelAvailability {
      */
     suspend fun querySupport(context: Context, locale: String): RecognitionSupport? =
         suspendCancellableCoroutine { continuation ->
+            // `SpeechRecognizer` の破棄経路を1箇所に集約する。コールバック・
+            // 同期例外・コルーチンのキャンセルのいずれで終わっても、必ず
+            // 1回だけ `destroy()` する。
+            //
+            // 破棄はメインスレッドで行う。`SpeechRecognizer` はメインスレッド
+            // から操作する契約であり、違反が例外になると `runCatching` が
+            // 握り潰してサービス接続の解放が保証できなくなる。ダウンロード
+            // 完了ポーリングは2秒間隔で最大10分続くため、取りこぼしが反復
+            // するとインスタンスが積み上がる。
+            var recognizer: SpeechRecognizer? = null
+            val destroyed = AtomicBoolean(false)
+            val mainExecutor = context.mainExecutor
+            fun destroyOnce() {
+                // 生成前に呼ばれた場合は `destroyed` を立てずに帰る。先に
+                // 立ててしまうと、生成とキャンセルが競合したときに
+                // 「フラグだけ立って実体は破棄されない」状態になり、以降の
+                // destroyOnce() が何もしなくなってリークする。
+                val target = recognizer ?: return
+                if (!destroyed.compareAndSet(false, true)) return
+                mainExecutor.execute { runCatching { target.destroy() } }
+            }
+
             try {
-                val recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+                recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+                // ハンドラの登録は生成後に行う。既にキャンセル済みであれば
+                // `invokeOnCancellation` は登録時点で即座にハンドラを実行する
+                // ため、生成直後にキャンセルされていても取りこぼさない。
+                continuation.invokeOnCancellation { destroyOnce() }
                 recognizer.checkRecognitionSupport(
                     buildRecognizerIntent(locale),
-                    callbackExecutor,
+                    mainExecutor,
                     object : RecognitionSupportCallback {
                         override fun onSupportResult(recognitionSupport: RecognitionSupport) {
-                            runCatching { recognizer.destroy() }
-                            if (continuation.isActive) continuation.resumeWith(Result.success(recognitionSupport))
+                            destroyOnce()
+                            if (continuation.isActive) {
+                                continuation.resumeWith(Result.success(recognitionSupport))
+                            }
                         }
 
                         override fun onError(error: Int) {
-                            runCatching { recognizer.destroy() }
+                            destroyOnce()
                             if (continuation.isActive) continuation.resumeWith(Result.success(null))
                         }
                     },
                 )
             } catch (t: Throwable) {
+                destroyOnce()
                 if (continuation.isActive) continuation.resumeWith(Result.success(null))
             }
         }

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MainActivity は AppCompatActivity を継承しているため、Theme.AppCompat の派生テーマが必須である。
+  これを満たさないと onCreate の setContentView で
+  "You need to use a Theme.AppCompat theme (or descendant) with this activity." が送出され、
+  アプリは起動直後にクラッシュする (エミュレータ上で実際に発生したため本テーマを追加した)。
+-->
+<resources>
+    <style name="Theme.OfflineSttSpike" parent="Theme.AppCompat.DayNight.NoActionBar" />
+</resources>

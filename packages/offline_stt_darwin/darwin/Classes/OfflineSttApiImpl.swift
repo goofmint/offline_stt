@@ -84,10 +84,22 @@ final class OfflineSttApiImpl: NSObject, OfflineSttHostApi {
     currentDownloadTask?.cancel()
   }
 
-  /// EventChannel自体がキャンセルされた場合の保険(EventChannelWrappers.swift
-  /// のドキュメントコメント参照)。
-  func cancelFromEventChannel() {
+  /// `segments` EventChannel自体がキャンセルされた場合の保険
+  /// (EventChannelWrappers.swift のドキュメントコメント参照)。
+  ///
+  /// 停止するのは文字起こしTaskのみである。2本のEventChannelは独立して
+  /// いるため、片方の購読解除でもう片方を巻き添えにしてはならない
+  /// (例: ja-JPの文字起こし中にen-USのダウンロードStreamの購読を
+  /// 解除しても、文字起こしは継続しなければならない)。明示的な
+  /// `cancel()` HostApiは従来どおり両方を停止する。
+  func cancelTranscriptionFromEventChannel() {
     currentTranscriptionTask?.cancel()
+  }
+
+  /// `downloadProgress` EventChannel自体がキャンセルされた場合の保険。
+  /// 停止するのはダウンロードTaskのみである(理由は
+  /// `cancelTranscriptionFromEventChannel()` のコメント参照)。
+  func cancelDownloadFromEventChannel() {
     currentDownloadTask?.cancel()
   }
 

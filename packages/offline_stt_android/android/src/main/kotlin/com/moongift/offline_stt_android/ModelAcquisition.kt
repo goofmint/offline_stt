@@ -17,9 +17,9 @@
 package com.moongift.offline_stt_android
 
 import android.content.Context
+import android.os.Build
 import android.speech.ModelDownloadListener
 import android.speech.SpeechRecognizer
-import java.util.concurrent.Executors
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -75,30 +75,57 @@ object ModelAcquisition {
 
     private suspend fun triggerDownload(context: Context, locale: String) {
         suspendCancellableCoroutine<Unit> { continuation ->
+            // `SpeechRecognizer` は生成したら必ず `destroy()` する。要求を
+            // 引き渡した時点で本インスタンスの用は済む(完了判定は呼び出し元の
+            // ポーリングが担う)ため、同期例外の有無にかかわらず finally で
+            // 破棄する。破棄し忘れるとダウンロード要求のたびにインスタンスが
+            // 積み上がる。本関数は OfflineSttApiImpl のメインスレッドスコープ
+            // 上で実行されるため、`destroy()` のメインスレッド契約も満たす。
+            var recognizer: SpeechRecognizer? = null
             try {
-                val recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
-                recognizer.triggerModelDownload(
-                    ModelAvailability.buildRecognizerIntent(locale),
-                    Executors.newSingleThreadExecutor(),
-                    object : ModelDownloadListener {
-                        // design.md §4.3(wt73版)のとおりこれらのコールバックは
-                        // 完了時に発火しない実測があるため、完了判定には使わず
-                        // ログの意味合いでのみ持つ。完了判定は呼び出し元の
-                        // ポーリングloopが担う。
-                        override fun onScheduled() {}
+                recognizer = SpeechRecognizer.createOnDeviceSpeechRecognizer(context)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    // `triggerModelDownload(Intent, Executor, ModelDownloadListener)`
+                    // は API 34(UPSIDE_DOWN_CAKE)で追加された overload である。
+                    // API 33 でこれを呼ぶと `NoSuchMethodError` になり、下の
+                    // catch が握り潰すためダウンロードが始まらないまま
+                    // ポーリングだけが上限まで続く。API 33 でも
+                    // `checkRecognitionSupport()` は downloadable を返しうる
+                    // ため、この経路には実際に到達する。
+                    recognizer.triggerModelDownload(
+                        ModelAvailability.buildRecognizerIntent(locale),
+                        // メインスレッドのExecutorを使う。専用スレッドの
+                        // Executor は非デーモンスレッドを作り `shutdown()` も
+                        // 呼ばれないため、呼び出しのたびにスレッドが残る。
+                        // 下のコールバックはいずれも空であり、専用スレッドを
+                        // 用意する理由が無い。
+                        context.mainExecutor,
+                        object : ModelDownloadListener {
+                            // design.md §4.3 のとおりこれらのコールバックは
+                            // 完了時に発火しない実測があるため、完了判定には
+                            // 使わない。完了判定は呼び出し元のポーリングloopが
+                            // 担う。
+                            override fun onScheduled() {}
 
-                        override fun onProgress(progress: Int) {}
+                            override fun onProgress(progress: Int) {}
 
-                        override fun onSuccess() {}
+                            override fun onSuccess() {}
 
-                        override fun onError(error: Int) {}
-                    },
-                )
+                            override fun onError(error: Int) {}
+                        },
+                    )
+                } else {
+                    recognizer.triggerModelDownload(
+                        ModelAvailability.buildRecognizerIntent(locale),
+                    )
+                }
             } catch (t: Throwable) {
                 // triggerModelDownload自体の呼び出し失敗は、以降の
                 // ポーリングに委ねる(再照会してもinstalledに現れなければ
                 // 最終的にMAX_WAIT_MSでタイムアウトする)。ここで例外を
                 // 投げて直ちに失敗にはしない。
+            } finally {
+                runCatching { recognizer?.destroy() }
             }
             if (continuation.isActive) continuation.resumeWith(Result.success(Unit))
         }
