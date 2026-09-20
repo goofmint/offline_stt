@@ -1,0 +1,35 @@
+name: offline_stt_darwin
+description: >-
+  offline_stt のiOS/macOS共用実装(Swift、SpeechAnalyzer + AVFoundation、
+  design.md §4.2)。雛形のみ、実装はM2で行う。
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+  flutter: ">=3.41.0"
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  offline_stt_platform_interface: ^0.1.0
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  plugin:
+    implements: offline_stt
+    platforms:
+      ios:
+        pluginClass: OfflineSttDarwinPlugin
+        dartPluginClass: OfflineSttDarwin
+        sharedDarwinSource: true
+      macos:
+        pluginClass: OfflineSttDarwinPlugin
+        dartPluginClass: OfflineSttDarwin
+        sharedDarwinSource: true

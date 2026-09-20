@@ -1,0 +1,5 @@
+com.moongift.offlinestt.spike.test.app-updated_navigation_xml-0 /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/build/generated/updated_navigation_xml/debugAndroidTest
+com.moongift.offlinestt.spike.test.app-packageDebugAndroidTestResources-1 /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/build/intermediates/incremental/debugAndroidTest/packageDebugAndroidTestResources/merged.dir
+com.moongift.offlinestt.spike.test.app-packageDebugAndroidTestResources-2 /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/build/intermediates/incremental/debugAndroidTest/packageDebugAndroidTestResources/stripped.dir
+com.moongift.offlinestt.spike.test.app-debugAndroidTest-3 /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/build/intermediates/merged_res/debugAndroidTest/mergeDebugAndroidTestResources
+gradleHome-0 /Users/nakatsugawa/.gradle

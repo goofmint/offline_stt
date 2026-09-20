@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  WindowsSTTSpikePackage.NoCapability.wapproj
+
+  Issue #18 対比実験用。WindowsSTTSpikePackage.wapproj との唯一の違いは
+  参照する AppxManifest が Package.NoCapability.appxmanifest である点のみ。
+  要確認事項はWindowsSTTSpikePackage.wapprojと同じ(README参照)。
+-->
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <ProjectGuid>{C1B4E9F2-7A3D-4C8E-9F1B-3D6A8E2C5B44}</ProjectGuid>
+    <TargetPlatformVersion>10.0.26100.0</TargetPlatformVersion>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <DefaultLanguage>ja-JP</DefaultLanguage>
+    <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
+    <EntryPointProjectUniqueName>..\WindowsSTTSpikeCli.vcxproj</EntryPointProjectUniqueName>
+    <AppxBundle>Never</AppxBundle>
+    <AppxBundlePlatforms>x64</AppxBundlePlatforms>
+    <GenerateAppInstallerFile>False</GenerateAppInstallerFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AppxManifest Include="Package.NoCapability.appxmanifest">
+      <SubType>Designer</SubType>
+    </AppxManifest>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\**\*.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WindowsSTTSpikeCli.vcxproj">
+      <Private>True</Private>
+      <ReferenceOutputAssembly>True</ReferenceOutputAssembly>
+    </ProjectReference>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">17.0</VisualStudioVersion>
+    <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
+  </PropertyGroup>
+
+  <Import Project="$(VSToolsPath)\AppxPackage\Microsoft.AppXPackage.Targets"
+          Condition="'$(VSToolsPath)' != ''" />
+</Project>

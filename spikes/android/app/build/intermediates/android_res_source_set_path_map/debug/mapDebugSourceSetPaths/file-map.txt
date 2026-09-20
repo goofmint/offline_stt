@@ -1,0 +1,8 @@
+com.moongift.offlinestt.spike.app-pngs-0 /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/build/generated/res/pngs/debug
+com.moongift.offlinestt.spike.app-updated_navigation_xml-1 /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/build/generated/updated_navigation_xml/debug
+com.moongift.offlinestt.spike.app-packageDebugResources-2 /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/build/intermediates/incremental/debug/packageDebugResources/merged.dir
+com.moongift.offlinestt.spike.app-packageDebugResources-3 /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/build/intermediates/incremental/debug/packageDebugResources/stripped.dir
+com.moongift.offlinestt.spike.app-debug-4 /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/build/intermediates/merged_res/debug/mergeDebugResources
+com.moongift.offlinestt.spike.app-debug-5 /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/debug/res
+com.moongift.offlinestt.spike.app-main-6 /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/res
+gradleHome-0 /Users/nakatsugawa/.gradle

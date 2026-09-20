@@ -118,6 +118,24 @@ xcrun simctl spawn F047D4FA-3E8D-4F3B-99A3-38DF6D3900B0 \
   .build/arm64-apple-ios-simulator/debug/darwin-stt-spike locales
 ```
 
+## ios-probe/(iOS実機検証アプリ)
+
+`spikes/darwin/ios-probe/` は、Issue #7(iOS実機で`SpeechTranscriber.supportedLocales`にjaが含まれるか確認)のためのiOS実機専用アプリである。SwiftPMの実行可能ターゲットはiOS実機では起動できないため、`DarwinSTTSpikeCore`のソースをそのまま取り込んだ単一アプリターゲットとして`project.yml`(xcodegen spec)で構成している。
+
+セットアップ・実行手順:
+
+```bash
+cd spikes/darwin/ios-probe
+xcodegen generate
+open DarwinSTTProbe.xcodeproj
+```
+
+Xcodeで開いたら、実機を接続してターゲットデバイスに選択し、実行(Run)する。`DarwinSTTProbe.xcodeproj` と `Info.plist` はいずれも `xcodegen generate` による生成物であり、`.gitignore` 対象である(`project.yml` がソース・オブ・トゥルース)。
+
+**端末が開発者アカウントに未登録の場合の注意**: `xcodebuild -allowProvisioningUpdates` では未登録の実機を自動登録できない。この場合はXcodeのGUIから一度実行し、デバイス登録の承認ダイアログを通す必要がある(実際にこの問題に遭遇した)。
+
+**シミュレータでは検証できない**: 後述のとおりiOSシミュレータではSpeechAnalyzerが利用できず(`isAvailable=false`)、Issue #7の検証には実機が必須である。詳細はRESULTS.md「iOSシミュレータでの実行」を参照。
+
 ## M1以降のE2E検証での再利用について
 
 このハーネスは `spikes/web/` 同様、tasks.md M1「E2E手動チェックリスト作成」やM2 Darwin実装のE2E検証の雛形を兼ねる。

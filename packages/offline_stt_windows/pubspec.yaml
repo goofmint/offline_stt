@@ -1,0 +1,30 @@
+name: offline_stt_windows
+description: >-
+  offline_stt のWindows実装(C++/WinRT、Windows AI Speech Recognition +
+  Media Foundation、design.md §4.4)。雛形のみ、実装はM4で行う。
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+  flutter: ">=3.41.0"
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  offline_stt_platform_interface: ^0.1.0
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  plugin:
+    implements: offline_stt
+    platforms:
+      windows:
+        pluginClass: OfflineSttWindowsPluginCApi
+        dartPluginClass: OfflineSttWindows

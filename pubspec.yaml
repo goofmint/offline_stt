@@ -1,0 +1,39 @@
+name: offline_stt_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+
+workspace:
+  - packages/offline_stt
+  - packages/offline_stt_platform_interface
+  - packages/offline_stt_android
+  - packages/offline_stt_darwin
+  - packages/offline_stt_windows
+  - packages/offline_stt_web
+  - apps/example
+
+dev_dependencies:
+  melos: ^8.2.2
+
+melos:
+  name: offline_stt_workspace
+
+  scripts:
+    analyze:
+      description: 全パッケージで dart analyze を実行する。
+      exec:
+        command: dart analyze --fatal-infos .
+        concurrency: 1
+    test:
+      description: test/ を持つ全パッケージで dart test を実行する。
+      exec:
+        command: dart test
+        concurrency: 1
+      packageFilters:
+        dirExists: test
+    get:
+      description: 全パッケージで pub get を実行する(通常は workspace 解決で不要)。
+      exec:
+        command: dart pub get
+        concurrency: 1

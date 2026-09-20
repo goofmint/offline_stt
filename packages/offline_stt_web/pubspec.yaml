@@ -1,0 +1,33 @@
+name: offline_stt_web
+description: >-
+  offline_stt のWeb実装(Dart JS interop、Chrome オンデバイスWeb Speech +
+  Web Audio、design.md §4.1)。雛形のみ、実装はM1で行う。
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+  flutter: ">=3.41.0"
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
+  offline_stt_platform_interface: ^0.1.0
+  web: ^1.1.0
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  plugin:
+    implements: offline_stt
+    platforms:
+      web:
+        pluginClass: OfflineSttWeb
+        fileName: offline_stt_web.dart
