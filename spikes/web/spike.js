@@ -26,6 +26,9 @@ const THRESHOLDS = {
 // onended から onend を待つ猶予時間 (ms)。これを超えたら stop() を呼んでタイムアウト扱いにする。
 const ONEND_TIMEOUT_MS = 15000;
 
+// stop() が効かず abort() まで打った後に onend を待つ猶予 (ms)。
+const ABORT_GRACE_MS = 5000;
+
 const TARGET_LOCALES = ['ja-JP', 'en-US'];
 
 // keywords.json のクリップIDとファイル名プレフィックスの対応 (ファイル名からの自動推定に使う)
@@ -44,6 +47,9 @@ const CLIP_ID_HINTS = {
 let KEYWORDS_DB = null;
 
 let selectedFile = null;
+// install() の対象ロケール。可用性チェックや文字起こし前チェックで downloadable を
+// 検出したロケールを保持する。ja-JP 固定にしないこと (en-US も検証対象のため)。
+let pendingInstallLocale = 'ja-JP';
 let currentSession = null; // 実行中の認識セッション制御用
 
 // ---------------------------------------------------------------------------
@@ -151,16 +157,23 @@ async function runAvailabilityCheck() {
     .join(' / ');
   setStatus('availability-result', summary);
 
-  const jaResult = results.find((r) => r.locale === 'ja-JP');
+  // ja-JP を優先しつつ、downloadable なロケールがあれば install 対象にする。
   const installBtn = document.getElementById('btn-install');
-  if (jaResult && jaResult.ok && jaResult.result === 'downloadable') {
+  const downloadable = results.filter((r) => r.ok && r.result === 'downloadable');
+  const target = downloadable.find((r) => r.locale === 'ja-JP') || downloadable[0];
+  if (target) {
+    pendingInstallLocale = target.locale;
     installBtn.disabled = false;
-    log('ja-JP が downloadable のため、言語パック取得ボタンを有効化した。');
+    installBtn.textContent = `言語パック取得 (install: ${target.locale})`;
+    log(`${target.locale} が downloadable のため、言語パック取得ボタンを有効化した。`);
+    if (downloadable.length > 1) {
+      log(`他に downloadable なロケール: ${downloadable.filter((r) => r !== target).map((r) => r.locale).join(', ')}。` +
+          'それらを使う場合は、該当ロケールの音声を選んでから文字起こしを実行すると取得を促す。');
+    }
   } else {
     installBtn.disabled = true;
-    if (jaResult && jaResult.ok) {
-      log(`ja-JP は downloadable ではない (${jaResult.result}) ため、install ボタンは無効のまま。`);
-    }
+    const states = results.filter((r) => r.ok).map((r) => `${r.locale}=${r.result}`).join(', ');
+    log(`downloadable なロケールが無い (${states}) ため、install ボタンは無効のまま。`);
   }
 
   log('=== 可用性チェック終了 ===');
@@ -184,8 +197,9 @@ async function runInstall() {
   // 進捗取得を試みる先は Promise の戻り値ではなく SR 自体/グローバルのどちらかになり得る。
   // 存在しないAPIを推測で叩かないよう、まず install() の戻り値の型を確認してからイベント登録を試みる。
   try {
-    const installPromise = SR.install({ langs: ['ja-JP'], processLocally: true });
-    log('SpeechRecognition.install({langs:["ja-JP"], processLocally:true}) を呼び出した。');
+    const installLocale = pendingInstallLocale;
+    const installPromise = SR.install({ langs: [installLocale], processLocally: true });
+    log(`SpeechRecognition.install({langs:["${installLocale}"], processLocally:true}) を呼び出した。`);
 
     // 戻り値がイベントを発火できるオブジェクト (addEventListener を持つ) であれば
     // downloadprogress を試験的に購読する。無ければ何もしない (フォールバックはしない、単に「無い」とログするだけ)。
@@ -264,9 +278,17 @@ async function decodeToAudioBuffer(audioCtx, arrayBuffer) {
  * AudioBuffer → AudioBufferSourceNode → MediaStreamAudioDestinationNode を接続し、
  * audioTrack を取得する。design.md §4.1 のパイプラインに対応。
  */
-function buildAudioTrack(audioCtx, audioBuffer) {
+function buildAudioTrack(audioCtx, audioBuffer, playbackRate) {
   const source = audioCtx.createBufferSource();
   source.buffer = audioBuffer;
+  // playbackRate は単純な速度変更であり、ピッチも同じ倍率で変化する。
+  // Web Audio にピッチ保持のタイムストレッチは無い。design.md §4.1 が
+  // 倍速を「認識品質への影響が未検証」としているため、ここで測定できるようにする。
+  source.playbackRate.value = playbackRate;
+  if (playbackRate !== 1) {
+    log(`playbackRate=${playbackRate} を設定した。ピッチも ${playbackRate} 倍になる点に注意。`, 'warn');
+    log(`想定所要時間: 約 ${(audioBuffer.duration / playbackRate).toFixed(1)} 秒 (実時間なら ${audioBuffer.duration.toFixed(1)} 秒)。`);
+  }
   const destination = audioCtx.createMediaStreamDestination();
   source.connect(destination);
 
@@ -282,18 +304,24 @@ function buildAudioTrack(audioCtx, audioBuffer) {
     log('audioTrack.readyState === "live" を確認した。', 'ok');
   }
 
-  return { source, audioTrack };
+  // destination と stream を呼び出し側へ返して参照を保持させる。
+  // これらをローカル変数のまま捨てると、到達不能になった時点で GC により
+  // MediaStreamAudioDestinationNode が回収され、audioTrack が ended になり、
+  // 認識が "aborted" で即座に中断する。
+  return { source, destination, stream, audioTrack };
 }
 
 /**
  * SpeechRecognition インスタンスを構築し、processLocally を設定 → 読み戻し検証する。
  * NFR-2: processLocally が true で読み戻せない場合はサーバーフォールバックせずエラーで停止する。
  */
-function buildRecognition(SR, locale) {
+function buildRecognition(SR, locale, opts) {
   const recognition = new SR();
   recognition.lang = locale;
-  recognition.continuous = true;
-  recognition.interimResults = true;
+  // design.md §4.1 の既定は continuous/interimResults とも true。
+  // 実機で isFinal が立たない事象を確認したため、切り分け用に変更可能にしている。
+  recognition.continuous = opts.continuous;
+  recognition.interimResults = opts.interimResults;
 
   // processLocally はプロパティとして存在するとは限らない。存在確認せず単純代入すると
   // サイレントに無視される可能性があるため、設定直後に読み戻して必ず検証する。
@@ -317,9 +345,17 @@ function buildRecognition(SR, locale) {
  * 認識セッション本体。source.start() + recognition.start(audioTrack) を行い、
  * final結果を蓄積して返す。design.md §4.1 / §8 未決事項4 の検証対象。
  */
-function runRecognitionSession(recognition, source, audioTrack) {
+function runRecognitionSession(recognition, source, audioTrack, retained) {
   return new Promise((resolve, reject) => {
+    // retained (destination / stream) はこのクロージャが握り続けることで
+    // セッション中の GC を防ぐ。finish() でも参照して最適化による除去を避ける。
+    const keepAlive = retained;
     let finalText = '';
+    // Chrome のオンデバイス認識は isFinal を一度も立てずに onend へ到達することがある
+    // (実機で確認済み)。その場合でも認識テキスト自体は interim として得られているため、
+    // 最後の interim を保持しておき、final が皆無だったときの記録に使う。
+    let lastInterimText = '';
+    let interimOnly = false;
     let sessionEnded = false;
     let onendTimer = null;
     const startedAt = performance.now();
@@ -332,12 +368,54 @@ function runRecognitionSession(recognition, source, audioTrack) {
       if (sessionEnded) return;
       sessionEnded = true;
       if (onendTimer) clearTimeout(onendTimer);
+      // keepAlive をここで参照し、セッション終了まで destination / stream が
+      // 到達可能であることを保証する (GC による audioTrack 終了の防止)。
+      if (keepAlive && keepAlive.stream) {
+        log(`セッション終了時の audioTrack.readyState=${audioTrack.readyState}`);
+      }
+      log(`収集した確定テキスト: ${finalText.length} 文字`);
+      if (!finalText && lastInterimText) {
+        // フォールバックではなく事実の記録。final が出ないこと自体が
+        // design.md §2.2 の isFinal 設計に関わる知見であるため、
+        // interim を採用したことを必ず明示する。
+        interimOnly = true;
+        finalText = lastInterimText;
+        log(
+          'isFinal が一度も立たないまま onend に到達した。最後の interim 結果を' +
+          `採用する (${lastInterimText.length} 文字)。` +
+          'この挙動は design.md §2.2 / §4.1 の isFinal 写像に影響する。',
+          'warn'
+        );
+      }
       const elapsedMs = Math.round(performance.now() - startedAt);
       if (error) {
-        reject({ error, elapsedMs, finalText, networkErrorSeen });
+        reject({ error, elapsedMs, finalText, networkErrorSeen, interimOnly });
       } else {
-        resolve({ finalText, elapsedMs, networkErrorSeen });
+        resolve({ finalText, elapsedMs, networkErrorSeen, interimOnly });
       }
+    };
+
+    /**
+     * 再生開始前 (source.start() 失敗時、または onstart タイムアウト時) の失敗経路専用。
+     * finish() はエラーを返すだけで認識セッション/音声トラックを終了させないため、
+     * ここで recognition.abort() と audioTrack.stop() を試みてから finish() を呼ぶ。
+     * 個々の呼び出し失敗は握りつぶさずログに残す。
+     */
+    const failBeforePlayback = (error) => {
+      log('再生開始前に失敗したため、認識セッションと音声トラックを終了させる。', 'warn');
+      try {
+        recognition.abort();
+        log('recognition.abort() を呼び出した。', 'ok');
+      } catch (abortErr) {
+        log(`recognition.abort() 呼び出しでエラー: ${abortErr && abortErr.message}`, 'ng');
+      }
+      try {
+        audioTrack.stop();
+        log('audioTrack.stop() を呼び出した。', 'ok');
+      } catch (stopErr) {
+        log(`audioTrack.stop() 呼び出しでエラー: ${stopErr && stopErr.message}`, 'ng');
+      }
+      finish(null, error);
     };
 
     recognition.onresult = (event) => {
@@ -348,6 +426,7 @@ function runRecognitionSession(recognition, source, audioTrack) {
           finalText += transcript;
           log(`[final] ${transcript}`, 'ok');
         } else {
+          lastInterimText = transcript;
           log(`[partial] ${transcript}`);
         }
       }
@@ -379,49 +458,114 @@ function runRecognitionSession(recognition, source, audioTrack) {
       finish();
     };
 
-    recognition.onstart = () => {
-      log('recognition.onstart 発火。認識セッションが開始された。', 'ok');
-    };
-
     source.onended = () => {
-      log('audio source.onended 発火。recognition.onend を待つ (タイムアウト' + ONEND_TIMEOUT_MS + 'ms)。');
+      // continuous = true では、AudioBufferSourceNode が再生を終えても
+      // MediaStreamAudioDestinationNode のトラックは live のまま無音を流し続ける。
+      // そのため Chrome は入力が終わったことを知りようがなく、放置しても onend は来ない。
+      // design.md §4.1 の「sourceの onended 後、recognition.onend をもって Stream close」を
+      // 成立させるには、ここで明示的に stop() を呼んで入力終了を通知する必要がある。
+      log('audio source.onended 発火。recognition.stop() で入力終了を通知し、onend を待つ。');
+      try {
+        recognition.stop();
+        log('recognition.stop() を呼び出した。', 'ok');
+      } catch (stopErr) {
+        log(`recognition.stop() 呼び出しでエラー: ${stopErr && stopErr.message}`, 'ng');
+      }
+
       onendTimer = setTimeout(() => {
-        log(`onended から ${ONEND_TIMEOUT_MS}ms 経過しても onend が来ないためタイムアウト。recognition.stop() を呼ぶ。`, 'warn');
-        const timeoutError = new Error(
-          `recognition.onend did not fire within ${ONEND_TIMEOUT_MS}ms after source.onended`
-        );
-        try {
-          recognition.stop();
-        } catch (stopErr) {
-          log(`recognition.stop() 呼び出しでエラー: ${stopErr && stopErr.message}`, 'ng');
-        }
-        // stop() を呼んでもonendが来ない可能性があるため、ここで強制的にセッションを閉じる。
-        // タイムアウト時の finalText は不完全な可能性があるため、明示的なエラーで終了させ、
-        // 包含率評価には渡さない。
-        finish(null, timeoutError);
+        log(`stop() から ${ONEND_TIMEOUT_MS}ms 経過しても onend が来ない。トラックを停止して abort() する。`, 'warn');
+        // 入力トラック自体を終了させてから abort() する。ここまでやっても onend が
+        // 来ないのであれば、それ自体が design.md §4.1 の終了検出に関する知見となる。
+        try { audioTrack.stop(); } catch (e) { log(`audioTrack.stop() でエラー: ${e && e.message}`, 'ng'); }
+        try { recognition.abort(); } catch (e) { log(`recognition.abort() でエラー: ${e && e.message}`, 'ng'); }
+
+        onendTimer = setTimeout(() => {
+          const timeoutError = new Error(
+            `recognition.onend did not fire within ${ONEND_TIMEOUT_MS}ms after stop(), ` +
+            `nor within ${ABORT_GRACE_MS}ms after abort()`
+          );
+          // 収集済みの確定テキストがあれば必ず残す。3分クリップの認識結果を
+          // 捨てないため。ただし包含率評価には渡さない (セッションは異常終了扱い)。
+          if (finalText) {
+            log(`onend 未達だが確定テキストを ${finalText.length} 文字収集済み。結果欄に表示する。`, 'warn');
+          }
+          finish(null, timeoutError);
+        }, ABORT_GRACE_MS);
       }, ONEND_TIMEOUT_MS);
     };
 
-    try {
-      source.start();
-      log('AudioBufferSourceNode.start() を呼び出した。再生を開始する。');
-    } catch (err) {
-      finish(null, err);
-      return;
-    }
+    // audioTrack が途中で終了/ミュートされると認識は "aborted" になる。
+    // 原因切り分けのため、トラック側のイベントを必ず記録する。
+    audioTrack.onended = () => {
+      log(`audioTrack.onended 発火 (readyState=${audioTrack.readyState})。以降の認識入力は途切れる。`, 'ng');
+    };
+    audioTrack.onmute = () => log('audioTrack.onmute 発火。入力が無音として扱われる。', 'warn');
+    audioTrack.onunmute = () => log('audioTrack.onunmute 発火。');
+
+    // recognition を先に開始し、onstart を待ってから音声を再生する。
+    // 逆順だと先頭が認識器に渡る前に再生が進み、冒頭が欠落する。
+    let startedSource = false;
+    const startSource = () => {
+      if (startedSource) return;
+      startedSource = true;
+      try {
+        source.start();
+        log('AudioBufferSourceNode.start() を呼び出した。再生を開始する。');
+      } catch (err) {
+        failBeforePlayback(err);
+      }
+    };
+
+    const onstartTimer = setTimeout(() => {
+      if (!startedSource && !sessionEnded) {
+        failBeforePlayback(
+          new Error('recognition.start(audioTrack) 後 5000ms 以内に onstart が発火しなかった。')
+        );
+      }
+    }, 5000);
+
+    recognition.onstart = () => {
+      clearTimeout(onstartTimer);
+      log('recognition.onstart 発火。認識セッションが開始された。', 'ok');
+      log(`onstart 時点の audioTrack: readyState=${audioTrack.readyState}, enabled=${audioTrack.enabled}, muted=${audioTrack.muted}`);
+      startSource();
+    };
 
     try {
       recognition.start(audioTrack);
       log('recognition.start(audioTrack) を呼び出した。design.md §8 未決事項4 の検証対象。');
     } catch (err) {
+      clearTimeout(onstartTimer);
       log(`recognition.start(audioTrack) 呼び出しで例外: ${err && err.message}`, 'ng');
-      finish(null, err);
+      // start() 自体が失敗した経路でも audioTrack は live のまま残るため、
+      // 他の失敗経路と同様に確実に停止させてから終了する。
+      failBeforePlayback(err);
     }
   });
 }
 
+/**
+ * マイク権限の状態を記録する。start(audioTrack) はマイクを使わないが、
+ * Chrome の SpeechRecognition が権限を要求するかどうかが未確認のため、
+ * "aborted" / "not-allowed" の原因切り分け材料として必ず残す。
+ */
+async function logMicrophonePermission() {
+  if (!navigator.permissions || !navigator.permissions.query) {
+    log('navigator.permissions.query が利用できない。マイク権限状態は取得不可。', 'warn');
+    return;
+  }
+  try {
+    const status = await navigator.permissions.query({ name: 'microphone' });
+    log(`マイク権限の状態: ${status.state}`);
+  } catch (err) {
+    log(`マイク権限の照会に失敗: ${err && err.name}: ${err && err.message}`, 'warn');
+  }
+}
+
 async function runTranscription() {
   log('=== 文字起こし実行 開始 ===');
+  log(`document.visibilityState=${document.visibilityState}, document.hasFocus()=${document.hasFocus()}`);
+  await logMicrophonePermission();
   if (!selectedFile) {
     log('ファイルが選択されていない。', 'ng');
     return;
@@ -441,6 +585,38 @@ async function runTranscription() {
   const clip = KEYWORDS_DB[clipId];
   log(`クリップID=${clipId} (locale=${clip.locale}) を使用する。`);
 
+  // design.md §3: transcribeFile() は checkModel() が available 以外なら
+  // 即座に ModelUnavailableException を返す。内部で暗黙にダウンロードしない
+  // (同意UXをアプリ側に強制するため)。ハーネスも同じ契約に従う。
+  // このチェックが無いと、言語パック未取得のまま start() が呼ばれ、
+  // Chrome が "aborted" / "language-not-supported" を返して原因が分かりにくくなる。
+  const availabilityCheck = await checkAvailability(SR, clip.locale);
+  if (!availabilityCheck.ok) {
+    const msg = `${availabilityCheck.errorName}: ${availabilityCheck.errorMessage}`;
+    log(`available() の失敗により文字起こしを中止する (locale=${clip.locale})。`, 'ng');
+    setStatus('transcribe-status', `エラー: ${msg}`);
+    return;
+  }
+  const availability = availabilityCheck.result;
+  log(`文字起こし前の available({langs:["${clip.locale}"], processLocally:true}) = ${availability}`);
+  if (availability !== 'available') {
+    if (availability === 'downloadable') {
+      pendingInstallLocale = clip.locale;
+      const installBtn = document.getElementById('btn-install');
+      installBtn.disabled = false;
+      installBtn.textContent = `言語パック取得 (install: ${clip.locale})`;
+    }
+    const msg =
+      `${clip.locale} の言語パックが available ではない (${availability})。` +
+      (availability === 'downloadable'
+        ? `「言語パック取得 (install: ${clip.locale})」を実行してから、もう一度文字起こしを実行すること。`
+        : 'この環境ではこのロケールのオンデバイス認識を利用できない。');
+    log(msg, 'ng');
+    setStatus('transcribe-status', `中止: ${availability}`);
+    return;
+  }
+  log(`${clip.locale} は available。文字起こしを開始する。`, 'ok');
+
   let audioCtx = null;
   try {
     log(`ファイル読込開始: name="${selectedFile.name}" size=${selectedFile.size}bytes`);
@@ -450,16 +626,31 @@ async function runTranscription() {
     audioCtx = new (window.AudioContext ?? window.webkitAudioContext)();
     const audioBuffer = await decodeToAudioBuffer(audioCtx, arrayBuffer);
 
-    const { source, audioTrack } = buildAudioTrack(audioCtx, audioBuffer);
-    const recognition = buildRecognition(SR, clip.locale);
+    const rateEl = document.getElementById('playback-rate');
+    const playbackRate = rateEl ? Number(rateEl.value) : 1;
+    if (!Number.isFinite(playbackRate) || playbackRate <= 0) {
+      log(`再生速度の値が不正 (${rateEl && rateEl.value})。`, 'ng');
+      return;
+    }
+    const { source, destination, stream, audioTrack } = buildAudioTrack(audioCtx, audioBuffer, playbackRate);
+    const recognitionOpts = {
+      continuous: document.getElementById('opt-continuous').checked,
+      interimResults: document.getElementById('opt-interim').checked,
+    };
+    log(`認識オプション: continuous=${recognitionOpts.continuous}, interimResults=${recognitionOpts.interimResults}`);
+    const recognition = buildRecognition(SR, clip.locale, recognitionOpts);
 
     setStatus('transcribe-status', '実行中...');
-    const sessionResult = await runRecognitionSession(recognition, source, audioTrack);
+    const sessionResult = await runRecognitionSession(recognition, source, audioTrack, { destination, stream });
 
     log(`所要時間: ${sessionResult.elapsedMs}ms (NFR-1: Webはファイル長と同程度になる想定)`);
     setStatus('transcribe-status', `完了 (${sessionResult.elapsedMs}ms)`);
     document.getElementById('result-text').value = sessionResult.finalText;
 
+    log(`再生速度 ${playbackRate}x での所要時間: ${sessionResult.elapsedMs}ms`);
+    if (sessionResult.interimOnly) {
+      log('注意: この結果は確定(isFinal)結果ではなく interim 結果である。', 'warn');
+    }
     scoreResult(clipId, sessionResult.finalText, sessionResult.elapsedMs, sessionResult.networkErrorSeen);
   } catch (errInfo) {
     // decode失敗やstart失敗など、reject/throw両方の経路をまとめて捕捉する
@@ -471,6 +662,9 @@ async function runTranscription() {
     setStatus('transcribe-status', `エラー: ${message}`);
     if (partialFinal) {
       document.getElementById('result-text').value = partialFinal;
+      log(`エラー終了だが確定テキスト ${partialFinal.length} 文字を結果欄に表示した。包含率評価には渡さない。`, 'warn');
+    } else {
+      log('確定テキストは1文字も得られていない。', 'ng');
     }
     if (elapsedMs != null) {
       log(`エラー発生までの所要時間: ${elapsedMs}ms`);

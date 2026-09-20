@@ -47,6 +47,7 @@ class DownloadProgress {
 class TranscribeRequest {
   final String path;        // Webでは Blob URL / ObjectURL
   final String locale;      // BCP-47
+  final double playbackRate; // 既定 1.0。Web専用オプション。他プラットフォームでは無視される
 }
 
 class TranscriptSegment {
@@ -101,8 +102,22 @@ File/Blob → fetch/FileReader → ArrayBuffer
 - `AudioContext.decodeAudioData` は入力が16kHzでも `AudioContext` の既定サンプルレートへ自動リサンプリングされる(実測環境では48kHz)
 - `processLocally = true` を常時設定。設定不能・失敗時はサーバーフォールバックせずエラー終了(NFR-2)
 - `continuous = true`、`interimResults = true` でpartialをTranscriptSegmentに写像
-- 終了検出: sourceの `onended` 後、`recognition.onend` をもってStream close
-- 制約: 認識は実時間。倍速再生でのスループット向上は非対応として仕様化(認識品質への影響が未検証のため)
+- 終了検出: sourceの `onended` 後、`recognition.onend` をもってStream close。**`onended` ハンドラ内で明示的に `recognition.stop()` を呼ぶ実装が必須である**(Chrome 153実機で確認済み)。`continuous = true` では `AudioBufferSourceNode` が再生を終えても `MediaStreamTrack` は `live` のまま無音を流し続けるため、`stop()` を呼ばない限り Chrome は入力終了を認識せず `onend` が発火しない
+- `isFinal` の発火粒度(実測、Chrome 153): `isFinal = true` の結果は `stop()` 呼び出し後に1回だけ発火し、それ以前に得られる結果はすべて `isFinal = false`(interim)である。したがってWebでは、partialが認識中継続的にemitされ続け、finalは末尾に1件のみemitされる、という粒度になる。FR-3・§2.2の `TranscriptSegment.isFinal` はこの前提で扱う
+- partialとfinalでテキスト形式が異なる。**確定(final)結果は形態素単位で空白区切りされる**(例: `東京 都 渋谷 で 2024 年 ...`)ことをChrome 153実機で確認済み。partial結果には空白が入らない。アプリへ返す前にこの空白を除去するかどうか、実装時にテキスト整形の方針を決める必要がある
+- 再生速度オプション(`TranscribeRequest.playbackRate`、§2.2参照)は `AudioBufferSourceNode.playbackRate` にそのまま渡して実装する。**制約として、ピッチも同倍率で変化する**(Web Audio にピッチ保持のタイムストレッチは無い)。Chrome 153実機での jaJP_10s(音声長9.56秒、期待キーワード6件)実測は以下のとおりである
+
+  | 再生速度 | 所要時間 | 包含率 | isFinal発火 |
+  |---|---|---|---|
+  | 1.0x | 9,676 ms | 4/6 = 66.7% | あり |
+  | 1.1x | 8,808 ms | 4/6 = 66.7% | なし(interim採用) |
+  | 1.25x | 7,726 ms | 4/6 = 66.7% | なし(interim採用) |
+  | 1.5x | 6,464 ms | 3/6 = 50.0% | あり |
+  | 1.75x | (未実施) | (未実施) | (未実施) |
+  | 2.0x | 4,867 ms | 2/6 = 33.3% | あり |
+
+  1.1x・1.25xでは `isFinal = true` の結果が発火しない事例が観測されており、その場合は末尾のinterim結果を実質的な確定結果として採用する実装上の対応が必要になる(前掲の「isFinalの発火粒度」の記述はあくまで1.0x等での実測であり、速度によって発火有無が変わりうる点に注意)。また「株式会社モーンギフト」の認識結果は 1.0x「ムーンギフト」→ 1.1x「モヨンギフト」→ 1.25x「オンギフト」→ 1.5x「モンギフト」→ 2.0x(消失)と推移しており、包含率が同じ1.0〜1.25xの間でもテキストの劣化は進行している。**限界**: この測定は jaJP_10s(期待キーワード6件)のみであり、キーワード1件の増減で包含率が16.7ポイント動く粗い分解能でしかない。他クリップでの追加測定はM0スコープ外であり未実施である。再生速度の実装上の上限値を設けるか、また精度低下を利用者へどう提示するかはM1で決める(§8参照)
+- 言語パック未取得のまま `start()` を呼ぶと、ロケールによって異なるエラーが返る(ja-JP: `aborted`、en-US: `language-not-supported`)ことをChrome 153実機で確認済み。原因が分かりにくいエラーになるため、本節冒頭の `SpeechRecognition.available()` による事前確認(§3参照)が必須である
 - Chrome以外・非対応環境は `checkModel()` が `unavailable` を返す
 
 ### 4.2 Darwin(<name>_darwin、iOS/macOS共用)
@@ -178,6 +193,7 @@ AVAudioFile(任意フォーマット読込)
 | Cancelled | Flow cancel | Task cancel | 認識中断 | stop/abort |
 
 - 注記: Darwin列のうち DecodeFailed(AVAudioFileエラー)と LocaleUnsupported(supportedLocales外)は、macOS 26.5.1実機でエラーを実発火させ動作を確認済みである(spikes/darwin/RESULTS.md 参照)。
+- 注記: Web列について、言語パック未取得のまま `start()` を呼んだ場合に返るエラー名はロケールによって異なることをChrome 153実機で確認済みである。ja-JPでは `aborted`、en-USでは `language-not-supported` が返る(いずれも上表の `available() = unavailable` や `language-not-supported` とは別に、言語パック未取得という状況で観測された実測結果である)。この状況を `ModelUnavailable` へ写像する実装は、エラー名の判定ではなく `available()` による事前確認によって行うべきである(spikes/web/RESULTS.md 参照)。
 - 注記: Windows列の ModelUnavailable に記載の「NotReady / EnsureNeeded で未同意」のうち「EnsureNeeded」という状態は、実際の `AIFeatureReadyState` enumには存在しない。実際の値は `Ready` / `NotReady` / `NotSupportedOnCurrentSystem` / `DisabledByUser` / `CapabilityMissing` / `NotCompatibleWithSystemHardware` / `OSUpdateNeeded` の7つであることをドキュメント調査で確認した(spikes/windows/RESULTS.md 参照)。本表のWindows列は実機確認のうえ確定させる必要がある。
 
 ## 6. 並行性・スレッディング
@@ -225,6 +241,8 @@ AVAudioFile(任意フォーマット読込)
 
 macOS 26.5.1実機での実測(spikes/darwin/RESULTS.md 参照)では、基準音声8ファイル(ja-JP/en-US × 10秒/3分 × wav/m4a)**全てで上記しきい値に対して「不成立」**という結果になった(ja-JP: 28.6〜66.7%、en-US: 44.0〜80.0%)。
 
+Webでも同じ基準音声 jaJP_10s(1.0x再生)で実測したところ、包含率は 66.7%(4/6)であり、Darwinの jaJP_10s と**同率**であった(spikes/web/RESULTS.md 参照)。ただし両プラットフォームで落としているキーワードは同一ではない(Darwin: 株式会社モーンギフト / 128名。Web: 東京都渋谷区 / 株式会社モーンギフト)。同率という事実は、原因が(a)基準音声の設計、(b)各プラットフォームの認識モデル自体の実力、のいずれであるかを切り分ける材料にはなっておらず、原因未確定であることは変わらない。
+
 一方で、認識自体は概ね正確であることも確認できている。例えば jaJP_10s では6キーワード中4つが一致しており、不一致となった2件は「株式会社モーンギフト」→「モーギフト/モギフト」(架空の固有名詞の誤認識)と「128名」→「102十8名」(数値の表記形式の揺れ)のみであった。
 
 **不成立の原因は未確定である。** 対照条件を振った再測定を行っていないため、(a)基準音声がTTS合成音声であること、(b)`SpeechTranscriber.Preset` の選択、(c)認識モデル自体の精度、(d)キーワード選定と上記正規化規則が表記差を吸収できていないこと、のいずれが支配的かを分離できていない。上記の例も、認識内容そのものの誤りと、キーワード比較が表記差を吸収できていないことの切り分けができていない。
@@ -248,8 +266,9 @@ macOS 26.5.1実機での実測(spikes/darwin/RESULTS.md 参照)では、基準�
    - ファイル処理速度: **確定**。macOS 26.5.1実機でRTF 0.008〜0.026(実時間の約38〜125倍高速)を実測(spikes/darwin/RESULTS.md 参照)
    - ja-JP対応可否: **確認済み(iOS 26実機は未実施)**。macOS 26.5.1実機では `supportedLocales`(30件)にja-JPが含まれ、実際の文字起こしも動作することを確認済み。iOS 27.0実機(iPhone 17)でも `supportedLocales`(45件)にja-JPが含まれることを確認済み。ただしIssue #7が指定するiOS 26実機での確認は未実施である(iOSシミュレータでは`.app`バンドルでの再検証でも`isAvailable=false`となることを確認しており、原因はシミュレータ自体にオンデバイス音声モデルが無いことと判明している。spikes/darwin/RESULTS.md 参照)
 4. Web: `start(audioTrack)` + `processLocally: true` の併用動作
-   - 進捗注記: `processLocally = true` の設定と読み戻しはChrome 153で可能であることを確認済み。併用動作そのものは未検証
+   - **確定**。Chrome 153実機(通常の対話的Chromeセッション)で実測し、成立することを確認した。`processLocally = true` の設定と読み戻しが成功し、`audioTrack.readyState = "live"` の状態で `recognition.start(audioTrack)` が受理されて `onstart` が発火、partial結果が実時間で継続的に得られた。`network` エラーは発生しなかった。ただし `continuous = true` では `AudioBufferSourceNode` の再生終了後も `MediaStreamTrack` が `live` のまま無音を流し続けるため、Chromeは入力終了を自動認識しない。`source.onended` の後に明示的に `recognition.stop()` を呼んで初めて、約25ms後に `isFinal` の結果と、その直後に `onend` が発火してセッションが正常終了する。この `stop()` 呼び出しが§4.1の終了検出フローの必須要素である(spikes/web/RESULTS.md 参照)
 5. Android: MODE_ADVANCED指定時の非対応端末での自動フォールバック有無
 6. Android: リサンプリング実装の要否(実ファイルのMediaCodec出力レート調査)
+7. Web: 再生速度オプション(`playbackRate`)の上限値と、精度低下に関する利用者への提示方法(M1で決定。§4.1参照)
 
 確定事項: `available()` / `install()` のja-JP実機確認結果(クリーンプロファイルで `downloadable` → `install()` で `available`。Chrome 153、spikes/web/RESULTS.md 参照)
