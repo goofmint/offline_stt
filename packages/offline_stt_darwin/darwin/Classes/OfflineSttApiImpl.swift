@@ -112,10 +112,13 @@ final class OfflineSttApiImpl: NSObject, OfflineSttHostApi {
       downloadProgressWrapper.sendEndOfStream()
     } catch let error as DarwinTranscribeError {
       downloadProgressWrapper.sendError(error)
+      downloadProgressWrapper.sendEndOfStream()
     } catch is CancellationError {
       downloadProgressWrapper.sendError(.cancelled)
+      downloadProgressWrapper.sendEndOfStream()
     } catch {
       downloadProgressWrapper.sendError(.platformError("\(error)"))
+      downloadProgressWrapper.sendEndOfStream()
     }
   }
 

@@ -26,5 +26,23 @@
 /// 入らないため、この関数はfinal結果(通常のisFinal=true結果、および
 /// isFinalが一度も発火しなかった場合に採用する末尾interim結果の両方)に
 /// のみ適用する(recognition_session.dart参照)。
-String stripChromeSegmentationWhitespace(String text) =>
-    text.replaceAll(RegExp(r'\s'), '');
+///
+/// ## ロケールで限定する理由
+/// **空白除去はCJK(日本語・中国語・韓国語)のロケールに限定する。**
+/// 形態素単位の空白区切りは、本来語間に空白を持たない言語でのみ
+/// Chromeが挿入するものである。en-US のように語間の空白が意味を持つ
+/// 言語に適用すると `hello world` が `helloworld` になり、認識結果を
+/// 破壊してしまう。
+String stripChromeSegmentationWhitespace(String text, String locale) {
+  if (!_isCjkLocale(locale)) return text;
+  return text.replaceAll(RegExp(r'\s'), '');
+}
+
+/// BCP-47 ロケールの言語サブタグが CJK かどうかを判定する。
+///
+/// 語間に空白を持たない言語のみを対象とする。判定は言語サブタグ
+/// (最初の `-` より前)のみで行い、地域サブタグは見ない。
+bool _isCjkLocale(String locale) {
+  final language = locale.split('-').first.toLowerCase();
+  return language == 'ja' || language == 'zh' || language == 'ko';
+}

@@ -85,9 +85,13 @@
    - partial(`isFinal: false`)のセグメントが実行中に継続的に届くこと
    - 最終的に `isFinal: true` のセグメントが1件以上届き、Streamが `done` で
      完了すること
-   - `isFinal: true` の結果テキストに、Chrome内部の形態素区切り空白
-     (`東京 都 渋谷 で` のような)が**残っていない**こと(空白除去の実装
-     確認。`lib/src/final_text_formatting.dart` 参照)
+   - **ja-JP の場合**: `isFinal: true` の結果テキストに、Chrome内部の形態素
+     区切り空白(`東京 都 渋谷 で` のような)が**残っていない**こと
+     (空白除去の実装確認。`lib/src/final_text_formatting.dart` 参照)
+   - **en-US の場合**: `isFinal: true` の結果テキストで、**語間の空白が
+     保持されている**こと(`hello world` が `helloworld` になっていないこと)。
+     空白除去はCJKロケールに限定しており、語間の空白が意味を持つ言語へは
+     適用してはならない
    - DevTools Networkタブで、文字起こし実行中に音声データや認識結果らしき
      ペイロードが外部へ送信されていないこと(NFR-2確認)
    - `recognition.onerror` の `error` が `network` になっていないこと
