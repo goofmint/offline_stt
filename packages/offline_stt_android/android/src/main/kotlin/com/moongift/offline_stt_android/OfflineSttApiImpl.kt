@@ -1,0 +1,112 @@
+// OfflineSttApiImpl.kt
+// `OfflineSttHostApi`(Pigeon生成、Pigeon.g.kt)の実装本体。
+// design.md §4.3(wt73版)、requirements.md FR-1〜FR-3 FR-6(Issue #43〜#48)
+// に対応する(offline_stt_darwinのOfflineSttApiImpl.swiftのKotlin版)。
+//
+// `checkModel`/`downloadModel`/`transcribeFile`/`cancel`いずれも
+// `SpeechRecognizer.createOnDeviceSpeechRecognizer()`を要求するため、
+// design.md §4.3(wt73版)注記9のとおりメインスレッドから呼び出す必要がある。
+// `OfflineSttHostApi`のメソッドはFlutterのプラットフォームスレッド
+// (Android上はメインスレッドと同一)から呼ばれるため、追加のスレッド切替は
+// 不要である。
+package com.moongift.offline_stt_android
+
+import android.content.Context
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+
+class OfflineSttApiImpl(
+    private val context: Context,
+    private val segmentsWrapper: SegmentsEventWrapper,
+    private val downloadProgressWrapper: DownloadProgressEventWrapper,
+) : OfflineSttHostApi {
+
+    // Dispatchers.Main.immediate: design.md §4.3(wt73版)注記9のとおり
+    // SpeechRecognizerはメインスレッドから操作する必要があるため。
+    // SupervisorJob: checkModel呼び出しがdownloadModel/transcribeFileの
+    // 失敗で巻き添えにならないようにする。
+    private val mainScope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
+
+    private var currentTranscriptionJob: Job? = null
+    private var currentDownloadJob: Job? = null
+
+    override fun checkModel(locale: String, callback: (Result<ModelState>) -> Unit) {
+        mainScope.launch {
+            val state = ModelAvailability.checkModel(context, locale)
+            callback(Result.success(state))
+        }
+    }
+
+    override fun downloadModel(locale: String) {
+        currentDownloadJob?.cancel()
+        currentDownloadJob = mainScope.launch { runDownload(locale) }
+    }
+
+    override fun transcribeFile(request: TranscribeRequest) {
+        // design.md §3のセッション排他(v1では同時1本まで)はDart側
+        // `TranscribeSessionGuard`が担うため、通常この時点で前のJobが
+        // 生きていることはない。念のため多重起動を防ぐ。
+        currentTranscriptionJob?.cancel()
+        currentTranscriptionJob = mainScope.launch { runTranscription(request) }
+    }
+
+    override fun cancel() {
+        currentTranscriptionJob?.cancel()
+        currentDownloadJob?.cancel()
+    }
+
+    /**
+     * EventChannel自体がキャンセルされた場合の保険
+     * (`EventChannelWrappers.kt`のドキュメントコメント参照)。
+     */
+    fun cancelFromEventChannel() {
+        currentTranscriptionJob?.cancel()
+        currentDownloadJob?.cancel()
+    }
+
+    private suspend fun runDownload(locale: String) {
+        // design.md §3細則3: downloadable以外で呼ばれた場合は状態を変化
+        // させず何もemitせず完了する。
+        val state = ModelAvailability.checkModel(context, locale)
+        if (state != ModelState.DOWNLOADABLE) {
+            downloadProgressWrapper.sendEndOfStream()
+            return
+        }
+
+        downloadProgressWrapper.send(fraction = null, completed = false)
+        try {
+            ModelAcquisition.run(context, locale) { fraction, completed ->
+                downloadProgressWrapper.send(fraction = fraction, completed = completed)
+            }
+            downloadProgressWrapper.sendEndOfStream()
+        } catch (e: CancellationException) {
+            downloadProgressWrapper.sendError(AndroidTranscribeError.Cancelled)
+        } catch (e: AndroidTranscribeError) {
+            downloadProgressWrapper.sendError(e)
+        } catch (e: Exception) {
+            downloadProgressWrapper.sendError(AndroidTranscribeError.PlatformError("$e"))
+        }
+    }
+
+    private suspend fun runTranscription(request: TranscribeRequest) {
+        // design.md §2.2: `playbackRate`はWeb専用オプションであり、
+        // Androidでは無視する。PigeonスキーマのTranscribeRequestには
+        // 現行ブランチの時点でplaybackRateフィールド自体が存在しない
+        // (offline_stt_darwinと同じ事情)ため、path/localeのみを使用する
+        // 形で自然に無視される。
+        try {
+            RecognitionSession.run(context, request, segmentsWrapper)
+        } catch (e: CancellationException) {
+            // RecognitionSession.run()内のinvokeOnCancellationで既に
+            // Cancelledエラーを送出済みのため、ここでは何もしない。
+        } catch (e: AndroidTranscribeError) {
+            segmentsWrapper.sendError(e)
+        } catch (e: Exception) {
+            segmentsWrapper.sendError(AndroidTranscribeError.PlatformError("$e"))
+        }
+    }
+}

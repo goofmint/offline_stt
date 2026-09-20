@@ -1,7 +1,8 @@
 name: offline_stt_android
 description: >-
-  offline_stt のAndroid(Kotlin)実装。ML Kit GenAI Speech Recognition +
-  MediaCodecポンプ(design.md §4.3)。雛形のみ、実装はM3で行う。
+  offline_stt のAndroid(Kotlin)実装。Android標準android.speech.SpeechRecognizer
+  (オンデバイス) + MediaCodecデコード + リサンプリング + 実時間ポンプ
+  (PR #73 design.md §4.3)。
 version: 0.1.0
 publish_to: none
 
@@ -22,6 +23,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   pigeon: ^27.3.0
+  test: ^1.25.0
 
 flutter:
   plugin:

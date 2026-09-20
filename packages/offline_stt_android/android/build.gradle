@@ -44,5 +44,14 @@ android {
 }
 
 dependencies {
-    // ML Kit GenAI Speech Recognition依存はPigeonスキーマ確定後(M3)に追加する。
+    // 標準 android.speech.SpeechRecognizer はAndroid SDK同梱APIであり追加の
+    // 依存を必要としない(design.md §4.3(wt73版)冒頭「バックエンド差し替えの
+    // 経緯」参照。ML Kit GenAI Speech Recognition〈genai-speech-recognition〉
+    // は不採用のため追加しない)。
+    // 実時間ポンプ(RealtimePump.kt)・デコード層がコルーチンを使うための依存。
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0"
+
+    testImplementation "org.jetbrains.kotlin:kotlin-test:$kotlin_version"
+    testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0"
+    testImplementation "junit:junit:4.13.2"
 }
