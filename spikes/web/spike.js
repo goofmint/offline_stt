@@ -44,6 +44,9 @@ const CLIP_ID_HINTS = {
 let KEYWORDS_DB = null;
 
 let selectedFile = null;
+// install() の対象ロケール。可用性チェックや文字起こし前チェックで downloadable を
+// 検出したロケールを保持する。ja-JP 固定にしないこと (en-US も検証対象のため)。
+let pendingInstallLocale = 'ja-JP';
 let currentSession = null; // 実行中の認識セッション制御用
 
 // ---------------------------------------------------------------------------
@@ -151,16 +154,23 @@ async function runAvailabilityCheck() {
     .join(' / ');
   setStatus('availability-result', summary);
 
-  const jaResult = results.find((r) => r.locale === 'ja-JP');
+  // ja-JP を優先しつつ、downloadable なロケールがあれば install 対象にする。
   const installBtn = document.getElementById('btn-install');
-  if (jaResult && jaResult.ok && jaResult.result === 'downloadable') {
+  const downloadable = results.filter((r) => r.ok && r.result === 'downloadable');
+  const target = downloadable.find((r) => r.locale === 'ja-JP') || downloadable[0];
+  if (target) {
+    pendingInstallLocale = target.locale;
     installBtn.disabled = false;
-    log('ja-JP が downloadable のため、言語パック取得ボタンを有効化した。');
+    installBtn.textContent = `言語パック取得 (install: ${target.locale})`;
+    log(`${target.locale} が downloadable のため、言語パック取得ボタンを有効化した。`);
+    if (downloadable.length > 1) {
+      log(`他に downloadable なロケール: ${downloadable.filter((r) => r !== target).map((r) => r.locale).join(', ')}。` +
+          'それらを使う場合は、該当ロケールの音声を選んでから文字起こしを実行すると取得を促す。');
+    }
   } else {
     installBtn.disabled = true;
-    if (jaResult && jaResult.ok) {
-      log(`ja-JP は downloadable ではない (${jaResult.result}) ため、install ボタンは無効のまま。`);
-    }
+    const states = results.filter((r) => r.ok).map((r) => `${r.locale}=${r.result}`).join(', ');
+    log(`downloadable なロケールが無い (${states}) ため、install ボタンは無効のまま。`);
   }
 
   log('=== 可用性チェック終了 ===');
@@ -184,8 +194,9 @@ async function runInstall() {
   // 進捗取得を試みる先は Promise の戻り値ではなく SR 自体/グローバルのどちらかになり得る。
   // 存在しないAPIを推測で叩かないよう、まず install() の戻り値の型を確認してからイベント登録を試みる。
   try {
-    const installPromise = SR.install({ langs: ['ja-JP'], processLocally: true });
-    log('SpeechRecognition.install({langs:["ja-JP"], processLocally:true}) を呼び出した。');
+    const installLocale = pendingInstallLocale;
+    const installPromise = SR.install({ langs: [installLocale], processLocally: true });
+    log(`SpeechRecognition.install({langs:["${installLocale}"], processLocally:true}) を呼び出した。`);
 
     // 戻り値がイベントを発火できるオブジェクト (addEventListener を持つ) であれば
     // downloadprogress を試験的に購読する。無ければ何もしない (フォールバックはしない、単に「無い」とログするだけ)。
@@ -499,6 +510,31 @@ async function runTranscription() {
   }
   const clip = KEYWORDS_DB[clipId];
   log(`クリップID=${clipId} (locale=${clip.locale}) を使用する。`);
+
+  // design.md §3: transcribeFile() は checkModel() が available 以外なら
+  // 即座に ModelUnavailableException を返す。内部で暗黙にダウンロードしない
+  // (同意UXをアプリ側に強制するため)。ハーネスも同じ契約に従う。
+  // このチェックが無いと、言語パック未取得のまま start() が呼ばれ、
+  // Chrome が "aborted" / "language-not-supported" を返して原因が分かりにくくなる。
+  const availability = await SR.available({ langs: [clip.locale], processLocally: true });
+  log(`文字起こし前の available({langs:["${clip.locale}"], processLocally:true}) = ${availability}`);
+  if (availability !== 'available') {
+    if (availability === 'downloadable') {
+      pendingInstallLocale = clip.locale;
+      const installBtn = document.getElementById('btn-install');
+      installBtn.disabled = false;
+      installBtn.textContent = `言語パック取得 (install: ${clip.locale})`;
+    }
+    const msg =
+      `${clip.locale} の言語パックが available ではない (${availability})。` +
+      (availability === 'downloadable'
+        ? `「言語パック取得 (install: ${clip.locale})」を実行してから、もう一度文字起こしを実行すること。`
+        : 'この環境ではこのロケールのオンデバイス認識を利用できない。');
+    log(msg, 'ng');
+    setStatus('transcribe-status', `中止: ${availability}`);
+    return;
+  }
+  log(`${clip.locale} は available。文字起こしを開始する。`, 'ok');
 
   let audioCtx = null;
   try {
