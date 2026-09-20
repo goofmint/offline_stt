@@ -1,0 +1,31 @@
+name: offline_stt_android
+description: >-
+  offline_stt のAndroid(Kotlin)実装。ML Kit GenAI Speech Recognition +
+  MediaCodecポンプ(design.md §4.3)。雛形のみ、実装はM3で行う。
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+  flutter: ">=3.41.0"
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  offline_stt_platform_interface: ^0.1.0
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  plugin:
+    implements: offline_stt
+    platforms:
+      android:
+        package: com.moongift.offline_stt_android
+        pluginClass: OfflineSttAndroidPlugin
+        dartPluginClass: OfflineSttAndroid

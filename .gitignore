@@ -1,0 +1,33 @@
+# Dart / Flutter
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+build/
+pubspec.lock
+.pub-cache/
+.pub/
+
+# Melos / pub workspaces
+pubspec_overrides.yaml
+melos_*.iml
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# macOS
+.DS_Store
+
+# Platform build artifacts (native scaffolds are source-only in this repo)
+**/android/.gradle/
+**/android/local.properties
+**/ios/Pods/
+**/ios/.symlinks/
+**/macos/Pods/
+**/windows/flutter/ephemeral/
+**/linux/flutter/ephemeral/
+
+# 一時設計ノート
+.tmp/

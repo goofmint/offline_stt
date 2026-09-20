@@ -1,0 +1,41 @@
+name: offline_stt
+description: >-
+  録音済み音声ファイルをOSネイティブAPIのみでオフライン文字起こしするFlutter
+  ライブラリ。認識モデル・推論エンジンは同梱せず、モデル管理はOS側に委ねる。
+  利用者はこのエントリパッケージにのみ依存する。
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.9.0
+  flutter: ">=3.41.0"
+
+resolution: workspace
+
+dependencies:
+  flutter:
+    sdk: flutter
+  offline_stt_android: ^0.1.0
+  offline_stt_darwin: ^0.1.0
+  offline_stt_platform_interface: ^0.1.0
+  offline_stt_web: ^0.1.0
+  offline_stt_windows: ^0.1.0
+
+dev_dependencies:
+  flutter_lints: ^6.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        default_package: offline_stt_android
+      ios:
+        default_package: offline_stt_darwin
+      macos:
+        default_package: offline_stt_darwin
+      windows:
+        default_package: offline_stt_windows
+      web:
+        default_package: offline_stt_web
