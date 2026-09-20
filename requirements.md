@@ -60,7 +60,7 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」要�
 
 - 入力: 一般的な音声ファイル形式(wav / m4a / mp3 / aac 等、各OS標準デコーダが対応する範囲)
 - 各OS純正デコーダのみ使用(方針維持のためFFmpeg等の同梱は不可):
-  - Android: MediaCodecで 16kHz・モノラル・16-bit raw PCM へ変換し、実時間レート(毎秒約32KB)でParcelFileDescriptorに供給するポンプを実装
+  - Android: MediaCodecで 16kHz・モノラル・16-bit raw PCM へ変換し、実時間レート(毎秒約32KB)でParcelFileDescriptorに供給するポンプを実装。MediaCodecはコーデックのデコードのみを行いサンプルレート変換・チャンネルのダウンミックスは行わないため(実測で確認済み、spikes/android/RESULTS.md 参照)、16kHz・モノラルへの変換処理はライブラリ側で別途実装する必要がある
   - iOS/macOS: AVFoundationでデコードしSpeechAnalyzerへ入力
   - Windows: `BatchRecognition.RecognizeFromFile(path)` にパスを直接渡す。対応フォーマットは要検証、必要時はMedia Foundationでwav変換
   - Web: `AudioContext.decodeAudioData` → MediaStreamAudioDestinationNode → `start(audioTrack)`

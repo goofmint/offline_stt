@@ -1,0 +1,27 @@
+# Gradle
+.gradle/
+build/
+*/build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Local configuration (contains machine-specific SDK path; required to build but not committed)
+local.properties
+
+# Android Studio / IntelliJ
+.idea/
+*.iml
+.cxx/
+
+# Generated assets (none should be produced by this project; sourceSets reference
+# test-assets/baseline-audio directly instead of copying, but this entry guards
+# against any generation task added later).
+app/src/main/assets-generated/
+app/src/androidTest/assets-generated/
+
+# Issue #14: 実環境相当音源フィクスチャ(fixtures/generate-rate-fixtures.sh の生成物)。
+# test-assets/baseline-audio/jaJP_10s.wav から機械的に再生成できるため、コミット対象外とする。
+fixtures/generated/
+
+# Instrumentation test output pulled from the device
+*.ec
+captures/

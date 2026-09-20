@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  M0 Android 検証スパイク (spikes/android)。
+
+  RECORD_AUDIO は付与しない: 本スパイクは音声ファイルのデコード入力のみを扱い、
+  マイク入力は対象外である (design.md §4.3、Issue #11/#12/#13 の CodeRabbit プランに準拠)。
+
+  INTERNET も付与しない: NFR-2 (プライバシー) の方針に合わせ、アプリ自身がネットワーク送信を
+  行う経路を持たないことを明示する。ML Kit / AICore 側のモデルダウンロードは OS ・Google Play
+  services 側のプロセスが行うため、アプリ自身の INTERNET permission がなくても checkStatus() /
+  download() の呼び出し自体は可能という前提だが、これは実機検証で確認できていない
+  (本スパイクはエミュレータ上では AICore が動作しないため未検証。RESULTS.md 参照)。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:icon="@android:drawable/ic_menu_info_details"
+        android:label="@string/app_name"
+        android:theme="@android:style/Theme.Material.Light">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

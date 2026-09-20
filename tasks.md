@@ -30,10 +30,10 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」タ�
 
 ### Android
 
-- [ ] Pixel以外のAPI 31+実機で Basic モード + ja-JP の動作確認
-- [ ] `MODE_ADVANCED` 指定時の非対応端末フォールバック挙動確認(設計未決事項5)
-- [ ] PFDパイプ + 実時間ポンプの最小実装で `AudioSource.fromPfd()` が受理されるか確認
-- [ ] 手持ち音源の MediaCodec デコード出力レート調査(リサンプリング要否判定、設計未決事項6)
+- [ ] Pixel以外のAPI 31+実機で Basic モード + ja-JP の動作確認(ハーネス実装済み。ML Kit GenAI が AICore を要するためエミュレータでは検証不可、実機待ち。spikes/android/RESULTS.md 参照)
+- [ ] `MODE_ADVANCED` 指定時の非対応端末フォールバック挙動確認(設計未決事項5)(ハーネス実装済み。ML Kit GenAI が AICore を要するためエミュレータでは検証不可、実機待ち。spikes/android/RESULTS.md 参照)
+- [ ] PFDパイプ + 実時間ポンプの最小実装で `AudioSource.fromPfd()` が受理されるか確認(ハーネス実装済み。ML Kit GenAI が AICore を要するためエミュレータでは検証不可、実機待ち。spikes/android/RESULTS.md 参照)
+- [x] 手持ち音源の MediaCodec デコード出力レート調査(リサンプリング要否判定、設計未決事項6)(結論: リサンプリング必須。MediaCodecはrate/chを変換しない。spikes/android/RESULTS.md 参照)
 
 ### Windows
 
@@ -93,7 +93,7 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」タ�
 - [ ] androidパッケージ雛形、`genai-speech-recognition` 依存追加(バージョン固定)
 - [ ] モデル管理: checkStatus → checkModel、download Flow → downloadModel進捗
 - [ ] デコード層: MediaExtractor + MediaCodec → 16kHz/モノラル/16-bit PCM
-- [ ] リサンプリング実装 or 対応入力の限定(M0調査結果に従う)
+- [ ] リサンプリング実装 or 対応入力の限定(M0調査結果に従う)(M0結論: リサンプリング必須)
 - [ ] 実時間ポンプ: PFDパイプ、壁時計基準レート制御(100msバッファ)
 - [ ] 認識セッション: preferredMode設定、Flow → EventChannel転送、Basicリトライ(M0結果次第)
 - [ ] キャンセル(パイプclose → stopRecognition → close)

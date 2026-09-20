@@ -140,9 +140,9 @@ AVAudioFile(任意フォーマット読込)
 
 - `speechRecognizerOptions { locale; preferredMode = MODE_ADVANCED }` で生成し、Advanced非対応端末のBasicフォールバック挙動をM0で確認。フォールバックが自動でない場合はBasicで再生成するリトライを実装
 - 実時間ポンプ設計:
-  - 供給レートは壁時計基準(累積送信サンプル数と経過時間の差分でsleep調整)。バッファ単位100ms(3,200サンプル)
+  - 供給レートは壁時計基準(累積送信サンプル数と経過時間の差分でsleep調整)。バッファ単位100ms(16kHz・モノラル・16-bit PCMでは1,600サンプル=3,200バイト。1サンプル=2バイトである点に注意)
   - キャンセル時はパイプclose → `stopRecognition()` → `close()`
-- リサンプリング: MediaCodec出力が16kHz以外の場合は線形補間ではなくAudioResampler相当の処理が必要。実装コスト次第で対応入力を「デコード後にリサンプル可能な形式」に限定するか判断(M3で決定)
+- リサンプリング: **必須(M0スパイクで実測確定)**。MediaCodecはコーデックのデコードのみを行い、サンプルレート変換・チャンネルのダウンミックスは一切行わないことを実測で確認した。実環境相当の音源7ファイル(44.1kHz/48kHzステレオのwav・m4a・mp3、22.05kHzモノラル、8kHzモノラル)全てで出力`MediaFormat`のサンプルレート・チャンネル数が入力側と完全に一致し、16kHz・モノラルへの変換は起きなかった(resampleNeeded=true、7/7。spikes/android/RESULTS.md 参照)。よって線形補間ではなくAudioResampler相当のサンプルレート変換 + ステレオ→モノラルのダウンミックス処理をM3で実装する。なお本結果はエミュレータ単一環境での実測であり、実機での追試が引き続き望ましい
 - ブートローダーアンロック端末・AICore未初期化は `checkStatus()` 結果とAICoreエラーコード(601 / 606 等)を `DeviceUnsupportedException` / `ModelUnavailableException` に写像
 
 ### 4.4 Windows(<name>_windows)
@@ -173,6 +173,7 @@ AVAudioFile(任意フォーマット読込)
 | Cancelled | Flow cancel | Task cancel | 認識中断 | stop/abort |
 
 - 注記: Darwin列のうち DecodeFailed(AVAudioFileエラー)と LocaleUnsupported(supportedLocales外)は、macOS 26.5.1実機でエラーを実発火させ動作を確認済みである(spikes/darwin/RESULTS.md 参照)。
+- 注記: Android列が言及する「AICore 606」のような数値エラーコードは、`GenAiException.ErrorCode`(`genai-common:1.0.0-beta3` をjavapで確認)の実際の定数一覧には含まれていない。同ライブラリが公開する定数は UNKNOWN / REQUEST_PROCESSING_ERROR / CANCELLED / NOT_AVAILABLE / BUSY / RESPONSE_PROCESSING_ERROR / REQUEST_TOO_LARGE / REQUEST_TOO_SMALL / RESPONSE_GENERATION_ERROR / PER_APP_BATTERY_USE_QUOTA_EXCEEDED / BACKGROUND_USE_BLOCKED / NOT_ENOUGH_DISK_SPACE / NEEDS_SYSTEM_UPDATE / AICORE_INCOMPATIBLE / INVALID_INPUT_IMAGE / CACHE_PROCESSING_ERROR である(spikes/android/RESULTS.md 参照)。表のAndroid列との対応付けはM3実装時に実機でエラーを実発火させて確定させる必要がある。
 
 ## 6. 並行性・スレッディング
 
@@ -241,5 +242,6 @@ macOS 26.5.1実機での実測(spikes/darwin/RESULTS.md 参照)では、基準�
    - 進捗注記: `processLocally = true` の設定と読み戻しはChrome 153で可能であることを確認済み。併用動作そのものは未検証
 5. Android: MODE_ADVANCED指定時の非対応端末での自動フォールバック有無
 6. Android: リサンプリング実装の要否(実ファイルのMediaCodec出力レート調査)
+   - **確定: リサンプリングは必須**。MediaCodecはコーデックのデコードのみを行い、サンプルレート変換・チャンネルのダウンミックスは一切行わないことを実測で確認した。実環境相当の音源7ファイル(44.1kHz/48kHzステレオのwav・m4a・mp3、22.05kHzモノラル、8kHzモノラル)全てで`resampleNeeded=true`となった(spikes/android/RESULTS.md 参照)。エミュレータ(`sdk_gphone64_arm64`, Android 16/API 36)単一環境での実測であり、実機での追試は引き続き望ましい
 
 確定事項: `available()` / `install()` のja-JP実機確認結果(クリーンプロファイルで `downloadable` → `install()` で `available`。Chrome 153、spikes/web/RESULTS.md 参照)
