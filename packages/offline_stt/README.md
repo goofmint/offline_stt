@@ -40,7 +40,30 @@ Linuxは対象外である(OSネイティブのASR APIが存在しないため)�
 | モデル取得 | `Stream<DownloadProgress> downloadModel(String locale)` |
 | 文字起こし | `Stream<TranscriptSegment> transcribeFile(TranscribeRequest request)` |
 
-> **現時点の制約: 本パッケージはまだ利用者向けのファサードクラス(`OfflineTranscriber` 等)を持たない。** `lib/offline_stt.dart` は上記の型を再エクスポートするだけであり、実際の呼び出しは `offline_stt_platform_interface` の `OfflineTranscriberPlatform.instance` に対して行う必要がある。ファサードの実装は後続Issueの対象である。参照実装の [`apps/example`](https://github.com/goofmint/offline_stt/tree/main/apps/example) も、この理由で暫定的に `offline_stt_platform_interface` を直接依存に書いている。**ファサード実装後はこの依存が不要になるため、利用側もその前提で書くこと。**
+上記3メソッドは `OfflineTranscriber` が公開している。
+
+```dart
+import 'package:offline_stt/offline_stt.dart';
+
+const transcriber = OfflineTranscriber();
+
+final state = await transcriber.checkModel('ja-JP');
+if (state == ModelState.downloadable) {
+  // アプリ側で同意を取ってから呼ぶ(ライブラリは同意UIを出さない)。
+  await for (final _ in transcriber.downloadModel('ja-JP')) {}
+}
+await for (final segment in transcriber.transcribeFile(
+  TranscribeRequest(path: path, locale: 'ja-JP'),
+)) {
+  if (segment.isFinal) {
+    // 確定テキスト
+  }
+}
+```
+
+`OfflineTranscriber` は `OfflineTranscriberPlatform.instance` へ委譲するだけの薄い層であり、独自のロジック・状態・既定値を持たない。**`offline_stt_platform_interface` を直接依存に書く必要はない。**
+
+> 参照実装の [`apps/example`](https://github.com/goofmint/offline_stt/tree/main/apps/example) は、ファサードが無かった頃の名残で `offline_stt_platform_interface` を直接依存に書いている。利用側で真似する必要はない。
 
 ## 正しい呼び出し順序
 

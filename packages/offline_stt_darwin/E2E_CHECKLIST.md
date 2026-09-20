@@ -49,8 +49,11 @@ ja-JP / en-US のオンデバイスモデルが取得済みである保証は無
    M0検証では、`installedLocales` に ja-JP が含まれるにもかかわらず
    `AssetInventory.status(forModules:)` が `.supported` を返す状態が
    macOS・iOS実機の双方で再現した(SpeechAnalyzer APIの仕様であると確定)。
-   この状態で `checkModel()` が `downloadable` を返し、ユーザーに不要な
-   再ダウンロードを促していないことを確認する。
+   この状態で `checkModel()` が **`available` を返す**ことを確認する
+   (`ModelAvailability.swift` の判定規則6: `status == .supported` かつ
+   `installedLocales` に解決済みロケールが含まれる → `available`)。
+   ここで `downloadable` が返るなら、取得済みモデルに対して不要な再
+   ダウンロードを促すことになるため不合格である。
 
 ### 2. downloadModel
 

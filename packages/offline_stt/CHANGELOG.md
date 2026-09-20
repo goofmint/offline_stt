@@ -10,13 +10,13 @@
   Android / iOS / macOS / Windows / Web の各実装パッケージが自動的に
   選択される。
 - `offline_stt_platform_interface` のデータ型・例外型の再エクスポート。
+- 利用者向けファサード `OfflineTranscriber`。`checkModel()` /
+  `downloadModel()` / `transcribeFile()` の3メソッドを持ち、
+  `OfflineTranscriberPlatform.instance` へ委譲する。**利用者が
+  `offline_stt_platform_interface` を直接依存に書く必要はない。**
 
 ### 既知の制約
 
-- **利用者向けのfacadeクラス(`OfflineTranscriber` 等)はまだ存在しない。**
-  現時点では `OfflineTranscriberPlatform.instance` を直接使う必要がある
-  (`apps/example` も暫定的にそうしている)。facade の実装は後続の
-  Issue に委ねている。
 - **Windows はアプリ側の追加セットアップが必須である。** MSIX パッケージ化と
   `systemAIModels` capability の宣言、および `winapp init` によるWinAppSDK
   ヘッダーの配置が必要である。手順は `offline_stt_windows` の README を

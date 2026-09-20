@@ -15,9 +15,10 @@
 /// (CIはWinRTバックエンドを除外した構成のみをコンパイルする)。実機での
 /// 確認はIssue #58に委ねている。
 ///
-/// 公開APIは [OfflineSttWindows] と、`src/stream_router.dart` の
-/// [WindowsStreamRouter](Windows固有のストリーム配送。`registerWith()` から
-/// 使う)である。詳細は [OfflineSttWindows] のdocコメントを参照すること。
+/// 公開APIは [OfflineSttWindows] のみである。`src/stream_router.dart` の
+/// `WindowsStreamRouter` は本バレルから export しておらず、内部実装として
+/// `registerWith()` から使う。詳細は [OfflineSttWindows] のdocコメントを
+/// 参照すること。
 library;
 
 import 'package:offline_stt_platform_interface/offline_stt_platform_interface.dart';

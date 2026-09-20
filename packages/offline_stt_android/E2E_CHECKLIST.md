@@ -120,13 +120,19 @@ Pixel 6 を非対応と明示しており、アプリ側の実装では回避で
 ### 4. キャンセル
 
 1. 3分クリップの文字起こし実行中に購読(`StreamSubscription`)を
-   `cancel()` する。
+   `await subscription.cancel()` でキャンセルし、**返るFutureの完了まで
+   待つ**。
 2. 以下を確認する:
    - それ以降 `TranscriptSegment` が届かないこと
    - ネイティブ側がパイプclose →`stopListening()` → `destroy()` の順で
      後始末し、`ERROR_CLIENT`(5番)等のエラーがログに残らないこと
-   - 直後に別の `transcribeFile()` を開始でき、`StateError`(セッション
-     排他違反)にならないこと
+   - **キャンセルFutureの完了後に**別の `transcribeFile()` を開始でき、
+     `StateError`(セッション排他違反)にならないこと。
+     `TranscribeSessionGuard` はキャンセルFutureの完了を待たずにセッション枠
+     を解放するため、これは `StateError` を避けるための待機ではなく、
+     キャンセル後のネイティブ側の後始末が安定して終わったことを確認する
+     ための待機である。未awaitで次を始めると、前のJobのキャンセル処理と
+     次の開始処理が重なりうる
    - ポンプのスレッドがリークしないこと(連続実行を繰り返しても破綻
      しないこと)
 3. **キャンセル経路はM0検証の範囲外であり、一度も検証されていない**
