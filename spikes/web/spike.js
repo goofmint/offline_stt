@@ -278,9 +278,17 @@ async function decodeToAudioBuffer(audioCtx, arrayBuffer) {
  * AudioBuffer → AudioBufferSourceNode → MediaStreamAudioDestinationNode を接続し、
  * audioTrack を取得する。design.md §4.1 のパイプラインに対応。
  */
-function buildAudioTrack(audioCtx, audioBuffer) {
+function buildAudioTrack(audioCtx, audioBuffer, playbackRate) {
   const source = audioCtx.createBufferSource();
   source.buffer = audioBuffer;
+  // playbackRate は単純な速度変更であり、ピッチも同じ倍率で変化する。
+  // Web Audio にピッチ保持のタイムストレッチは無い。design.md §4.1 が
+  // 倍速を「認識品質への影響が未検証」としているため、ここで測定できるようにする。
+  source.playbackRate.value = playbackRate;
+  if (playbackRate !== 1) {
+    log(`playbackRate=${playbackRate} を設定した。ピッチも ${playbackRate} 倍になる点に注意。`, 'warn');
+    log(`想定所要時間: 約 ${(audioBuffer.duration / playbackRate).toFixed(1)} 秒 (実時間なら ${audioBuffer.duration.toFixed(1)} 秒)。`);
+  }
   const destination = audioCtx.createMediaStreamDestination();
   source.connect(destination);
 
@@ -566,7 +574,13 @@ async function runTranscription() {
     audioCtx = new (window.AudioContext ?? window.webkitAudioContext)();
     const audioBuffer = await decodeToAudioBuffer(audioCtx, arrayBuffer);
 
-    const { source, destination, stream, audioTrack } = buildAudioTrack(audioCtx, audioBuffer);
+    const rateEl = document.getElementById('playback-rate');
+    const playbackRate = rateEl ? Number(rateEl.value) : 1;
+    if (!Number.isFinite(playbackRate) || playbackRate <= 0) {
+      log(`再生速度の値が不正 (${rateEl && rateEl.value})。`, 'ng');
+      return;
+    }
+    const { source, destination, stream, audioTrack } = buildAudioTrack(audioCtx, audioBuffer, playbackRate);
     const recognition = buildRecognition(SR, clip.locale);
 
     setStatus('transcribe-status', '実行中...');
@@ -576,6 +590,7 @@ async function runTranscription() {
     setStatus('transcribe-status', `完了 (${sessionResult.elapsedMs}ms)`);
     document.getElementById('result-text').value = sessionResult.finalText;
 
+    log(`再生速度 ${playbackRate}x での所要時間: ${sessionResult.elapsedMs}ms`);
     scoreResult(clipId, sessionResult.finalText, sessionResult.elapsedMs, sessionResult.networkErrorSeen);
   } catch (errInfo) {
     // decode失敗やstart失敗など、reject/throw両方の経路をまとめて捕捉する

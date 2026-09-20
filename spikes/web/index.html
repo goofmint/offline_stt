@@ -158,6 +158,21 @@
         <option value="enUS_3m">enUS_3m</option>
       </select>
     </p>
+    <div style="margin: 8px 0;">
+      <label for="playback-rate">再生速度:</label>
+      <select id="playback-rate">
+        <option value="1" selected>1.0x (実時間。design.md §4.1 の既定)</option>
+        <option value="1.5">1.5x (実験)</option>
+        <option value="2">2.0x (実験)</option>
+        <option value="3">3.0x (実験)</option>
+      </select>
+      <p class="note">
+        1.0x 以外は <code>AudioBufferSourceNode.playbackRate</code> による単純な速度変更であり、
+        ピッチも同じ倍率で上がる(Web Audio にピッチ保持のタイムストレッチは無い)。
+        design.md §4.1 は倍速を「認識品質への影響が未検証」として非対応にしているため、
+        ここで包含率を測って影響を確認する。
+      </p>
+    </div>
     <button id="btn-transcribe">文字起こし実行</button>
     <dl>
       <dt>実行状態</dt><dd id="transcribe-status">(未実施)</dd>
