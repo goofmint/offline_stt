@@ -1,0 +1,12 @@
+{
+  "locale": "ja-JP",
+  "transcript": "東京都渋谷区で、2024年11月3日午後3時、株式会社モーンギフトが新製品を発表しました。来場者は128名でした。",
+  "keywords": ["東京都渋谷区", "2024年11月3日", "午後3時", "株式会社モーンギフト", "新製品", "128名"],
+  "tool": "say+ffmpeg",
+  "voice": "Kyoko",
+  "sample_rate": 16000,
+  "channels": 1,
+  "encoding": "pcm_s16le",
+  "generated_at": "2026-09-20T08:35:11Z",
+  "sha256": "90fa759f63ff1d4586a7ca40cf0ca6d86ed447306f61216b6ad00f78fc4522fe"
+}

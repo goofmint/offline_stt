@@ -161,8 +161,10 @@ AVAudioFile(任意フォーマット読込)
 ```
 
 - モデル管理: `GetReadyState()` → FR-1、`EnsureReadyAsync()` → FR-2。進捗APIの粒度が粗い場合は `DownloadProgress(fraction: null)` の不定進捗
-- `RecognizeFromFile` の対応入力フォーマットはM0で確認。wav以外が通らなければMedia Foundation変換層を必須化
-- 言語指定APIの有無をM0で確認(ドキュメント上、ロケール指定の記載が未確認。指定不能ならOS言語依存としてREADME明記、ja-JP検証が最優先)
+- `AIFeatureReadyState` の実際の値は7つである: `Ready` / `NotReady` / `NotSupportedOnCurrentSystem` / `DisabledByUser` / `CapabilityMissing` / `NotCompatibleWithSystemHardware` / `OSUpdateNeeded`(うち `CapabilityMissing` / `NotCompatibleWithSystemHardware` / `OSUpdateNeeded` の3つはWinAppSDK 2.0以降の値。ドキュメント調査で確認済み。spikes/windows/RESULTS.md 参照)。FR-1の4値(available/downloadable/downloading/unavailable)への写像には課題がある: **`downloading` に一意対応する状態が存在しない**。`NotReady` はダウンロード開始前の状態であり、ダウンロード中であることを知るには `EnsureReadyAsync()` 実行中に `SpeechRecognitionModelProgress.Status`(`Installing`/`Caching`/`Loading`等)の進捗イベントを観測する必要がある
+- `RecognizeFromFile(String)` はファイルパス文字列を直接渡す(StorageFileではない)。対応入力フォーマットはドキュメントに記載が無く、実機での確認が必須である(未確定。spikes/windows/RESULTS.md 参照)。wav以外が通らなければMedia Foundation変換層を必須化。なお `BatchRecognition` には `Recognize(Byte[])` という別オーバーロードも存在する(バイト列の期待フォーマットは未確認)
+- 言語指定APIの有無: **確定**。`Microsoft.Windows.AI.Speech` 名前空間にロケール・言語を指定するAPIは存在しないことをドキュメント調査で確認した(spikes/windows/RESULTS.md 参照)。指定不能であるため、OS言語依存としてREADMEに明記する方針が確定した前提となる。ja-JPで実際に高精度認識されるかは実機未検証のまま残る
+- WinAppSDKのバージョン前提に課題がある: `Microsoft.Windows.AI.Speech` 名前空間のAPIリファレンスページは `windows-app-sdk-2.0-experimental` モニカーでのみ存在し、1.7 / 1.8 / 2.0(安定版)のいずれのモニカーにも掲載が確認できなかった。requirements.md NFR-4が前提とする「WinAppSDK 1.7.1以上」という記述の再確認が必要である(spikes/windows/RESULTS.md 参照)
 - C++/WinRT実装。WinAppSDK 1.7.1+をプラグインの依存として宣言し、MSIX + `systemAIModels` はアプリ側要件としてREADMEに記載
 
 ## 5. エラーマッピング表
@@ -176,6 +178,7 @@ AVAudioFile(任意フォーマット読込)
 | Cancelled | Flow cancel | Task cancel | 認識中断 | stop/abort |
 
 - 注記: Darwin列のうち DecodeFailed(AVAudioFileエラー)と LocaleUnsupported(supportedLocales外)は、macOS 26.5.1実機でエラーを実発火させ動作を確認済みである(spikes/darwin/RESULTS.md 参照)。
+- 注記: Windows列の ModelUnavailable に記載の「NotReady / EnsureNeeded で未同意」のうち「EnsureNeeded」という状態は、実際の `AIFeatureReadyState` enumには存在しない。実際の値は `Ready` / `NotReady` / `NotSupportedOnCurrentSystem` / `DisabledByUser` / `CapabilityMissing` / `NotCompatibleWithSystemHardware` / `OSUpdateNeeded` の7つであることをドキュメント調査で確認した(spikes/windows/RESULTS.md 参照)。本表のWindows列は実機確認のうえ確定させる必要がある。
 
 ## 6. 並行性・スレッディング
 
@@ -236,7 +239,11 @@ macOS 26.5.1実機での実測(spikes/darwin/RESULTS.md 参照)では、基準�
 ## 8. 設計上の未決事項(M0の結果で確定)
 
 1. Windows: RecognizeFromFileの対応フォーマットとロケール指定可否
+   - ロケール指定可否: **確定**。下記未決事項2参照
+   - 対応フォーマット: **未確定**。`BatchRecognition.RecognizeFromFile` の公式APIリファレンスページ(および周辺ページ・名前空間全体)に、対応するコンテナ・コーデックの一覧や制約に関する記載が見つからなかった。wav / m4a / mp3 が受理されるかはWindows実機での確認が必須である(Windows機が無いため未実施。spikes/windows/RESULTS.md 参照)
 2. Windows: ja-JP対応可否
+   - ロケール指定APIの有無: **確定**。`Microsoft.Windows.AI.Speech` 名前空間の全クラス・全メンバー(`SpeechRecognitionModel`・`BatchRecognition`・`AudioConfiguration`等)を公式APIリファレンスで突き合わせた結果、ロケール・言語を指定する引数・プロパティ・メソッドは1件も存在しないことをドキュメント調査で確定した(spikes/windows/RESULTS.md 参照)。ロケール指定ができない以上、design.md §4.4にある「指定不能ならOS言語依存としてREADME明記」という方針が確定した前提となる
+   - ja-JP書き起こし可否: **未確定のまま**。ロケール指定APIが無い場合に実際にどの言語で認識されるか(OS表示言語連動か、既定入力言語連動か等)、およびja-JP音声が実際に高精度で認識されるかは、ドキュメントに記載が無くWindows実機でのみ確認可能である(Windows機が無いため未実施。spikes/windows/RESULTS.md 参照)
 3. Darwin: SpeechAnalyzerのja-JP対応可否とファイル処理速度
    - ファイル処理速度: **確定**。macOS 26.5.1実機でRTF 0.008〜0.026(実時間の約38〜125倍高速)を実測(spikes/darwin/RESULTS.md 参照)
    - ja-JP対応可否: **確認済み(iOS 26実機は未実施)**。macOS 26.5.1実機では `supportedLocales`(30件)にja-JPが含まれ、実際の文字起こしも動作することを確認済み。iOS 27.0実機(iPhone 17)でも `supportedLocales`(45件)にja-JPが含まれることを確認済み。ただしIssue #7が指定するiOS 26実機での確認は未実施である(iOSシミュレータでは`.app`バンドルでの再検証でも`isAvailable=false`となることを確認しており、原因はシミュレータ自体にオンデバイス音声モデルが無いことと判明している。spikes/darwin/RESULTS.md 参照)

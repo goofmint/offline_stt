@@ -38,10 +38,10 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」タ�
 
 ### Windows
 
-- [ ] Windows 11 24H2機で `EnsureReadyAsync` → モデル取得確認(CPU機 / 可能ならCopilot+ PC両方)
-- [ ] `RecognizeFromFile` の対応フォーマット確認: wav / m4a / mp3(設計未決事項1)
-- [ ] ロケール指定APIの有無確認、ja-JP 書き起こし確認(設計未決事項2)
-- [ ] MSIX + `systemAIModels` capability の最小構成アプリで動作確認
+- [ ] Windows 11 24H2機で `EnsureReadyAsync` → モデル取得確認(CPU機 / 可能ならCopilot+ PC両方)(スパイク実装済み。Windows機が無いため未実施。spikes/windows/RESULTS.md 参照)
+- [ ] `RecognizeFromFile` の対応フォーマット確認: wav / m4a / mp3(設計未決事項1)(スパイク実装済み。ドキュメントに記載が無く実機確認が必須。Windows機が無いため未実施。spikes/windows/RESULTS.md 参照)
+- [ ] ロケール指定APIの有無確認、ja-JP 書き起こし確認(設計未決事項2)(ロケール指定APIは存在しないことをドキュメント調査で確定。ja-JP 書き起こしは Windows機が無いため未実施。spikes/windows/RESULTS.md 参照)
+- [ ] MSIX + `systemAIModels` capability の最小構成アプリで動作確認(スパイク実装済み。capability あり/なし両方の manifest を用意済み。Windows機が無いため未実施。spikes/windows/RESULTS.md 参照)
 
 ### M0 出口判定
 
