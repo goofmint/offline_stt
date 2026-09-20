@@ -28,14 +28,32 @@ flutter run -d macos   # または -d chrome 等
 - **iOSシミュレータでは動作しない。** `SpeechTranscriber.isAvailable` が
   `false` になり、SpeechAnalyzerによる認識自体が利用できない
   (design.md §4.2)。文字起こしのE2E検証には実機が必要である。
-- **Android / Windows は未実装である(M3/M4で実装予定)。** `checkModel()`
-  等は `UnimplementedError` を送出する。example appはこれを捕捉して
-  「未対応である」旨を画面に表示するが、実際の認識は行えない。
+- **Androidは実機が必要である。** バックエンドはAndroid標準の
+  `android.speech.SpeechRecognizer`(オンデバイス)であり、エミュレータには
+  オンデバイス認識のモデルが存在しない。また `minSdk` は 31 だが、モデル
+  状態の判定に使う `checkRecognitionSupport()` がAPI 33 で追加された
+  APIであるため、**API 31/32 では `checkModel()` が常に `unavailable` を
+  返す。** 詳細は `packages/offline_stt_android/E2E_CHECKLIST.md` を参照。
+- **Windowsは依存を書くだけでは動かない。** MSIXパッケージ化と
+  `systemAIModels` capability の宣言、および `winapp init`(WinAppSDKの
+  C++/WinRTプロジェクションヘッダー展開)が必要である。手順は
+  `packages/offline_stt_windows/README.md` と
+  `apps/example/windows/packaging/README.md` にある。**このexample appを
+  Windowsで動かした実績は無い**(リポジトリにWindows実機が無いため。
+  Issue #58)。`flutter build windows --debug` によるコンパイル検証のみ
+  CIで行っている。
 - **Webは Chrome 142 以上でのみ動作する。** それ以外のブラウザでは
   モデル状態が「利用不可」になる(requirements.md §8)。`localhost` または
   `https` 配信であることも必要(`on-device-speech-recognition`
   Permissions Policy)。詳細な手動E2E手順は
   `packages/offline_stt_web/E2E_CHECKLIST.md` を参照。
+
+**検証状況について**: Android / iOS / macOS / Windows / Web のいずれについて
+も、**本appを使って実機E2Eチェックリストを通して実行した実績は無い**
+(`E2E_CHECKLIST.md` の「実行実績」欄を参照)。ローカルでビルド成功を確認
+しているのは web / macOS / iOS の3つであり、android / windows はCIの
+コンパイル検証のみである。実機E2Eは Issue #40(Darwin)/ #50(Android)/
+#58(Windows)の対象である。
 
 ## モデルダウンロードの同意について
 

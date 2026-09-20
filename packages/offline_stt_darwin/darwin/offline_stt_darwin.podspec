@@ -9,9 +9,9 @@ Pod::Spec.new do |s|
 offline_stt のiOS/macOS共用実装。SpeechAnalyzer + AVFoundationによる
 ファイル入力オフライン文字起こし(design.md §4.2)。
                        DESC
-  s.homepage         = 'https://github.com/moongift/offline_stt'
+  s.homepage         = 'https://github.com/goofmint/offline_stt'
   # LICENSEファイルはIssue #60〜#62で整備する。それまでは型のみ指定する。
-  s.license          = { :type => 'TBD' }
+  s.license          = { :type => 'MIT', :file => '../LICENSE' }
   s.author           = { 'MOONGIFT' => 'moongift@gmail.com' }
   s.source           = { :path => '.' }
   s.source_files     = 'Classes/**/*.swift'

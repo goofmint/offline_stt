@@ -23,7 +23,7 @@ EXTERNAL SOURCES:
 SPEC CHECKSUMS:
   file_picker_darwin: 27e043831d68462d54f1c40e724b1f53c9d1e8be
   FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
-  offline_stt_darwin: d9e0f5e7c270305879cd1f366e54572bf91e6664
+  offline_stt_darwin: fdda55dc5335cb0eb33e76db64f00b33c0b38216
 
 PODFILE CHECKSUM: 224cb1c0d6f5312abfc2477bcb5c7f1fca2574fb
 
