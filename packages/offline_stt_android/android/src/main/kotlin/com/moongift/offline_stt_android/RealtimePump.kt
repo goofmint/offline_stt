@@ -76,7 +76,11 @@ object RealtimePump {
     ) {
         init {
             require(sampleRateHz > 0) { "sampleRateHz must be positive" }
-            require(bitsPerSample % 8 == 0) { "bitsPerSample must be a multiple of 8" }
+            // 0 や負の8の倍数がここを通ると、フレームサイズ計算の除算で
+            // ArithmeticException になったり ByteArray の生成に失敗したりする。
+            require(bitsPerSample > 0 && bitsPerSample % 8 == 0) {
+                "bitsPerSample must be a positive multiple of 8"
+            }
             require(channels > 0) { "channels must be positive" }
             require(chunkSamples > 0) { "chunkSamples must be positive" }
         }
