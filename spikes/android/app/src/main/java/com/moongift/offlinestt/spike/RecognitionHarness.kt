@@ -13,6 +13,7 @@ import com.google.mlkit.genai.speechrecognition.SpeechRecognizerResponse
 import com.google.mlkit.genai.speechrecognition.speechRecognizerOptions
 import com.google.mlkit.genai.speechrecognition.speechRecognizerRequest
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -65,6 +66,9 @@ class RecognitionHarness(private val context: Context) {
     @Volatile
     private var active: ActiveSession? = null
 
+    /** 認識処理の重複起動防止用ガード。キューには積まず、実行中の追加起動は拒否する。 */
+    private val launchGuard = AtomicBoolean(false)
+
     fun modeLabel(mode: Int): String = when (mode) {
         SpeechRecognizerOptions.Mode.MODE_BASIC -> "MODE_BASIC"
         SpeechRecognizerOptions.Mode.MODE_ADVANCED -> "MODE_ADVANCED"
@@ -74,12 +78,49 @@ class RecognitionHarness(private val context: Context) {
     /**
      * checkStatus() → 必要ならdownload() → PFDパイプ+実時間ポンプ → startRecognition() の
      * 一連の流れを実行する (Issue #11 / #13 共通の中核パス)。
+     *
+     * 重複起動防止: 実行中に追加で呼ばれた場合はキューに積まず、起動を拒否する
+     * ([launchGuard] 参照。1セッションのみ許可)。
      */
     suspend fun runRecognition(
         locale: String,
         mode: Int,
         clipId: String,
         firstResponseTimeoutMs: Long = 20_000,
+        joinTimeoutMs: Long = 5_000,
+    ): SessionResult {
+        if (!launchGuard.compareAndSet(false, true)) {
+            SpikeLog.warn(
+                "runRecognition(): 別セッションが実行中のため起動を拒否した " +
+                    "(mode=${modeLabel(mode)}, clip=$clipId)。"
+            )
+            return SessionResult(
+                accepted = false,
+                mode = mode,
+                featureStatusBefore = -1,
+                featureStatusAfterDownload = null,
+                partials = emptyList(),
+                finalText = null,
+                completed = false,
+                error = null,
+                pumpBytesSent = 0,
+                pumpElapsedMs = 0,
+                firstResponseLatencyMs = null,
+            )
+        }
+        try {
+            return runRecognitionLocked(locale, mode, clipId, firstResponseTimeoutMs, joinTimeoutMs)
+        } finally {
+            launchGuard.set(false)
+        }
+    }
+
+    private suspend fun runRecognitionLocked(
+        locale: String,
+        mode: Int,
+        clipId: String,
+        firstResponseTimeoutMs: Long,
+        joinTimeoutMs: Long,
     ): SessionResult = coroutineScope {
         SpikeLog.info("=== runRecognition開始: locale=$locale mode=${modeLabel(mode)} clip=$clipId ===")
 
@@ -264,43 +305,76 @@ class RecognitionHarness(private val context: Context) {
             }
         }
 
-        active = ActiveSession(recognizer, readSide, writeSide, pumpJob, collectJob)
+        val session = ActiveSession(recognizer, readSide, writeSide, pumpJob, collectJob)
+        active = session
 
-        val gotFirstResponse = withTimeoutOrNull(firstResponseTimeoutMs) {
-            firstResponseLatch.await()
-            true
-        } ?: false
+        try {
+            val gotFirstResponse = withTimeoutOrNull(firstResponseTimeoutMs) {
+                firstResponseLatch.await()
+                true
+            } ?: false
 
-        if (!gotFirstResponse) {
-            SpikeLog.ng(
-                "受理不成立: ${firstResponseTimeoutMs}ms 以内に最初の応答/エラーが到達しなかった。" +
-                    "パイプ/実時間ポンプ/AudioSource.fromPfd()/startRecognition() のいずれかが" +
-                    "機能していない可能性がある。"
+            if (!gotFirstResponse) {
+                SpikeLog.ng(
+                    "受理不成立: ${firstResponseTimeoutMs}ms 以内に最初の応答/エラーが到達しなかった。" +
+                        "パイプ/実時間ポンプ/AudioSource.fromPfd()/startRecognition() のいずれかが" +
+                        "機能していない可能性がある。"
+                )
+                // タイムアウト時は既存のキャンセル経路と同じ順序で停止する
+                // (パイプclose → stopRecognition() → close()。design.md §4.3 参照)。
+                SpikeLog.warn("=== タイムアウトによる停止経路開始: パイプclose → stopRecognition() → close() ===")
+                runCatching { writeSide.close() }
+                    .onFailure { SpikeLog.warn("writeSide.close() 失敗: ${it.message}") }
+                runCatching { readSide.close() }
+                    .onFailure { SpikeLog.warn("readSide.close() 失敗: ${it.message}") }
+                pumpJob.cancelAndJoin()
+                runCatching { recognizer.stopRecognition() }
+                    .onFailure { SpikeLog.warn("stopRecognition() 失敗: ${it.message}") }
+                collectJob.cancelAndJoin()
+                SpikeLog.warn("=== タイムアウトによる停止経路完了 ===")
+            } else {
+                SpikeLog.ok("受理成立条件(fromPfd成功 + Flow開始 + 最初の応答/エラー到達)を満たした。")
+
+                // 受理判定後もFlow/ポンプの完了を待ち、最終テキストとキャンセル可否検証の材料を
+                // 揃えるが、無期限には待たない(上限を設ける)。
+                val collectJoined = withTimeoutOrNull(joinTimeoutMs) { collectJob.join(); true } ?: false
+                if (!collectJoined) {
+                    SpikeLog.warn("collectJob.join() が ${joinTimeoutMs}ms 以内に完了しなかった。")
+                }
+                val pumpJoined = withTimeoutOrNull(joinTimeoutMs) { pumpJob.join(); true } ?: false
+                if (!pumpJoined) {
+                    SpikeLog.warn("pumpJob.join() が ${joinTimeoutMs}ms 以内に完了しなかった。")
+                }
+            }
+
+            SpikeLog.info("=== runRecognition終了: accepted=$gotFirstResponse ===")
+
+            SessionResult(
+                accepted = gotFirstResponse,
+                mode = mode,
+                featureStatusBefore = statusBefore,
+                featureStatusAfterDownload = statusAfterDownload,
+                partials = partials,
+                finalText = finalText,
+                completed = completed,
+                error = lastError,
+                pumpBytesSent = pumpBytesSent,
+                pumpElapsedMs = pumpElapsedMs,
+                firstResponseLatencyMs = firstResponseLatencyMs,
             )
-        } else {
-            SpikeLog.ok("受理成立条件(fromPfd成功 + Flow開始 + 最初の応答/エラー到達)を満たした。")
+        } finally {
+            // 例外・キャンセルを含めて recognizer と pipe の解放を保証する。
+            // 自セッションに対応する場合のみ解放する(別セッションの状態を壊さない。issue #2 参照)。
+            if (active === session) {
+                runCatching { recognizer.close() }
+                    .onFailure { SpikeLog.warn("recognizer.close() 失敗: ${it.message}") }
+                runCatching { readSide.close() }
+                    .onFailure { SpikeLog.warn("readSide.close() 失敗: ${it.message}") }
+                runCatching { writeSide.close() }
+                    .onFailure { SpikeLog.warn("writeSide.close() 失敗: ${it.message}") }
+                active = null
+            }
         }
-
-        // 受理判定後もFlow/ポンプの完了を待ち、最終テキストとキャンセル可否検証の材料を揃える。
-        collectJob.join()
-        pumpJob.join()
-        active = null
-
-        SpikeLog.info("=== runRecognition終了: accepted=$gotFirstResponse ===")
-
-        SessionResult(
-            accepted = gotFirstResponse,
-            mode = mode,
-            featureStatusBefore = statusBefore,
-            featureStatusAfterDownload = statusAfterDownload,
-            partials = partials,
-            finalText = finalText,
-            completed = completed,
-            error = lastError,
-            pumpBytesSent = pumpBytesSent,
-            pumpElapsedMs = pumpElapsedMs,
-            firstResponseLatencyMs = firstResponseLatencyMs,
-        )
     }
 
     /** Issue #12 (design.md §8 未決事項5) の結果一式。 */

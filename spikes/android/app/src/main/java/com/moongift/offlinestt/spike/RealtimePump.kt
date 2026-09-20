@@ -9,24 +9,20 @@ import kotlin.coroutines.coroutineContext
  * design.md §4.3 の実時間ポンプ (Issue #13)。壁時計基準で PCM を `ParcelFileDescriptor` の
  * 書き込み側へ供給する。design.md §6 に従い呼び出し元は `Dispatchers.IO` 上で実行すること。
  *
- * 設計上の注記 (design.md との数値の齟齬について):
- * design.md §4.3 は「バッファ単位100ms(3,200サンプル)」と記すが、16kHz・モノラル・16-bit PCM
- * では 3,200 サンプル = 200ms に相当し、同じ design.md / requirements.md FR-4 が明記する目標
- * 「毎秒約32KB」(= 16000 samples/sec × 2 bytes = 32,000 bytes/sec = 100msあたり1,600サンプル
- * ＝3,200バイト) とも整合しない。この不整合はdesign.md記述側の誤り(サンプル数とバイト数の混同、
- * または100msと200msの混同)と考えられる。
+ * バッファ単位について:
+ * design.md §4.3 は「バッファ単位100ms(16kHz・モノラル・16-bit PCMでは1,600サンプル=3,200バイト。
+ * 1サンプル=2バイトである点に注意)」と定める。本実装の [DEFAULT_CHUNK_SAMPLES] はこの値
+ * (1,600サンプル)に合わせている。
  *
  * 本実装は「1チャンクのサンプル数」という設定値の大小に依存せず、書き込むたびに
  * 累積送信サンプル数と壁時計経過時間の差分で sleep を調整する自己補正アルゴリズムを採る
  * (design.md の記述通り)。そのため実効スループットはチャンクサイズの値に関わらず常に
- * `sampleRateHz × bytesPerSample × channels` バイト/秒に収束する。チャンクサイズ自体は
- * design.md 記載の数値 3,200 をそのまま採用しているが、これは「サンプル数」としてではなく
- * 「1回の write() あたりのサンプル数」という運用パラメータとして解釈している。
+ * `sampleRateHz × bytesPerSample × channels` バイト/秒に収束する。
  */
 object RealtimePump {
 
-    /** design.md §4.3 記載の値をそのまま踏襲 (上記コメント参照)。 */
-    const val DEFAULT_CHUNK_SAMPLES = 3200
+    /** design.md §4.3 記載の値(100ms相当 = 1,600サンプル)をそのまま踏襲 (上記コメント参照)。 */
+    const val DEFAULT_CHUNK_SAMPLES = 1600
 
     data class PumpResult(
         val totalBytesSent: Int,

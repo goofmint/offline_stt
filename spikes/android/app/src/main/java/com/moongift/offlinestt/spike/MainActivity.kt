@@ -9,6 +9,7 @@ import com.google.mlkit.genai.speechrecognition.SpeechRecognizerOptions
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -30,6 +31,23 @@ class MainActivity : AppCompatActivity() {
     private val targetClipId = "jaJP_10s"
     private val targetLocale = "ja-JP"
 
+    /**
+     * SpikeLog.sink に代入するログ出力先。プロパティとして切り出すことで、onDestroy() で
+     * 「自分が設定した sink かどうか」を参照同一性(===)で判定できるようにする (画面回転時に
+     * 新しい Activity が既に上書きした sink を誤って null にしないため)。
+     */
+    private val logSink: (SpikeLog.Level, String) -> Unit = { level, message ->
+        runOnUiThread {
+            val prefix = when (level) {
+                SpikeLog.Level.OK -> "[OK] "
+                SpikeLog.Level.NG -> "[NG] "
+                SpikeLog.Level.WARN -> "[WARN] "
+                SpikeLog.Level.INFO -> ""
+            }
+            textLog.append("$prefix$message\n")
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -38,17 +56,7 @@ class MainActivity : AppCompatActivity() {
         textLog = findViewById(R.id.text_log)
         textResult = findViewById(R.id.text_result)
 
-        SpikeLog.sink = { level, message ->
-            runOnUiThread {
-                val prefix = when (level) {
-                    SpikeLog.Level.OK -> "[OK] "
-                    SpikeLog.Level.NG -> "[NG] "
-                    SpikeLog.Level.WARN -> "[WARN] "
-                    SpikeLog.Level.INFO -> ""
-                }
-                textLog.append("$prefix$message\n")
-            }
-        }
+        SpikeLog.sink = logSink
 
         val envText = "Build.MODEL=${Build.MODEL} / Build.MANUFACTURER=${Build.MANUFACTURER} / " +
             "SDK_INT=${Build.VERSION.SDK_INT} / FINGERPRINT=${Build.FINGERPRINT}"
@@ -136,6 +144,19 @@ class MainActivity : AppCompatActivity() {
         scope.launch {
             harness.cancelActiveSession()
         }
+    }
+
+    override fun onDestroy() {
+        // Activity破棄後も残る子コルーチンが旧textResult/textLogへ書き込み続けないよう、
+        // superより先にscopeをキャンセルする (design.md記載の破棄処理とは別に、CodeRabbit指摘対応)。
+        scope.cancel()
+        // 画面回転時は新しいActivityのonCreate()が既にSpikeLog.sinkを自分のlogSinkへ
+        // 上書き済みのため、無条件にnullを代入すると新Activityのログ出力を壊す。
+        // 自分が設定したsinkのときだけnullに戻す。
+        if (SpikeLog.sink === logSink) {
+            SpikeLog.sink = null
+        }
+        super.onDestroy()
     }
 
     private fun reportSessionResult(label: String, clip: BaselineClip, result: RecognitionHarness.SessionResult) {
