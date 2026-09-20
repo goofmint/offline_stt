@@ -7,13 +7,14 @@ import 'model_management.dart' as model_management;
 import 'pigeon.g.dart' as pigeon;
 import 'platform_exception_mapping.dart';
 
-/// 認識セッション本体(design.md §4.2、requirements.md FR-3、
-/// Issue #36 #37 #38)。
+/// 認識セッション本体(design.md §4.3(wt73版)、requirements.md FR-3、
+/// Issue #44〜#48)。
 ///
-/// 呼び出し側(`OfflineSttDarwin.transcribeFile()`)が
+/// 呼び出し側(`OfflineSttAndroid.transcribeFile()`)が
 /// `offline_stt_platform_interface`の`TranscribeSessionGuard`でこの
 /// Streamをラップし、design.md §3のセッション排他規則(同時1本まで・
-/// 2本目はStreamエラーでStateError)を満たす前提である。
+/// 2本目はStreamエラーでStateError)を満たす前提である
+/// (offline_stt_darwinと同一の構成)。
 ///
 /// ## このファイルの責務と単体テストの切り分け
 /// PigeonのHostApi/EventChannelを直接叩く層であるため、このファイル自体の
@@ -21,8 +22,8 @@ import 'platform_exception_mapping.dart';
 /// 切り出し、そちらを単体テストする(`model_state_mapping.dart`・
 /// `error_code_mapping.dart`)。`TranscriptSegment`はフィールドをそのまま
 /// 写すだけで分岐ロジックを持たないため、専用の写像関数には切り出さず
-/// 呼び出し箇所で直接組み立てている。ネイティブ依存部分の検証はIssue #40の
-/// 実機E2Eでカバーする。
+/// 呼び出し箇所で直接組み立てている。ネイティブ依存部分の検証は実機E2E
+/// (design.md §7、本ブランチのスコープ外である#50)でカバーする。
 Stream<TranscriptSegment> runTranscriptionSession(
   pigeon.OfflineSttHostApi hostApi,
   TranscribeRequest request,
@@ -53,7 +54,7 @@ Stream<TranscriptSegment> runTranscriptionSession(
         // design.md §3: transcribeFile()はcheckModel()相当がavailable
         // 以外なら即座にModelUnavailableExceptionをStreamエラーで返す。
         // 内部で暗黙的にモデルをダウンロードしてはならない
-        // (offline_stt_webの`recognition_session.dart`と同じ方針)。
+        // (offline_stt_darwin/webの`recognition_session.dart`と同じ方針)。
         final ModelState state;
         try {
           state = await model_management.checkModel(hostApi, request.locale);
@@ -98,10 +99,12 @@ Stream<TranscriptSegment> runTranscriptionSession(
         );
 
         // design.md §2.2: `playbackRate`はWeb専用オプションであり、
-        // Darwinでは無視する。`pigeons/offline_stt_events.dart`の
-        // `TranscribeRequest`には現行ブランチの時点で`playbackRate`
-        // フィールド自体が存在しない(PR#74で追加予定だが本ブランチは
-        // 分岐前のため未反映。同ファイル冒頭コメント参照)ため、
+        // Androidでは無視する(design.md §4.3(wt73版)実装方針にも明記
+        // のとおり、Androidの実時間ポンプ方式は理論上は同種の適用余地が
+        // あるが、M0時点では未検証のスコープ外)。
+        // `pigeons/offline_stt_events.dart`の`TranscribeRequest`には現行
+        // ブランチの時点で`playbackRate`フィールド自体が存在しない
+        // (PR#74で追加予定だが本ブランチは分岐前のため未反映)ため、
         // `path`/`locale`のみをネイティブへ渡す形で自然に無視される。
         final nativeRequest = pigeon.TranscribeRequest(
           path: request.path,
@@ -123,9 +126,11 @@ Stream<TranscriptSegment> runTranscriptionSession(
       }());
     },
     onCancel: () {
-      // design.md §3・§5 Cancelled: 購読キャンセル時はネイティブ側へ
-      // 明示的にキャンセルを要求する(`HostApi.cancel()`、
-      // `pigeons/offline_stt_events.dart`のドキュメントコメント参照)。
+      // design.md §3・requirements.md FR-6 Cancelled: 購読キャンセル時は
+      // ネイティブ側へ明示的にキャンセルを要求する(`HostApi.cancel()`)。
+      // design.md §4.3(wt73版)の「キャンセル時はパイプclose →
+      // stopListening() → destroy()」はネイティブ側(Kotlin)の責務であり、
+      // Dart側はキャンセル要求を送るだけでよい。
       if (finished) return null;
       finished = true;
       unawaited(nativeSubscription?.cancel());

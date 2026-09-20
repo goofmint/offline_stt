@@ -7,15 +7,15 @@ import 'model_state_mapping.dart';
 import 'pigeon.g.dart' as pigeon;
 import 'platform_exception_mapping.dart';
 
-/// モデル管理層(design.md §4.2、requirements.md FR-1/FR-2、Issue #35)。
+/// モデル管理層(design.md §4.3、requirements.md FR-1/FR-2、Issue #43)。
 ///
 /// PigeonのHostApi/EventChannelを直接叩く層であるため、このファイル自体の
 /// 単体テストは書かない(状態写像・エラー写像そのものは
 /// `model_state_mapping.dart`・`error_code_mapping.dart`に切り出して単体
-/// テストする。テスト方針の詳細は本パッケージの`offline_stt_darwin.dart`
+/// テストする。テスト方針の詳細は本パッケージの`offline_stt_android.dart`
 /// 冒頭コメントを参照)。`DownloadProgress`はフィールドをそのまま写す
 /// だけで分岐ロジックを持たないため、専用の写像関数には切り出さず
-/// 呼び出し箇所で直接組み立てている。
+/// 呼び出し箇所で直接組み立てている(offline_stt_darwinと同一の構成)。
 
 /// requirements.md FR-1。
 Future<ModelState> checkModel(
@@ -36,12 +36,21 @@ Future<ModelState> checkModel(
 /// は、transcribeFile()とは異なり呼び出し時点で即座に確定させる」と定める。
 /// これを満たすため`async*`ジェネレータ(購読されるまで本体が実行されない)
 /// は使わず、`downloadModel()`呼び出し時点で即座に
-/// `hostApi.downloadModel()`を呼び始める(offline_stt_webの
+/// `hostApi.downloadModel()`を呼び始める(offline_stt_darwin/webの
 /// `src/model_management.dart`と同じ設計判断)。
 ///
 /// ネイティブ側の`downloadProgress`EventChannelは、`hostApi.downloadModel()`
 /// を呼ぶより先に購読を開始する(呼び出し直後に届く早期の進捗イベントを
 /// 取りこぼさないようにするため)。
+///
+/// design.md §4.3(wt73版)のとおり、Kotlin実装(`ModelAcquisition.kt`)は
+/// `SpeechRecognizer.triggerModelDownload()`の`ModelDownloadListener`が
+/// ダウンロード完了時に発火しない実測があるため、完了判定を
+/// `checkRecognitionSupport()`の再照会でポーリングする。この再照会・
+/// ポーリングの詳細はネイティブ側の責務であり、Dart側は
+/// `downloadProgress`EventChannelから届く[DownloadProgress]をそのまま
+/// 中継するだけでよい(Windows/Webと同様、Androidも不定進捗
+/// `fraction: null`になり得る)。
 Stream<DownloadProgress> downloadModel(
   pigeon.OfflineSttHostApi hostApi,
   String locale,
