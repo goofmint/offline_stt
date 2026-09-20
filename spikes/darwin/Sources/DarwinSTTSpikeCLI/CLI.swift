@@ -126,7 +126,18 @@ enum CLI {
         // 既定はpartial観測のための.progressiveTranscription。--preset standard で
         // 非progressiveの.transcriptionへ切り替え、精度比較の参考値を取れるようにする。
         let presetName = optionValue(args, name: "--preset") ?? "progressive"
-        let preset: SpeechTranscriber.Preset = presetName == "standard" ? .transcription : .progressiveTranscription
+        // 未知の値を既定へ暗黙フォールバックさせない。出力に記録される preset 名と
+        // 実際に使用した Preset が食い違うと、測定条件の記録が誤りになるため。
+        let preset: SpeechTranscriber.Preset
+        switch presetName {
+        case "progressive":
+            preset = .progressiveTranscription
+        case "standard":
+            preset = .transcription
+        default:
+            print("エラー: --preset は progressive または standard を指定すること(指定値: \(presetName))")
+            exit(64)
+        }
 
         guard let baselineDir = BaselineAudioLocator.resolve(explicit: baselineDirOverride) else {
             print("エラー: test-assets/baseline-audio が見つからない")

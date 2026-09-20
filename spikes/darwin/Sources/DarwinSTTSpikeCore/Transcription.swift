@@ -65,6 +65,9 @@ public enum Transcription {
                 if let request = try await AssetInventory.assetInstallationRequest(supporting: [transcriber]) {
                     try await request.downloadAndInstall()
                 }
+            } catch is CancellationError {
+                // design.md §5: Darwin の Task cancel は Cancelled に分類する。
+                throw DarwinSpikeError.cancelled
             } catch {
                 throw DarwinSpikeError.assetUnavailable("assetInstallationRequest/downloadAndInstall failed: \(error)")
             }
@@ -103,6 +106,10 @@ public enum Transcription {
 
         do {
             try await analyzer.finalizeAndFinishThroughEndOfInput()
+        } catch is CancellationError {
+            // design.md §5: Darwin の Task cancel は Cancelled に分類する。
+            resultsTask.cancel()
+            throw DarwinSpikeError.cancelled
         } catch {
             resultsTask.cancel()
             throw DarwinSpikeError.underlying("finalizeAndFinishThroughEndOfInput() failed: \(error)")
