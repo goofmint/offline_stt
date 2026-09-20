@@ -345,6 +345,24 @@ class RecognitionHarness(private val context: Context) {
                 if (!pumpJoined) {
                     SpikeLog.warn("pumpJob.join() が ${joinTimeoutMs}ms 以内に完了しなかった。")
                 }
+                // withTimeoutOrNull は join() の待機を打ち切るだけで、対象ジョブ自体は
+                // キャンセルしない。これらは coroutineScope の子ジョブであるため、残したまま
+                // 抜けると coroutineScope が完了を待ち続け、runRecognition の終了が
+                // joinTimeoutMs を超える。いずれかがタイムアウトした場合は、タイムアウト経路と
+                // 同じ順序(パイプclose → pump停止 → stopRecognition → collect停止。
+                // design.md §4.3 参照)で確実に停止させる。
+                if (!collectJoined || !pumpJoined) {
+                    SpikeLog.warn("=== join タイムアウトによる停止経路開始 ===")
+                    runCatching { writeSide.close() }
+                        .onFailure { SpikeLog.warn("writeSide.close() 失敗: ${it.message}") }
+                    runCatching { readSide.close() }
+                        .onFailure { SpikeLog.warn("readSide.close() 失敗: ${it.message}") }
+                    pumpJob.cancelAndJoin()
+                    runCatching { recognizer.stopRecognition() }
+                        .onFailure { SpikeLog.warn("stopRecognition() 失敗: ${it.message}") }
+                    collectJob.cancelAndJoin()
+                    SpikeLog.warn("=== join タイムアウトによる停止経路完了 ===")
+                }
             }
 
             SpikeLog.info("=== runRecognition終了: accepted=$gotFirstResponse ===")

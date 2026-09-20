@@ -211,6 +211,56 @@ Android の `MediaCodec`/`MediaExtractor` APIの設計(デコーダの責務が�
 | Issue #12 総合判定 | 保留(未実施) |
 | Issue #13 総合判定 | 保留(未実施) |
 
+## エミュレータでの実測(Issue #11/#12/#13 の到達点)
+
+**「エミュレータでは何も確認できない」わけではない。** 実際にアプリを起動して以下を実測した。
+
+検証環境: エミュレータ `sdk_gphone64_arm64`、`Build.MANUFACTURER=Google`、`SDK_INT=36`、
+`FINGERPRINT=google/sdk_gphone64_arm64/emu64a:16/BE2A.250530.026.F3/13894323:userdebug/dev-keys`。
+実行日時: 2026-09-20 JST。
+
+| 項目 | 結果 |
+|---|---|
+| アプリ起動・UI表示 | 成功 |
+| 基準音声アセットの読み込み | 成功(`jaJP_10s.json`、locale=ja-JP、keywords=6件) |
+| `SpeechRecognition.getClient().checkStatus()` | **`UNAVAILABLE`** |
+| `UNAVAILABLE` → `MODEL_UNAVAILABLE` への写像 | 成功(design.md §5 の Android 列どおりに分類され、明確なエラーで停止した) |
+| `AudioSource.fromPfd()` の受理(Issue #13) | **未到達**。`checkStatus()` が `AVAILABLE` でないため手前で中止する |
+| MODE_BASIC + ja-JP の認識(Issue #11) | **未到達**(同上) |
+| MODE_ADVANCED フォールバック(Issue #12) | **未到達**(同上) |
+
+実行ログ(抜粋):
+
+```
+=== Basic 状態確認開始 ===
+checkStatus() = UNAVAILABLE
+=== Basic 状態確認終了 ===
+=== runRecognition開始: locale=ja-JP mode=MODE_BASIC clip=jaJP_10s ===
+checkStatus() 初回 = UNAVAILABLE
+checkStatus() が MODEL_UNAVAILABLE 相当を示した (UNAVAILABLE)。
+checkStatus() が AVAILABLE にならなかった (UNAVAILABLE)。認識は実行できない。
+Basic: 受理不成立。error=null
+```
+
+つまり、**状態照会とエラー写像までは実測で動作を確認できており、そこから先(実際の認識)にのみ AICore 対応の実機が必要である**。ML Kit の API は「状態確認 → 認識」の順序を前提としており、`checkStatus()` が `AVAILABLE` でない限り `fromPfd()` には到達しない。これは実装方針ではなく API の仕様による。
+
+### エミュレータでの実行により発見・修正した不具合
+
+アプリが起動直後にクラッシュしていた。
+
+```
+java.lang.IllegalStateException: You need to use a Theme.AppCompat theme (or descendant) with this activity.
+	at com.moongift.offlinestt.spike.MainActivity.onCreate(MainActivity.kt:53)
+```
+
+`MainActivity` が `AppCompatActivity` を継承しているにもかかわらず、`AndroidManifest.xml` のテーマが
+`@android:style/Theme.Material.Light` であったことが原因である。Instrumentation Test(Issue #14)は
+`MainActivity` を起動しないため、この不具合はテストでは検出できなかった。
+`Theme.AppCompat.DayNight.NoActionBar` を親とするテーマを追加して修正し、起動を実測で確認した。
+
+**この不具合は実機でも同様に発生していたため、エミュレータでの起動確認を行わずに実機検証へ進んでいた場合、
+実機接続時に同じクラッシュで手戻りが発生していた。**
+
 ## 実行環境の制約
 
 本検証を実行した環境には以下の制約があり、Issue #11 / #12 / #13 (ML Kit GenAI Speech Recognition
