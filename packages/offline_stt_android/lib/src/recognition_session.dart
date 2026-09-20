@@ -31,6 +31,12 @@ Stream<TranscriptSegment> runTranscriptionSession(
   late final StreamController<TranscriptSegment> controller;
   StreamSubscription<pigeon.TranscriptSegment>? nativeSubscription;
   var finished = false;
+  // ネイティブ側の文字起こしを実際に開始したかどうか。
+  // `hostApi.cancel()` は文字起こしとダウンロードの**両方**を停止する
+  // 仕様であるため、まだ文字起こしを開始していない段階(checkModel の
+  // 完了待ちなど)で購読がキャンセルされたときにこれを呼ぶと、同時に
+  // 走っている無関係なモデルダウンロードまで止めてしまう。
+  var startedNativeTranscription = false;
 
   void finish({Object? error, StackTrace? stackTrace}) {
     if (finished) return;
@@ -105,6 +111,7 @@ Stream<TranscriptSegment> runTranscriptionSession(
           locale: request.locale,
         );
 
+        startedNativeTranscription = true;
         try {
           await hostApi.transcribeFile(nativeRequest);
         } on PlatformException catch (e, st) {
@@ -127,6 +134,9 @@ Stream<TranscriptSegment> runTranscriptionSession(
       if (finished) return null;
       finished = true;
       unawaited(nativeSubscription?.cancel());
+      // 文字起こしを開始していなければネイティブへキャンセルを送らない
+      // (理由は `startedNativeTranscription` の宣言箇所のコメント参照)。
+      if (!startedNativeTranscription) return null;
       return hostApi.cancel();
     },
   );
