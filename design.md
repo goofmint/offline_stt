@@ -10,7 +10,7 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」技�
 アプリ
  └── <name>(エントリパッケージ)
       └── <name>_platform_interface(共通抽象)
-           ├── <name>_android   … Pigeon → Kotlin(ML Kit + MediaCodecポンプ)
+           ├── <name>_android   … Pigeon → Kotlin(標準 SpeechRecognizer + MediaCodecポンプ)
            ├── <name>_darwin    … Pigeon → Swift(SpeechAnalyzer + AVFoundation)
            ├── <name>_windows   … Pigeon → C++/WinRT(Windows AI + Media Foundation)
            └── <name>_web       … Dart JS interop(Web Speech + Web Audio)
@@ -166,6 +166,8 @@ AVAudioFile(任意フォーマット読込)
 
 ### 4.3 Android(<name>_android)
 
+**バックエンド差し替えの経緯**: 当初はML Kit GenAI Speech Recognitionを想定していたが、実体のあるAICoreをGoogleが個別に対応と認めた端末でしか動作せず、API 37・ブートローダーロック済みのPixel 6実機でもAICoreがstub版でGoogle Playストアが「対応しなくなりました」と明示し動作しなかった。そこでAndroid標準の `android.speech.SpeechRecognizer` へ差し替えた。詳細な経緯・実測はspikes/android/RESULTS.md の「代替案の検証: Android 標準 SpeechRecognizer」節を参照。
+
 パイプライン:
 
 ```
@@ -174,17 +176,21 @@ AVAudioFile(任意フォーマット読込)
   → リサンプリング(16kHz・モノラル・16-bit PCM)
   → ParcelFileDescriptor.createPipe()
   → 書き込み側: 実時間ポンプ(毎秒約32KB、コルーチンで供給)
-  → AudioSource.fromPfd(読み取り側)
-  → SpeechRecognizer.startRecognition() の Kotlin Flow
+  → Intent.putExtra(RecognizerIntent.EXTRA_AUDIO_SOURCE, 読み取り側)
+  → SpeechRecognizer.createOnDeviceSpeechRecognizer() の startListening() → RecognitionListener
   → EventChannel へ転送
 ```
 
-- `speechRecognizerOptions { locale; preferredMode = MODE_ADVANCED }` で生成し、Advanced非対応端末のBasicフォールバック挙動をM0で確認。フォールバックが自動でない場合はBasicで再生成するリトライを実装
+- 認識セッションの生成: `SpeechRecognizer.createOnDeviceSpeechRecognizer(context)` でオンデバイス専用インスタンスを生成する。`Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)` に `EXTRA_LANGUAGE`(ロケール)と `EXTRA_PREFER_OFFLINE = true`(NFR-2のオフライン方針)を設定し、`startListening(intent)` を呼ぶ。ML Kit固有だった `MODE_ADVANCED` / `MODE_BASIC` のようなモードの概念は本APIには無く、代わりに「オンデバイス(`createOnDeviceSpeechRecognizer` + `EXTRA_PREFER_OFFLINE`)」と「オンライン」の区別のみが存在する
+- ファイル入力: `RecognizerIntent.EXTRA_AUDIO_SOURCE` に読み取り側の `ParcelFileDescriptor` を設定する。併せて `EXTRA_AUDIO_SOURCE_CHANNEL_COUNT`(=1)・`EXTRA_AUDIO_SOURCE_ENCODING`(=`AudioFormat.ENCODING_PCM_16BIT`)・`EXTRA_AUDIO_SOURCE_SAMPLING_RATE`(=16000)の3つのExtraを必ず併せて渡す必要がある(Pixel 6実機で受理を確認済み。spikes/android/RESULTS.md 参照)
+- **`RECORD_AUDIO` 権限は不要である。** Pixel 6実機での検証では同権限を一切付与せずに実行したが、`ERROR_INSUFFICIENT_PERMISSIONS` は発生せず、`onReadyForSpeech` → `onBeginningOfSpeech` → `onPartialResults`(日本語の逐次認識結果)と正常に進行した。これは音声がマイクではなくPFD経由で供給されていることの直接証拠である(spikes/android/RESULTS.md 参照)
 - 実時間ポンプ設計:
-  - 供給レートは壁時計基準(累積送信サンプル数と経過時間の差分でsleep調整)。バッファ単位100ms(3,200サンプル)
-  - キャンセル時はパイプclose → `stopRecognition()` → `close()`
-- リサンプリング: MediaCodec出力が16kHz以外の場合は線形補間ではなくAudioResampler相当の処理が必要。実装コスト次第で対応入力を「デコード後にリサンプル可能な形式」に限定するか判断(M3で決定)
-- ブートローダーアンロック端末・AICore未初期化は `checkStatus()` 結果とAICoreエラーコード(601 / 606 等)を `DeviceUnsupportedException` / `ModelUnavailableException` に写像
+  - 供給レートは壁時計基準(累積送信サンプル数と経過時間の差分でsleep調整)。バッファ単位100ms(16kHz・モノラル・16-bit PCMでは1,600サンプル=3,200バイト。1サンプル=2バイトである点に注意)
+  - **既存の実時間ポンプ設計はバックエンド差し替え後もそのまま使える(実測で確認済み)。** Pixel 6実機でjaJP_10s(305,988バイト)を供給したところ `sentBytes=305988/305988, elapsedMs=9564, 実効レート=31993.7バイト/秒` となり、目標値(毎秒約32,000バイト)とほぼ一致した(spikes/android/RESULTS.md 参照)
+  - キャンセル時はパイプclose → `stopListening()`(または `cancel()`)→ `destroy()`。ただしキャンセル経路そのものはM0スパイクの検証範囲外であり未検証である(spikes/android/RESULTS.md「限界」参照)
+- **`onResults()` の確定結果(`RESULTS_RECOGNITION`)が `null` になり、確定テキストが得られない。** Pixel 6実機での2回の独立実行いずれでも再現した。ログの時系列上、`onResults` は**パイプ(書き込み側)を閉じた直後、`stopListening()` を呼ぶ*前*に発火している**。すなわち入力終了は `stopListening()` ではなくパイプのcloseによって検出されており、`stopListening()` の有無に関わらずこの挙動が生じる。なお `onResults` の後に遅れて `stopListening()` を呼ぶと `ERROR_CLIENT`(5)が誘発されるだけであった(実測)。一方で完全なテキストは `onPartialResults()` 側に逐次emitされ、最長のpartial(例: 「東京都渋谷で2024年11月3日午後3時株式会社モンギフトが新製品を発表しました来場者は128名でした」)が実質的な文字起こし結果になっていた。**そのため本実装では、`onResults()` のtexts が null の場合は直前の `onPartialResults()` の最上位候補を確定結果として採用する**(Webで `isFinal` が立たない場合に末尾interimを採用したのと同じ構図。spikes/android/RESULTS.md 参照)。原因(オンデバイスエンジン側の挙動か `EXTRA_AUDIO_SOURCE` 経由特有の終端処理かなど)は特定できておらず、M3実装時に追加調査が必要である
+- リサンプリング: **必須(M0スパイクで実測確定。この結論はバックエンド差し替えの影響を受けない)**。MediaCodecはコーデックのデコードのみを行い、サンプルレート変換・チャンネルのダウンミックスは一切行わないことを実測で確認した。実環境相当の音源7ファイル(44.1kHz/48kHzステレオのwav・m4a・mp3、22.05kHzモノラル、8kHzモノラル)全てで出力`MediaFormat`のサンプルレート・チャンネル数が入力側と完全に一致し、16kHz・モノラルへの変換は起きなかった(resampleNeeded=true、7/7。spikes/android/RESULTS.md 参照)。よって線形補間ではなくAudioResampler相当のサンプルレート変換 + ステレオ→モノラルのダウンミックス処理をM3で実装する。MediaCodecのこの挙動は認識バックエンドとは無関係なAndroidフレームワークAPI(`MediaExtractor`/`MediaCodec`)の仕様であるため、ML Kit GenAI Speech Recognitionから標準SpeechRecognizerへの差し替えによってこの結論が変わることはない。なお本結果はエミュレータ単一環境での実測であり、実機での追試が引き続き望ましい
+- モデル管理・状態確認: `SpeechRecognizer.checkRecognitionSupport(intent, executor, RecognitionSupportCallback)` が返す `RecognitionSupport` の `supportedOnDeviceLanguages` / `installedOnDeviceLanguages` / `pendingOnDeviceLanguages` / `onlineLanguages` を突き合わせてFR-1の4値へ写像する(写像方針の詳細はrequirements.md FR-1参照)。モデル取得は `SpeechRecognizer.triggerModelDownload(intent, executor, ModelDownloadListener)` を用いるが、**`ModelDownloadListener` のコールバックはダウンロード完了時に発火しない実測がある**(Pixel 6実機でja-JP言語パック取得を試みた際、`onScheduled()` のみ発火し以降60秒間他のコールバックが到達しなかったが、実際にはダウンロードは完了していた)。そのため完了判定はコールバックではなく `checkRecognitionSupport()` の再照会(`installedOnDeviceLanguages`)で行う(spikes/android/RESULTS.md 参照)
 
 ### 4.4 Windows(<name>_windows)
 
@@ -209,19 +215,22 @@ AVAudioFile(任意フォーマット読込)
 
 | 共通例外 | Android | Darwin | Windows | Web |
 |---|---|---|---|---|
-| ModelUnavailable | FeatureStatus.UNAVAILABLE / AICore 606 | アセット取得不可 | NotReady / EnsureNeeded で未同意 | available() = unavailable |
-| LocaleUnsupported | ロケール非対応ステータス | supportedLocales外 | (M0確認後に確定) | language-not-supported |
+| ModelUnavailable | `checkRecognitionSupport()` で対象ロケールが `supportedOnDeviceLanguages` に無い / `ERROR_LANGUAGE_UNAVAILABLE` | アセット取得不可 | NotReady / EnsureNeeded で未同意 | available() = unavailable |
+| LocaleUnsupported | `ERROR_LANGUAGE_NOT_SUPPORTED` | supportedLocales外 | (M0確認後に確定) | language-not-supported |
 | DecodeFailed | MediaCodecエラー | AVAudioFileエラー | Media Foundation失敗 | decodeAudioData reject |
-| DeviceUnsupported | ブートローダーアンロック / API<31 | OS 26未満 | NotSupportedOnCurrentSystem | 非Chrome系 |
-| Cancelled | Flow cancel | Task cancel | 認識中断 | stop/abort |
+| DeviceUnsupported | API<31(NFR-4) / `ERROR_CANNOT_CHECK_SUPPORT` | OS 26未満 | NotSupportedOnCurrentSystem | 非Chrome系 |
+| Cancelled | `stopListening()`/`cancel()` 呼び出しに伴うセッション終了 | Task cancel | 認識中断 | stop/abort |
 
 - 注記: Darwin列のうち DecodeFailed(AVAudioFileエラー)と LocaleUnsupported(supportedLocales外)は、macOS 26.5.1実機でエラーを実発火させ動作を確認済みである(spikes/darwin/RESULTS.md 参照)。
+- 注記(採用しなかったバックエンドに関する記録): Android列が言及していた「AICore 606」のような数値エラーコードは、ML Kit GenAI Speech Recognitionの `GenAiException.ErrorCode`(`genai-common:1.0.0-beta3` をjavapで確認)の実際の定数一覧には含まれていなかった。同ライブラリが公開する定数は UNKNOWN / REQUEST_PROCESSING_ERROR / CANCELLED / NOT_AVAILABLE / BUSY / RESPONSE_PROCESSING_ERROR / REQUEST_TOO_LARGE / REQUEST_TOO_SMALL / RESPONSE_GENERATION_ERROR / PER_APP_BATTERY_USE_QUOTA_EXCEEDED / BACKGROUND_USE_BLOCKED / NOT_ENOUGH_DISK_SPACE / NEEDS_SYSTEM_UPDATE / AICORE_INCOMPATIBLE / INVALID_INPUT_IMAGE / CACHE_PROCESSING_ERROR であった(spikes/android/RESULTS.md 参照)。ML Kit GenAI Speech Recognitionを不採用としたため、この対応付けはもはや必要ない。
+- 注記(採用しなかったバックエンドに関する記録): Pixel 6実機(API 37、ブートローダーロック済み)でのML Kit GenAI Speech Recognitionの実測では、`checkStatus()`/`startRecognition()` が `PERMISSION_DENIED: Api access revoked.`(AICoreがGoogle Playストアからも「対応しなくなりました」と明示されるstub版であることが原因)を、`MODE_ADVANCED` 指定時には `UNAVAILABLE: Peer process crashed, exited or was killed (binderDied)` を返すことを確認していた(spikes/android/RESULTS.md 参照)。この実測結果自体がAndroid標準SpeechRecognizerへの差し替えの根拠になったが、上表のAndroid列はすでに新バックエンドの `ERROR_*` 定数に置き換え済みであり、これらのML Kit固有エラーコードの写像は不要になった。
+- 注記: 上表のAndroid列(標準SpeechRecognizerの `ERROR_*` 定数)は、Pixel 6実機での実測(`ERROR_INSUFFICIENT_PERMISSIONS` が発生しないこと等)に基づき初期版を記載したが、各 `ERROR_*` 定数と共通例外の対応付けは、`ERROR_LANGUAGE_UNAVAILABLE` / `ERROR_CANNOT_CHECK_SUPPORT` 等を含め実機でエラーを実発火させたわけではないため、M3実装時に確定させる必要がある。
 - 注記: Web列について、言語パック未取得のまま `start()` を呼んだ場合に返るエラー名はロケールによって異なることをChrome 153実機で確認済みである。ja-JPでは `aborted`、en-USでは `language-not-supported` が返る(いずれも上表の `available() = unavailable` や `language-not-supported` とは別に、言語パック未取得という状況で観測された実測結果である)。この状況を `ModelUnavailable` へ写像する実装は、エラー名の判定ではなく `available()` による事前確認によって行うべきである(spikes/web/RESULTS.md 参照)。
 - 注記: Windows列の ModelUnavailable に記載の「NotReady / EnsureNeeded で未同意」のうち「EnsureNeeded」という状態は、実際の `AIFeatureReadyState` enumには存在しない。実際の値は `Ready` / `NotReady` / `NotSupportedOnCurrentSystem` / `DisabledByUser` / `CapabilityMissing` / `NotCompatibleWithSystemHardware` / `OSUpdateNeeded` の7つであることをドキュメント調査で確認した(spikes/windows/RESULTS.md 参照)。本表のWindows列は実機確認のうえ確定させる必要がある。
 
 ## 6. 並行性・スレッディング
 
-- Android: デコードポンプはDispatchers.IO、認識FlowはML Kit既定。EventChannelへの転送はメインスレッドへpost
+- Android: デコードポンプはDispatchers.IO。`SpeechRecognizer` はコールバック(`RecognitionListener`)ベースであり、生成と `startListening()` / `stopListening()` / `destroy()` はメインスレッドから呼ぶ必要がある。`RecognitionListener` のコールバックもメインスレッドへ届くため、EventChannelへの転送はそのまま行える
 - Darwin: SpeechAnalyzerのAsyncSequenceをTaskで消費、FlutterEventSinkへはmain actor経由
 - Windows: WinRT asyncをcoroutine(C++/WinRT)で待機、結果はplatform threadへdispatch
 - Web: シングルスレッド。長時間ファイルでもdecodeAudioDataは非同期なのでUIブロックなし
@@ -291,7 +300,11 @@ Webでも同じ基準音声 jaJP_10s(1.0x再生)で実測したところ、包�
 4. Web: `start(audioTrack)` + `processLocally: true` の併用動作
    - **確定**。Chrome 153実機(通常の対話的Chromeセッション)で実測し、成立することを確認した。`processLocally = true` の設定と読み戻しが成功し、`audioTrack.readyState = "live"` の状態で `recognition.start(audioTrack)` が受理されて `onstart` が発火、partial結果が実時間で継続的に得られた。`network` エラーは発生しなかった。ただし `continuous = true` では `AudioBufferSourceNode` の再生終了後も `MediaStreamTrack` が `live` のまま無音を流し続けるため、Chromeは入力終了を自動認識しない。`source.onended` の後に明示的に `recognition.stop()` を呼んで初めて、約25ms後に `isFinal` の結果と、その直後に `onend` が発火してセッションが正常終了する。この `stop()` 呼び出しが§4.1の終了検出フローの必須要素である(spikes/web/RESULTS.md 参照)
 5. Android: MODE_ADVANCED指定時の非対応端末での自動フォールバック有無
+   - **ML Kit GenAI Speech Recognitionを採用しないため本項目は対象外となった。** バックエンドをAndroid標準 `android.speech.SpeechRecognizer` へ差し替えたことにより、ML Kit固有の概念である `MODE_ADVANCED`/`MODE_BASIC` およびそのフォールバック挙動自体が存在しなくなった(経緯はspikes/android/RESULTS.md「代替案の検証: Android 標準 SpeechRecognizer」節、および本ドキュメント§4.3冒頭参照)。
 6. Android: リサンプリング実装の要否(実ファイルのMediaCodec出力レート調査)
+   - **確定: リサンプリングは必須**。MediaCodecはコーデックのデコードのみを行い、サンプルレート変換・チャンネルのダウンミックスは一切行わないことを実測で確認した。実環境相当の音源7ファイル(44.1kHz/48kHzステレオのwav・m4a・mp3、22.05kHzモノラル、8kHzモノラル)全てで`resampleNeeded=true`となった(spikes/android/RESULTS.md 参照)。エミュレータ(`sdk_gphone64_arm64`, Android 16/API 36)単一環境での実測であり、実機での追試は引き続き望ましい。この結論は認識バックエンド(ML Kit GenAI Speech Recognition / 標準SpeechRecognizer)とは無関係なMediaCodecの挙動であり、バックエンド差し替えの影響を受けない
 7. Web: 再生速度オプション(`playbackRate`)の上限値と、精度低下に関する利用者への提示方法(M1で決定。§4.1参照)
+8. Android: 標準SpeechRecognizerのPixel 6以外の端末での動作、および `onResults()` が `null` になる挙動が全端末共通かどうか
+   - **未確定。M3で確認する必要がある。** §4.3記載のとおり、ja-JPオンデバイス言語パックの取得・`EXTRA_AUDIO_SOURCE`経由のファイル入力受理・`onResults()`が`null`になる挙動は、いずれもPixel 6(API 37、ブートローダーロック済み)単一機種での実測にとどまる(spikes/android/RESULTS.md「限界」参照)。他機種(特にja-JPのオンデバイス言語パックが最初から導入済みの機種や、`supportedOnDeviceLanguages`自体にja-JPを含まない機種)での挙動、および`onResults()`が`null`になる挙動がAndroidバージョン・機種によらず一貫するかは未検証である
 
 確定事項: `available()` / `install()` のja-JP実機確認結果(クリーンプロファイルで `downloadable` → `install()` で `available`。Chrome 153、spikes/web/RESULTS.md 参照)
