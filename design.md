@@ -74,6 +74,7 @@ class PlatformException_ extends TranscribeException { final String code; final 
 - 共通エラー列挙型 `TranscribeErrorCode`(`modelUnavailable` / `localeUnsupported` / `decodeFailed` / `deviceUnsupported` / `cancelled` / `platformError`)をPigeonスキーマに定義する。§2.2 の sealed 例外階層に対応するが、C++ は sealed class を持てないため列挙型でワイヤを渡す。Android/Darwin ではEventChannelの組み込みエラーシンクを使うため、スキーマ上は定義のみとする
 - 生成物(`.g.dart` / `.g.kt` / `.g.swift` / `.g.h` / `.g.cpp`)は**リポジトリにコミットする**。ネイティブビルド(Gradle / Xcode / CMake)はDart・Pigeonツールチェーンを経由せず生成済みコードを直接コンパイルするため、コミットしないとネイティブビルドが成立しない。再生成は melos スクリプト(`melos run pigeon`)で行う
 - Web: Pigeon不要。`package:web` + `dart:js_interop` で直接実装
+- `HostApi` はネイティブ側実装が非同期APIの完了を待って結果を返す必要があるメソッド(例: Darwinの `checkModel`、`AssetInventory`/`SpeechTranscriber` の async API に依存)には `@async` を使う。プラットフォームスレッドを `DispatchSemaphore` 等でブロックして待ち合わせる実装は禁止とする(ANR・デッドロックの危険があるため)
 
 ## 3. 状態遷移
 

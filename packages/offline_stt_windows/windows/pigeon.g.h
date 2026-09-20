@@ -239,11 +239,32 @@ class OfflineSttHostApi {
   OfflineSttHostApi& operator=(const OfflineSttHostApi&) = delete;
   virtual ~OfflineSttHostApi() {}
   // 対象ロケールのモデル状態を確認する(requirements.md FR-1)。
-  virtual ErrorOr<ModelState> CheckModel(const std::string& locale) = 0;
+  //
+  // ## `@async` を付与する理由
+  // `pigeons/offline_stt_events.dart` の同名メソッドと契約(HostApi)を
+  // 揃えるため付与する。design.md §4.4 のとおりWindowsの写像元は
+  // `GetReadyState()`(Async接尾辞が無いためAPI自体は同期の見込み)だが、
+  // PigeonのC++生成器は `@async` を付けたメソッドを
+  // `std::function<void(ErrorOr<ModelState> reply)>` を受け取るコール
+  // バック形式で生成する(実際に生成して確認済み。`windows/pigeon.g.h`
+  // 参照)。M4実装では `GetReadyState()` の結果を即座に
+  // `result(...)` で返せばよく、同期実装しか用意できない場合でも
+  // 不利にならない。将来的にWindows側の判定処理が非同期化しても
+  // このコールバック形式のまま自然に対応できる。
+  virtual void CheckModel(
+    const std::string& locale,
+    std::function<void(ErrorOr<ModelState> reply)> result) = 0;
   // モデルダウンロードを開始する(requirements.md FR-2)。
   //
   // 進捗は `OfflineSttStreamCallbackApi.onDownloadProgress` で配信される。
   // 本メソッド自体は開始要求のみを表し、値を返さない。
+  //
+  // ## `@async` を付けない理由
+  // `pigeons/offline_stt_events.dart` の同名メソッドと同様「開始要求
+  // のみ」の契約である。`EnsureReadyAsync()`(design.md §4.4)の完了を
+  // 待たずに開始要求だけを受け付けて直ちに制御を返せる設計とし、進捗・
+  // 完了は `OfflineSttStreamCallbackApi.onDownloadProgress` /
+  // `onStreamDone` で別途通知する。
   virtual std::optional<FlutterError> DownloadModel(const std::string& locale) = 0;
   // 音声ファイルの文字起こしを開始する(requirements.md FR-3)。
   //
@@ -253,6 +274,11 @@ class OfflineSttHostApi {
   // design.md §3 のとおり、`checkModel()` が `ModelState.available` 以外
   // を返す状態でこのメソッドが呼ばれた場合、ネイティブ側は即座にエラーを
   // 返さなければならない(内部で暗黙的にダウンロードを開始してはならない)。
+  //
+  // ## `@async` を付けない理由
+  // `downloadModel` と同様に「開始要求のみ」の契約であり、
+  // `BatchRecognition.RecognizeFromFile` の完了を待たずに開始要求だけを
+  // 受け付けて直ちに制御を返せる。
   virtual std::optional<FlutterError> TranscribeFile(const TranscribeRequest& request) = 0;
   // 実行中のダウンロード、または文字起こしセッションをキャンセルする
   // (requirements.md FR-3)。
@@ -260,6 +286,10 @@ class OfflineSttHostApi {
   // design.md §3 のとおり同時セッションはv1では1本に制限されるため、
   // キャンセル対象を明示するパラメータは持たない(実行中の1本のみが
   // 対象になる)。
+  //
+  // ## `@async` を付けない理由
+  // 実行中の非同期処理へキャンセル要求を送るだけの同期的な操作である
+  // (完了を待つ必要がない)。
   virtual std::optional<FlutterError> Cancel() = 0;
 
   // The codec used by OfflineSttHostApi.
