@@ -41,6 +41,17 @@ android {
     kotlinOptions {
         jvmTarget = '17'
     }
+
+    testOptions {
+        unitTests {
+            // JVMユニットテスト(src/test/)では android.jar がスタブであり、
+            // 未モックのAndroid APIを呼ぶと既定では例外になる。
+            // RealtimePump は送出中断時に android.util.Log へ記録するため、
+            // キャンセル経路のテストがログ呼び出しで落ちないようにする。
+            // 対象は src/test/ のみで、実機の挙動には影響しない。
+            returnDefaultValues = true
+        }
+    }
 }
 
 dependencies {
