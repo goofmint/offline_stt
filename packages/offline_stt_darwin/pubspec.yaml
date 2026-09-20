@@ -14,12 +14,14 @@ resolution: workspace
 dependencies:
   flutter:
     sdk: flutter
+  meta: ^1.15.0
   offline_stt_platform_interface: ^0.1.0
 
 dev_dependencies:
   flutter_lints: ^6.0.0
   flutter_test:
     sdk: flutter
+  pigeon: ^27.3.0
 
 flutter:
   plugin:

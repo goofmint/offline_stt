@@ -36,9 +36,57 @@ melos run analyze
 
 # test/ を持つパッケージでユニットテストを実行
 melos run test
+
+# フォーマット差分チェック(Pigeon生成物 *.g.dart は対象外)
+melos run format
 ```
 
 `melos` は `~/.pub-cache/bin/melos` にインストールされている想定。PATHに無ければフルパスで実行する。
+
+## CI(GitHub Actions、Issue #25)
+
+`.github/workflows/ci.yml` は `push`(main)と `pull_request` で以下を実行する。
+
+| ジョブ | ランナー | 内容 |
+|---|---|---|
+| analyze-test | ubuntu-latest | `melos run analyze` / `melos run test` / `melos run format` |
+| build (android) | ubuntu-latest | `apps/example` の `flutter build apk --debug` |
+| build (web) | ubuntu-latest | `apps/example` の `flutter build web` |
+| build (windows) | windows-2025 | `apps/example` の `flutter build windows --debug` |
+| build (macos) | macos-26 | `apps/example` の `flutter build macos --debug` |
+| build (ios) | macos-26 | `apps/example` の `flutter build ios --no-codesign --debug` |
+
+**CIが検証すること**: 全パッケージの静的解析・ユニットテスト・フォーマット、および `apps/example` の各プラットフォーム向けコンパイル(ビルド検証のみ)。
+
+**CIが検証しないこと(design.md §7 の方針)**: 認識E2E(実際の音声ファイルが正しく文字起こしされるか)。以下のとおり実機依存であることが実測済みであり、CI環境では原理的に再現できないため、リリース前の手動チェックリストで運用する。
+
+- iOS: シミュレータでは `SpeechTranscriber.isAvailable` が `false` になり、SpeechAnalyzerによる認識自体が利用できない(`spikes/darwin/RESULTS.md`)
+- Android: エミュレータでは `checkStatus()` が `UNAVAILABLE` になる(AICore非搭載。`spikes/android/RESULTS.md`)
+- Web: ブラウザの言語パック(約60MB)取得と実ブラウザ環境が必要であり、ヘッドレスCIでは再現しない(`spikes/web/RESULTS.md`)
+
+**ランナー・SDKバージョンの調査結果**(2026-09時点):
+
+- `macos-26` ラベルは 2026-02-26 にGitHub ActionsでGA済み(既定Xcode 26.4.1、26.5等も選択可能)であり、requirements.md NFR-4「iOS 26 / macOS 26 以上」を満たすビルド環境として利用できる。
+- `windows-2025` ラベル(Windows Server 2025)もGA済み。requirements.md NFR-4「Windows 11 24H2 (build 26100)」とOSビルド世代は揃うが、GitHub Hosted RunnerにWindows 11クライアント版は存在せず、Server版である点に注意。
+- `offline_stt_windows/windows/CMakeLists.txt` は2026-09時点でWinAppSDKをまだNuGet等で依存宣言しておらず、`# TODO(M4)` コメントのみである。そのため現時点のWindowsビルドは WinAppSDK バージョン不一致では失敗しない。M4でWinAppSDK依存を追加した際はこの前提が変わるため、CI設定の見直しが必要になる。
+
+**ローカルで検証済みのビルド**:
+
+| ビルド | 結果 |
+|---|---|
+| `flutter build web` | 成功 |
+| `flutter build macos --debug` | 成功(Xcode 26.6 / macOS 26.5.1) |
+| `flutter build ios --no-codesign --debug` | 成功(Xcode 26.6) |
+
+android / windows はローカル環境の制約(JDK バージョン、OS)により未検証であり、CI が初回の検証となる。
+
+**Swift の言語モードについて**: `offline_stt_darwin.podspec` は `s.swift_version = '5.0'` を指定している。Swift 6 言語モード(strict concurrency)では、Pigeon が生成する `Pigeon.g.swift` のトップレベル `var`(`pigeonPigeonMethodCodec`)が `is not concurrency-safe because it is nonisolated global shared mutable state` としてコンパイルエラーになる。Pigeon 27.3.0 と最新の 29.0.2 のどちらでも同じコードが生成されるため、Pigeon の更新では解決しない。Swift 5 モードでも async/await と actor は使えるため、design.md §4.2 の SpeechAnalyzer 連携(M2)には支障がない。
+
+**その他の注意点**:
+
+- `apps/example` は雛形段階(機能実装はIssue #32)であり、android/ios/macos/windows/web のネイティブプロジェクト一式をまだリポジトリに含めていない。CIの各ビルドジョブは `flutter create . --platforms=<platform>` でCIワークスペース上にのみプラットフォームディレクトリを生成し(既存の `lib/pubspec.yaml` は保持される、公式にサポートされた再実行可能な操作)、リポジトリにはコミットしない。
+- macOS/iOSビルドジョブでは、`flutter create` が生成する既定のDeployment Target(macOSは10.15)が `offline_stt_darwin.podspec` の要求(`26.0`、requirements.md NFR-4)より低いため、CI内で `sed` によりDeployment Targetを26.0へ引き上げてからビルドしている。macOS・iOS ともにローカルでこの引き上げが必要であることを確認し、引き上げ後にビルドが成功することも確認済みである。
+- Androidビルドジョブでも同様に、`flutter create` が生成する既定の minSdk(24)が `offline_stt_android` の要求する 31(requirements.md NFR-4: Android 12 / API 31 以上)より低いため、CI内で 31 へ引き上げてからビルドしている。引き上げないとマニフェストのマージが `uses-sdk:minSdkVersion 24 cannot be smaller than version 31 declared in library [:offline_stt_android]` で失敗することを、CI の実行で実際に確認した。
 
 ## 現状
 

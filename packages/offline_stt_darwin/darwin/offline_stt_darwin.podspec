@@ -24,5 +24,12 @@ offline_stt のiOS/macOS共用実装。SpeechAnalyzer + AVFoundationによる
   s.osx.deployment_target = '26.0'
 
   s.pod_target_xcconfig = { 'DEFINES_MODULE' => 'YES' }
-  s.swift_version = '6.2'
+  # Swift 5 言語モードを指定する。Swift 6 言語モード(strict concurrency)では、
+  # Pigeon が生成する `var pigeonPigeonMethodCodec`(グローバル可変状態)が
+  # 「is not concurrency-safe because it is nonisolated global shared mutable state」
+  # としてコンパイルエラーになる。Pigeon 27.3.0 と最新の 29.0.2 のどちらでも
+  # 同じコードが生成されるため、Pigeon の更新では解決しない。
+  # Swift 5 モードでも async/await と actor は使えるため、design.md §4.2 の
+  # SpeechAnalyzer 連携(M2)には支障がない。
+  s.swift_version = '5.0'
 end
