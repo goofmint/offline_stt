@@ -111,7 +111,7 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」要�
 
 - Android 12 (API 31) 以上
 - iOS 26 以上 / macOS 26 以上
-- Windows 11 24H2 (build 26100) 以上、WinAppSDK 1.7.1以上(注記: Speech Recognition APIの公式APIリファレンスページは `windows-app-sdk-2.0-experimental` モニカーでのみ存在し、1.7 / 1.8 / 2.0(安定版)のいずれのモニカーにも掲載が確認できないことをドキュメント調査で確認した。このバージョン前提の再確認が必要である。spikes/windows/RESULTS.md 参照)
+- Windows 11 24H2 (build 26100) 以上、WinAppSDK 1.7.1以上(**M4実装時に再確認して確定**: 公式ドキュメント https://learn.microsoft.com/en-us/windows/ai/apis/speech-recognition の Prerequisites に「Windows 11, version 24H2 (build 26100) or later」「WinAppSDK version: Version 1.7.1 or later」と明記されている。M0調査時点ではAPIリファレンスが `windows-app-sdk-2.0-experimental` モニカーにしか無く本記述との齟齬を疑っていたが、本記述が正しかった。design.md §4.4 参照)
 - Chrome 142 以上(オンデバイスWeb Speechのリグレッション修正済みバージョン)
 
 ### NFR-5 バージョニング

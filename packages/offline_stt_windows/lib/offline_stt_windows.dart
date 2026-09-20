@@ -1,57 +1,70 @@
 import 'package:offline_stt_platform_interface/offline_stt_platform_interface.dart';
+// offline_stt_platform_interfaceのdocコメント(lib/src/session_guard.dart)が
+// 明記するとおり、TranscribeSessionGuardはネイティブ実装パッケージ間だけの
+// 共有実装であり、公開バレルには意図的に含まれていない。そのためsrc/への
+// 直接importが必要であり、implementation_importsのlintは意図的に抑止する。
+// ignore: implementation_imports
+import 'package:offline_stt_platform_interface/src/session_guard.dart';
 
-// Pigeon生成コード(`pigeons/offline_stt_windows.dart` から生成、Issue #24)。
-// `ModelState` / `DownloadProgress` / `TranscribeRequest` / `TranscriptSegment`
-// はplatform_interface側と同名のためプレフィックス付きでimportする。
-// design.md §2.3 の方針(EventChannel)どおりにはできないため、Windowsのみ
-// `OfflineSttStreamCallbackApi`(FlutterApiコールバック)でストリームを
-// 代替している(理由は `pigeons/offline_stt_windows.dart` 冒頭コメント参照)。
+import 'src/model_management.dart' as model_management;
 import 'src/pigeon.g.dart' as pigeon;
+import 'src/recognition_session.dart';
+import 'src/stream_router.dart';
 
-/// `offline_stt` のWindows実装(雛形)。
+/// `offline_stt`のWindows実装(design.md §4.4、Issue #52〜#56)。
 ///
-/// C++/WinRT実装本体(Windows AI Speech Recognition の
-/// `BatchRecognition.RecognizeFromFile` + 必要ならMedia Foundationでの
-/// wav変換、design.md §4.4)はM4で実装する。WinAppSDK 1.7.1+への依存宣言、
-/// MSIX + `systemAIModels` capability のアプリ側要件もM4で整備する。
-/// 本クラスは `OfflineTranscriberPlatform.instance` の登録先としての雛形
-/// のみであるが、Pigeon生成の `OfflineSttHostApi` /
-/// `OfflineSttStreamCallbackApi`(design.md §2.3)への参照はここで保持し、
-/// M4での実装の出発点とする。
-class OfflineSttWindows extends OfflineTranscriberPlatform {
-  /// `dartPluginClass` からFlutterに自動登録されるエントリポイント。
+/// Pigeon生成コード(`pigeons/offline_stt_windows.dart`から生成、Issue #24)
+/// のHostApi(MethodChannel)/FlutterApiコールバックを介して、C++/WinRT
+/// 実装本体(`windows/`。`Microsoft.Windows.AI.Speech`の
+/// `SpeechRecognitionModel` + `BatchRecognition`、およびMedia Foundationに
+/// よるwav変換)と通信する。`spikes/windows/`のドキュメント調査結果
+/// (spikes/windows/RESULTS.md)を移植の出発点とした。
+///
+/// design.md §1・§4.4が定める3モジュール境界をそのまま維持している:
+/// - モデル管理: `src/model_management.dart`(Issue #53)
+/// - デコード・認識セッション・キャンセル: `src/recognition_session.dart`
+///   (Issue #54〜#56)
+///
+/// セッション排他(design.md §3、同時1本まで)は
+/// `offline_stt_platform_interface`の`TranscribeSessionGuard`を`with`して
+/// 満たす(`offline_stt_darwin`/`offline_stt_web`と同じ構成)。
+///
+/// ## Windows固有の事情(Android/Darwinとの差分)
+/// PigeonのC++生成器が`@EventChannelApi`に未対応であるため、Windowsだけは
+/// ストリームを`@FlutterApi()`のコールバック4本で代替している
+/// (`pigeons/offline_stt_windows.dart`冒頭コメント参照)。コールバックに
+/// ストリーム識別子が無いため、配送先の管理は`src/stream_router.dart`の
+/// [WindowsStreamRouter]が担う。
+///
+/// ## 未検証であること(重要)
+/// 本パッケージのネイティブ実装(`windows/`)は、Windows実機が無いため
+/// **一度もビルド・実行されていない**。`Microsoft.Windows.AI.Speech`の
+/// プロジェクションヘッダーを得るためのWinAppSDK配線も未確定であり、
+/// `windows/CMakeLists.txt`では既定で無効化してある(同ファイルの
+/// コメント参照)。実機での確認はIssue #58で行う。
+class OfflineSttWindows extends OfflineTranscriberPlatform
+    with TranscribeSessionGuard {
+  /// `dartPluginClass`からFlutterに自動登録されるエントリポイント。
   static void registerWith() {
+    // ネイティブ→Dartのストリームコールバック受け口を先に張っておく
+    // (登録前にネイティブから呼ばれることは無いが、`instance`の差し替え
+    // より先に済ませておくほうが順序依存が無い)。
+    WindowsStreamRouter.instance.ensureRegistered();
     OfflineTranscriberPlatform.instance = OfflineSttWindows();
   }
 
   /// Pigeon生成のMethodチャネルAPI(design.md §2.3)。
-  ///
-  /// 各メソッドの実装本体(M4)で使用する。現時点では各メソッドが
-  /// `UnimplementedError` を送出するスタブのままであるため未使用であり、
-  /// それを示すため明示的にignoreしている。M4では合わせて
-  /// `pigeon.OfflineSttStreamCallbackApi.setUp()` でストリーム
-  /// コールバックの受信を登録する。
-  // ignore: unused_field
   final pigeon.OfflineSttHostApi _hostApi = pigeon.OfflineSttHostApi();
 
   @override
-  Future<ModelState> checkModel(String locale) {
-    throw UnimplementedError(
-      'offline_stt_windows: checkModel() はM4で実装する(design.md §4.4)。',
-    );
-  }
+  Future<ModelState> checkModel(String locale) =>
+      model_management.checkModel(_hostApi, locale);
 
   @override
-  Stream<DownloadProgress> downloadModel(String locale) {
-    throw UnimplementedError(
-      'offline_stt_windows: downloadModel() はM4で実装する(design.md §4.4)。',
-    );
-  }
+  Stream<DownloadProgress> downloadModel(String locale) =>
+      model_management.downloadModel(_hostApi, locale);
 
   @override
-  Stream<TranscriptSegment> transcribeFile(TranscribeRequest request) {
-    throw UnimplementedError(
-      'offline_stt_windows: transcribeFile() はM4で実装する(design.md §4.4)。',
-    );
-  }
+  Stream<TranscriptSegment> transcribeFile(TranscribeRequest request) =>
+      guardSession(() => runTranscriptionSession(_hostApi, request));
 }

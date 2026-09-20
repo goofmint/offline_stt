@@ -1,7 +1,7 @@
 name: offline_stt_windows
 description: >-
   offline_stt のWindows実装(C++/WinRT、Windows AI Speech Recognition +
-  Media Foundation、design.md §4.4)。雛形のみ、実装はM4で行う。
+  Media Foundation、design.md §4.4)。
 version: 0.1.0
 publish_to: none
 
@@ -22,6 +22,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   pigeon: ^27.3.0
+  test: ^1.25.0
 
 flutter:
   plugin:
