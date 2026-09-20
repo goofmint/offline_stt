@@ -696,3 +696,164 @@ generated_plugins.cmake` に `jni` を追加する副作用がある**(path_prov
 への影響は **未検証** である。`path_provider` を使っている理由は
 `getExternalStorageDirectory()` が必要だからで、生パスに対する
 `Directory.createSync()` は `Permission denied` になる(実測)。
+
+---
+
+# 追記: B-1 / B-3 / B-4 修正後の再実行(同一端末)
+
+上記の初回実行で見つかった不具合のうち B-1 / B-3 / B-4 を修正し、**同じ
+Pixel 6 で同じ手順を回し直した**。ここに書く数値はすべてその実測である。
+
+実行日時は初回と同日、環境は上記「実行環境」と同一
+(Pixel 6 / Android 17 / API 37 / ビルド `CP2A.260705.006`、Flutter 3.41.9、
+JDK 17、`RECORD_AUDIO` 未付与)。
+
+## 何を直したか
+
+### B-1: `destroy()` を post していたことがサービス切断を起こしていた
+
+`ModelAvailability.querySupport()` の後始末が
+`mainExecutor.execute { destroy() }` と **post** していた。ところが
+`checkRecognitionSupport()` のコールバックは、本関数が渡した同じ
+`mainExecutor` 上で走る。**つまり既にメインスレッド上であり、post すると
+「現在のメッセージ処理の後」に回る。**
+
+その結果:
+
+1. `onSupportResult()` が continuation を再開する
+2. 呼び出し元が認識用の `SpeechRecognizer` を生成する(2 sessions)
+3. **その後で**モデル確認用の `destroy()` が走る
+4. 音声認識サービスの接続が切れ、直後の `startListening()` が
+   `ERROR_SERVER_DISCONNECTED(11)` で失敗する
+
+`Looper.myLooper() == Looper.getMainLooper()` のときは**その場で同期破棄する**
+ようにした。メインスレッド以外(キャンセル経路)からの呼び出しは従来どおり
+post する。
+
+**この post は M3 のレビュー指摘「`SpeechRecognizer` はメインスレッドから
+操作する契約であるため post せよ」への対応として入れたものである。**
+契約自体は正しいが、既にメインスレッド上である経路にまで一律に post を
+適用したことが原因だった。実機で走らせるまで気づけなかった。
+
+### B-3: 仮説リセットで前半が失われていた
+
+`onPartialResults()` の内容が「直前の仮説の続き」ではなく「新しい仮説の
+先頭」になったことを検出し、確定済みセグメントを貯めて最後に連結する
+ようにした。判定は `RecognitionSession.isHypothesisReset()`
+(「長さが半分未満に縮み、かつ直前の接頭辞でもない」)。
+
+連結時は `RecognitionSession.joinWithOverlap()` が、累積テキストの末尾と
+次セグメントの先頭が一致する最長区間を取り除く。
+
+**いずれも経験則であり、OSが公開している判定手段ではない。** 単体テスト
+(`RecognitionSessionResetTest` 6件 / `RecognitionSessionJoinTest` 5件)は
+判定規則が意図どおりに書けていることを確認するもので、**閾値の妥当性は
+実機でしか確かめられない**。
+
+### B-4: タイムアウトが機能していなかった
+
+`ModelAcquisition.run` がデッドライン判定を `querySupport()` の**後**にしか
+行っておらず、`querySupport()` 自体にも上限が無かった。デッドライン判定を
+呼び出しの前にも置き、`withTimeoutOrNull(QUERY_TIMEOUT_MS = 15秒)` で
+1回の再照会にも上限を設けた。
+
+## 手順3 の再実行結果(8ファイル)
+
+| クリップ | 所要 | partials | finals | done | error |
+|---|---|---|---|---|---|
+| jaJP_10s.wav | 10,353ms | 61 | 1 | true | null |
+| jaJP_10s.m4a | 10,034ms | 61 | 1 | true | null |
+| enUS_10s.wav | 13,458ms | 71 | 1 | true | null |
+| enUS_10s.m4a | 13,473ms | 73 | 1 | true | null |
+| jaJP_3m.wav | 176,499ms | 1,335 | 1 | true | null |
+| jaJP_3m.m4a | 176,389ms | 1,342 | 1 | true | null |
+| enUS_3m.wav | 180,317ms | 1,159 | 1 | true | null |
+| enUS_3m.m4a | 179,114ms | 1,145 | 1 | true | null |
+
+**8/8 が成功した。** 修正前は20回中3回(15%)しか成功しなかったので、
+B-1 は解消したと判断してよい。ただし**これは2回の通し実行
+(修正直後の1回と本再実行)での結果であり、長期的な再現性までは確かめて
+いない。** `ERROR_SERVER_DISCONNECTED` は元々間欠的に出るものだったため、
+非Pixel機での確認(Issue #50 の残り半分)と併せて追試すべきである。
+
+## キーワード包含率の再測定
+
+採点は `test-assets/keyword_score.py`(design.md §7 の正規化を厳密実装)。
+
+| クリップ | 修正前 | 修正後 | 判定 | 確定テキスト長 / 期待 |
+|---|---|---|---|---|
+| jaJP_10s.wav | 66.7% | **66.7%** | 不成立 | 51 / 57 |
+| jaJP_10s.m4a | 66.7% | **66.7%** | 不成立 | 51 / 57 |
+| enUS_10s.wav | 100.0% | **100.0%** | **合格** | 154 / 159 |
+| enUS_10s.m4a | 100.0% | **100.0%** | **合格** | 154 / 159 |
+| jaJP_3m.wav | 17.9% | **82.1%** | 不成立 | 1,054 / 1,151 |
+| jaJP_3m.m4a | 17.9%(注) | **78.6%** | 不成立 | 1,058 / 1,151 |
+| enUS_3m.wav | 4.0% | **32.0%** | 不成立 | 3,779 / 2,888 |
+| enUS_3m.m4a | 4.0%(注) | **32.0%** | 不成立 | 3,761 / 2,888 |
+
+(注) 修正前は B-1 のため wav/m4a のどちらかしか成功しない実行があった。
+
+**10秒クリップの値は修正前後で1文字も変わっていない。** B-1 / B-3 の修正が
+認識結果そのものに影響していないことの裏付けになる。
+
+**3分クリップは大幅に改善した。** jaJP_3m は 17.9% → 82.1% で、確定テキストも
+343文字相当から1,054文字(期待1,151)になった。**ja-JP では重複は生じて
+いない。**
+
+## 残る問題: enUS_3m に約890文字の重複が残る
+
+`enUS_3m` の確定テキストは **3,779文字** で、期待の 2,888文字を大きく
+超えている。`joinWithOverlap()` を入れる前が3,800文字だったので、
+**重複除去はほとんど効いていない。**
+
+理由は実測から明らかで、**再認識のたびに細部が揺れるため完全一致の重なりが
+成立しない**。同じ箇所が `Moji tall core` と `Mojit tall core`、
+`9.80 per month` と `9.80 cents per month`、`ISO 2701` と `ISO 27001` の
+ように違う文字列で出る。
+
+対処として曖昧一致(編集距離等)による重複除去も考えられるが、**採らなかった**。
+誤って本文を削る危険があり、欠落は復元できない一方で重複は読めば分かる
+ためである。`joinWithOverlap()` は完全一致の重なりだけを取り除く。
+
+**包含率への影響は無い**(重複は部分文字列の集合を増やしこそすれ減らさない)。
+`enUS_3m` が 32.0% に留まるのは重複ではなく**キーワード設計側の問題**である。
+未一致の大半は、期待キーワードが英単語綴りなのに認識結果が数字表記になる
+ものである。
+
+- `three hundred and twenty thousand` ⇔ 認識結果 `320 000`
+- `ninety six point four percent` ⇔ 認識結果 `96.4`
+- `forty five seconds` ⇔ 認識結果 `45 seconds`
+
+design.md §7 は「表記が複数あり得るキーワードは `.json` の `keywords` に
+**許容表記を列挙**し、いずれか1つに一致すれば一致とみなす」と定めている。
+`enUS_3m.json` はこれに従っていない。**これはライブラリの不具合ではなく
+基準音声セット側の不備である。** 修正は M0 出口判定(Issue #19 / #20 で
+「基準音声セットの読み上げスクリプトとキーワード選定を見直すか」として
+保留されている論点)に属するため、本E2Eでは事実の記録に留める。
+
+## 単体テスト
+
+`RecognitionSessionResetTest`(6件)と `RecognitionSessionJoinTest`(5件)を
+追加した。Kotlin JVM テストは計31件全成功。
+
+| テストクラス | 件数 |
+|---|---|
+| ErrorMappingTest | 5 |
+| RealtimePumpTest | 7 |
+| RecognitionSessionJoinTest | 5 |
+| RecognitionSessionResetTest | 6 |
+| ResamplerStreamingTest | 7 |
+| ResamplerTest | 6 |
+
+## この再実行で確認していないこと
+
+- **B-2(`checkModel()` が偽の `unavailable` を返す)は未修正・未再測定である。**
+  B-1 と同じ「サービス接続の churn」が原因である可能性はあるが、**確かめて
+  いない**。手順1-b の再実行を行っていない
+- **B-4 の修正は実機で発火させていない。** ダウンロード対象の未取得ロケールで
+  実際にハングさせて上限が効くことを確認したわけではなく、コードパスの
+  是正に留まる
+- **F-1(`LocaleUnsupportedException` に到達できない)は未対処である。**
+  チェックリストと実装のどちらを正とするかは設計判断であり、本E2Eの範囲外
+- **非Pixel機での検証は未実施。Issue #50 はこれで閉じない**
+- 手順2 / 手順7 / example app の UI 経路は初回実行と同じく未実施

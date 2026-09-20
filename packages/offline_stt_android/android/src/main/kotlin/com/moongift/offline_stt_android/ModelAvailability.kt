@@ -22,6 +22,7 @@ package com.moongift.offline_stt_android
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Looper
 import android.speech.RecognitionSupport
 import android.speech.RecognitionSupportCallback
 import android.speech.RecognizerIntent
@@ -80,7 +81,23 @@ object ModelAvailability {
                 // destroyOnce() が何もしなくなってリークする。
                 val target = recognizer ?: return
                 if (!destroyed.compareAndSet(false, true)) return
-                mainExecutor.execute { runCatching { target.destroy() } }
+                // **既にメインスレッド上ならその場で破棄する。** post すると
+                // 現在のメッセージ処理の「後」に回るため、コールバックが
+                // continuation を再開 → 呼び出し元が認識用の SpeechRecognizer を
+                // 生成 → その後に本インスタンスが破棄される、という順序になる。
+                // Pixel 6 実機ではこの順序で音声認識サービスの接続が切れ、
+                // 直後の `startListening()` が ERROR_SERVER_DISCONNECTED(11) で
+                // 即座に失敗した(20回中17回。E2E_RESULTS.md の B-1)。
+                // `checkRecognitionSupport()` のコールバックは本関数が渡した
+                // mainExecutor 上で走るため、通常はこの分岐に入る。
+                if (Looper.myLooper() == Looper.getMainLooper()) {
+                    runCatching { target.destroy() }
+                } else {
+                    // キャンセル経路など、メインスレッド以外から呼ばれた場合。
+                    // `SpeechRecognizer` はメインスレッドから操作する契約で
+                    // あるため post する。
+                    mainExecutor.execute { runCatching { target.destroy() } }
+                }
             }
 
             try {
