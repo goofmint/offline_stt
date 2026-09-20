@@ -41,7 +41,7 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」要�
   - Android: `checkStatus()` の FeatureStatus
   - Windows: `GetReadyState()` の AIFeatureReadyState
   - Web: `SpeechRecognition.available()` の AvailabilityStatus
-  - iOS/macOS: AssetInventory の照会結果(`AssetInventory.status` の `.installed` は予約(reserve)状態に連動する一時状態であり、ディスク上の永続状態を表す `installedLocales` とは別軸であることをmacOS実機で確認済み。4値への写像には両方の突き合わせが必要。spikes/darwin/RESULTS.md 参照)
+  - iOS/macOS: AssetInventory の照会結果(`AssetInventory.status` の `.installed` は予約(reserve)状態に連動する一時状態であり、ディスク上の永続状態を表す `installedLocales` とは別軸であることをmacOS実機で確認済み。この挙動はiOS実機でも再現し、macOS固有の挙動ではなくSpeechAnalyzer APIの仕様であることを確認済み。4値への写像には両方の突き合わせが必要。spikes/darwin/RESULTS.md 参照)
 
 ### FR-2 モデルダウンロード
 
@@ -70,7 +70,7 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」要�
 
 - BCP-47形式でロケールを指定
 - 対応ロケールはプラットフォーム・モードごとに異なるため、静的リストを持たず `checkModel(locale)` による実行時解決とする
-- 日本語(ja-JP)は全プラットフォームで動作検証を必須とする(検証済み事項: Android Basic = ja-JP beta、Android Advanced = ja-JP 高精度リスト掲載、Chrome オンデバイス = ja-JP対応。Chrome 153で `available()` が `downloadable`、`install()` 後に `available` へ遷移することを実機確認済み(spikes/web/RESULTS.md 参照)。iOS SpeechAnalyzer と Windows AI の日本語対応は実機検証で確認。うちmacOS 26.5.1実機では `SpeechTranscriber.supportedLocales`(30件)に `ja-JP` が含まれることを確認済み。iOS実機は未確認、spikes/darwin/RESULTS.md 参照)
+- 日本語(ja-JP)は全プラットフォームで動作検証を必須とする(検証済み事項: Android Basic = ja-JP beta、Android Advanced = ja-JP 高精度リスト掲載、Chrome オンデバイス = ja-JP対応。Chrome 153で `available()` が `downloadable`、`install()` 後に `available` へ遷移することを実機確認済み(spikes/web/RESULTS.md 参照)。iOS SpeechAnalyzer と Windows AI の日本語対応は実機検証で確認。うちmacOS 26.5.1実機では `SpeechTranscriber.supportedLocales`(30件)に `ja-JP` が含まれることを確認済み。iOS 27.0実機(iPhone 17)でも `SpeechTranscriber.supportedLocales`(45件)に `ja-JP` が含まれることを確認済み。macOS 26.5.1の30件とiOS 27.0の45件は一致しておらず、この実測が本節冒頭の「静的リストを持たず `checkModel(locale)` による実行時解決とする」という設計判断を裏付けている(spikes/darwin/RESULTS.md 参照)
 
 ### FR-6 エラーモデル
 
@@ -145,7 +145,7 @@ abstract class OfflineTranscriber {
 |---|---|---|
 | ML Kit GenAI (alpha) の破壊的変更 | Android実装の書き直し | バージョン固定 + 0.x運用、CHANGELOG追従 |
 | Chrome オンデバイスWeb Speechの不安定さ(過去に一時無効化の実績) | Web実装が突然動かなくなる | `available()` を毎回確認、機能検出ベースで劣化 |
-| iOS SpeechAnalyzer / Windows AI の日本語対応が未確認 | 主要ユースケース不成立 | 実装前に4プラットフォームでja-JP実機検証(マイルストーン0)。macOS 26.5.1実機では`supportedLocales`にja-JPを含むことを確認済み(spikes/darwin/RESULTS.md 参照)。iOS実機での確認は残課題 |
+| iOS SpeechAnalyzer / Windows AI の日本語対応が未確認 | 主要ユースケース不成立 | 実装前に4プラットフォームでja-JP実機検証(マイルストーン0)。macOS 26.5.1実機・iOS 27.0実機の双方で`supportedLocales`にja-JPを含むことを確認済み(spikes/darwin/RESULTS.md 参照)。残るはWindowsのみ |
 | `start(audioTrack)` + `processLocally` の組み合わせ動作が未検証 | Web実装不成立 | マイルストーン0で検証 |
 | Advanced→Basicフォールバック挙動が未検証 | Android品質のばらつき | 実機検証 + preferredModeの挙動をドキュメント化 |
 | 最低OSバージョンが高くユーザー母数が限られる | 採用が進まない | READMEに前提を明記、モデル同梱型代替(sherpa-onnx等)への誘導を記載 |

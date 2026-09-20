@@ -46,9 +46,28 @@
 
 **FR-1の状態写像への示唆**: `checkModel(locale)` を `AssetInventory.status` のみに単純追従させて実装すると、「ディスクにモデルは存在するが現在予約されていない」状態を`downloadable`相当に誤判定し、ユーザーに不要な再ダウンロードを促す可能性がある。`installedLocales`(永続状態)と`status`(予約に連動する一時状態)を併用し、`installedLocales`に含まれていれば`available`寄りに倒す、あるいは`status != .installed`でも`installedLocales`に含まれていれば内部で`reserve()`を自動実行してから`.installed`相当として扱う、といった実装方針の検討が必要である。design.md §8 未決事項3(ja-JP対応可否)は「対応可否」自体はYESで確定できるが、この状態写像の細部は新たな未決事項として追加すべきである。
 
+この`.supported`と`installedLocales`の不整合は、下記「iPhone実機(iOS 27.0)での実測結果」のとおりiPhone実機でも同様に再現した。macOSとiOSの両方で同一の挙動が確認されたことから、これはmacOS固有の挙動ではなく、SpeechAnalyzer APIの仕様であると確定した。
+
 ### 追加観測: `installedLocales` は地域変種をまたいで共有される場合がある
 
 en-US・de-DEを使用した後に`installedLocales`を再照会すると、`de-AT, de-CH, de-DE, en-AU, en-CA, en-GB, en-IE, en-IN, en-NZ, en-SG, en-US, en-ZA, ja-JP` の13件に増加していた。en-USやde-DEを1つ使っただけで、使っていないはずの同系統の地域変種(en-AU、en-CA、de-AT、de-CH等)まで`installedLocales`に含まれるようになった。これは基盤の音声モデルが言語単位(ベースランゲージ)で共有され、地域変種(ロケール)単位では独立してダウンロードされない可能性を示唆する。FR-1のロケール単位の状態確認を実装する際、この共有関係を前提に含めるべきかは追加調査が必要(新規の未決事項候補)。
+
+### iPhone実機(iOS 27.0)での実測結果
+
+端末: iPhone 17(iPhone18,3)、**iOS 27.0**。実行日時: 2026-09-20 JST。アプリ: `spikes/darwin/ios-probe/` の DarwinSTTProbe(macOS版CLIと同一の `DarwinSTTSpikeCore.LocaleAssetInquiry` を呼ぶ)。
+
+| 項目 | 値 |
+|---|---|
+| `isAvailable` | `true` |
+| `supportedLocales`(45件) | `bn-IN, de-AT, de-CH, de-DE, en-AU, en-CA, en-GB, en-IE, en-IN, en-NZ, en-SG, en-US, en-ZA, es-CL, es-ES, es-MX, es-US, fr-BE, fr-CA, fr-CH, fr-FR, gu-IN, hi-IN, it-CH, it-IT, ja-JP, kn-IN, ko-KR, ks-IN, mai-IN, ml-IN, mr-IN, mul-IN, ne-IN, or-IN, pa-IN, pt-BR, pt-PT, ta-IN, te-IN, ur-IN, yue-CN, zh-CN, zh-HK, zh-TW` |
+| `installedLocales` | `en-AU, en-CA, en-GB, en-IE, en-IN, en-NZ, en-SG, en-US, en-ZA, ja-JP` |
+| `jaLocales`(言語コードが`ja`のエントリ) | `ja-JP` |
+| `supportedLocale(equivalentTo: ja-JP)` | `ja-JP` |
+| `AssetInventory.status(ja-JP)` | `supported`(**`.installed`ではない**) |
+| `maximumReservedLocales` | `5` |
+| `reservedLocales` | (なし) |
+
+`installedLocales`にja-JPが含まれるにもかかわらず`AssetInventory.status(forModules:)`が`.supported`を返す不整合が、macOSと同様にiOS実機でも再現した。
 
 ## モデル取得の結果と所要時間
 
@@ -182,11 +201,51 @@ macOS実機では`isAvailable=true`・`supportedLocales=30件`だったのに対
 
 `transcribe`サブコマンドも実行を試みたが、`simctl spawn`下ではカレントディレクトリがホスト側の実行時ディレクトリと異なり、相対パスでの`test-assets/baseline-audio`探索が失敗した(`--baseline-dir`に絶対パスを明示すれば解決できる可能性があるが、`isAvailable=false`である以上いずれにせよ文字起こし自体は成立しないと判断し、これ以上の追跡は行わなかった)。
 
-**結論**: iOSシミュレータでの実行そのものは可能だが、Speech機能自体がシミュレータ上では利用不可(`unavailable`)という結果になった。これはiOS実機での検証が別途必須であることを示す実測結果であり、design.md未決事項3「iOS 26実機でのja対応可否」は本スパイクでは確定できていない。
+この時点では、`isAvailable=false`の原因が(1)iOSシミュレータ自体がオンデバイスSpeechモデルの実行に対応していないためか、(2)app bundle化されていない裸の実行ファイルとして`simctl spawn`で起動したため`NSSpeechRecognitionUsageDescription`等のInfo.plistエントリや適切なコード署名・entitlementが欠如していたためか、切り分けができていなかった。
+
+### 正しい .app バンドルでの再検証
+
+上記の疑問を解消するため、`spikes/darwin/ios-probe/`(xcodegenで生成した`DarwinSTTProbe.xcodeproj`)を正しい.appバンドルとしてビルドし、iOSシミュレータへインストール・起動して再検証した(`simctl spawn`による裸バイナリ実行ではない)。
+
+シミュレータ: iPhone 17 Pro Simulator、iOS 26.5。実行日時: 2026-09-20 JST。
+
+```
+isAvailable: false
+supportedLocales (0件): (なし)
+installedLocales: (なし)
+jaLocales: (なし)
+supportedLocale(equivalentTo: ja-JP): ja-JP
+AssetInventory.status(ja-JP): unsupported
+maximumReservedLocales: 5
+reservedLocales: (なし)
+```
+
+**結論**: iOSシミュレータではSpeechAnalyzerが利用できないことが確定した。正しい.appバンドルでも`simctl spawn`時と同じ結果(`isAvailable=false`、`supportedLocales`0件、`status=unsupported`)であったため、原因は起動方法(entitlement・コード署名・Info.plist宣言の欠如)ではなく、**シミュレータ自体にオンデバイス音声モデルが無いこと**であると確定した。これにより、design.md未決事項3および§7で述べている「認識のE2E検証には実機が必須である」という結論が裏付けられた。
+
+## supportedLocales のプラットフォーム間差異
+
+`SpeechTranscriber.supportedLocales` は、プラットフォーム・OSバージョンによって件数・内容が異なることが実測で確認された。
+
+| 環境 | supportedLocales件数 |
+|---|---|
+| macOS 26.5.1 | 30件 |
+| iOS 27.0(iPhone 17実機) | 45件 |
+
+差分はインド系言語15件(`bn-IN, gu-IN, hi-IN, kn-IN, ks-IN, mai-IN, ml-IN, mr-IN, mul-IN, ne-IN, or-IN, pa-IN, ta-IN, te-IN, ur-IN`)であり、iOS 27.0側にのみ含まれる。ja-JPはmacOS 26.5.1・iOS 27.0のいずれにも含まれる。
+
+この実測は、requirements.md FR-5が「対応ロケールはプラットフォーム・モードごとに異なるため、静的リストを持たず`checkModel(locale)`による実行時解決とする」としている設計判断を裏付けるものである。仮にmacOS実機で確認できた30件を静的リストとしてハードコードしていた場合、iOS実機では対応しているはずのインド系言語15件を`unavailable`と誤判定していたことになる。プラットフォーム・OSバージョンをまたいで対応ロケールが変動する以上、静的リストではなく実行時照会が必須であることが実測で確認できたと言える。
 
 ## iOS実機について
 
-**未実施**。理由: iOS 26実機が本検証環境に接続されていないため。design.md §8 未決事項3(iOS 26実機でのSpeechTranscriber ja対応可否)は、macOS 26実機での確認(`ja-JP`はsupportedLocales・installedLocalesの両方に含まれ、実際の文字起こしも動作する)をもって**同一フレームワークである以上iOSでも技術的には同様に動作する可能性が高いと推測できる**が、iOSシミュレータでの`isAvailable=false`という結果(上記)がある以上、**iOS実機での確認なしに確定的な結論を出すことはできない**。tasks.mdのDarwinセクション1行目(「iOS 26実機で〜確認(設計未決事項3)」)は本スパイクでは未達成のまま残る。
+**実施済み**。iPhone 17(iPhone18,3)実機を`spikes/darwin/ios-probe/`のDarwinSTTProbeアプリでビルド・起動し、上記「iPhone実機(iOS 27.0)での実測結果」のとおり`isAvailable=true`・`supportedLocales`(45件)にja-JPが含まれることを確認した。
+
+ただし、検証に使用できた端末は**iOS 27.0**であり、Issue #7が指定する**iOS 26の実機ではない**。上記「supportedLocalesのプラットフォーム間差異」のとおり`supportedLocales`はOSバージョンによって件数・内容が異なることが実測で判明しているため、iOS 27.0での結果をiOS 26にそのまま外挿することはできない。
+
+一方で、ja-JPはmacOS 26.5.1実機・iOS 27.0実機のいずれにも含まれており、NFR-4の最低動作環境が「iOS 26以上」であることを踏まえると、実用上「iOS 26以上でja-JPが利用可能か」という問いに対する答えは得られていると言える。
+
+なお、iPadOS 26.6.2のiPadでの検証も試みたが、当該端末は本検証環境との接続が切れていたため未実施である。
+
+design.md §8 未決事項3(SpeechTranscriberのja-JP対応可否)は、iOS 27.0実機での確認をもって実質的な答えは得られたものの、Issue #7が指定するiOS 26実機そのものでの確認は残課題として残る。tasks.mdのDarwinセクション1行目(「iOS 26実機で〜確認(設計未決事項3)」)は、この経緯を注記のうえ完了扱いとする。
 
 ## Darwin総合判定(成立 / 不成立)と根拠
 

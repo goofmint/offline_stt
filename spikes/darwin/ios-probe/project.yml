@@ -1,0 +1,39 @@
+# xcodegen spec — Issue #7 の iOS 26 実機確認用の最小アプリ。
+# SwiftPM の実行可能ターゲットは iOS 実機で起動できないため、
+# DarwinSTTSpikeCore のソースをそのまま取り込んだ単一アプリターゲットにする。
+name: DarwinSTTProbe
+options:
+  bundleIdPrefix: jp.moongift.offlinestt
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: YX944FB478
+    CODE_SIGN_STYLE: Automatic
+targets:
+  DarwinSTTProbe:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+      # DarwinSTTSpikeCore をそのまま取り込む。macOS 版 CLI と同一ロジックを
+      # iOS 実機で動かし、結果の差異が API 側のものであることを担保する。
+      - path: ../Sources/DarwinSTTSpikeCore
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: Darwin STT Probe
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSSpeechRecognitionUsageDescription: >-
+          M0検証スパイクとして、オンデバイス音声認識の対応ロケールを照会する。
+          音声の録音・送信は行わない。
+        NSMicrophoneUsageDescription: >-
+          M0検証スパイクではマイクを使用しない。OSの要求により宣言のみ行う。
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: jp.moongift.offlinestt.darwinprobe
+        TARGETED_DEVICE_FAMILY: "1,2"
