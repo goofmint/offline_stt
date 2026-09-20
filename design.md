@@ -137,6 +137,9 @@ AVAudioFile(任意フォーマット読込)
 - ファイル入力時の処理速度: macOS 26.5.1実機でRTF(処理時間 ÷ 実時間長)0.008〜0.026を実測済み、すなわち実時間の約38〜125倍高速(ja-JP/en-US × 10秒/3分 × wav/m4aの全8ファイル、spikes/darwin/RESULTS.md 参照)。結果をREADMEの所要時間表に反映する
 - `SpeechTranscriber.Preset` の選定は精度に大きく影響する(実測ではプリセット違いで包含率が最大20ポイント以上変動)ため、実装時に選定基準を定める必要がある。partial(volatile)結果を得るには `.progressiveTranscription` 系のプリセットが必要である(spikes/darwin/RESULTS.md 参照)
 - `AssetInventory.status(forModules:)` の `.installed` は当該ロケールが現在「予約(reserve)」されているかに連動する一時状態であり、ディスク上のアセット存在を表す永続状態(`installedLocales`)とは別軸である。FR-1の4値への写像を実装する際は `installedLocales` との突き合わせが必要である(spikes/darwin/RESULTS.md 参照)
+- `supportedLocales` はプラットフォーム・OSバージョンによって件数・内容が異なる(macOS 26.5.1: 30件、iOS 27.0: 45件)ことを実機で確認済みである。そのため静的リストを持たず、実行時に照会して解決する(spikes/darwin/RESULTS.md 参照)
+- iOSシミュレータでは `SpeechTranscriber.isAvailable` が `false` となり、SpeechAnalyzerによる認識自体が利用できないことを確認済みである。認識のE2E検証には実機が必須である(spikes/darwin/RESULTS.md 参照)
+- `AssetInventory.status(forModules:)` の `.installed` が予約状態に連動する上記の挙動は、iOS実機でも再現することを確認済みである。macOS固有の挙動ではなく、SpeechAnalyzer APIの仕様であることが確定した(spikes/darwin/RESULTS.md 参照)
 
 ### 4.3 Android(<name>_android)
 
@@ -173,8 +176,10 @@ AVAudioFile(任意フォーマット読込)
 ```
 
 - モデル管理: `GetReadyState()` → FR-1、`EnsureReadyAsync()` → FR-2。進捗APIの粒度が粗い場合は `DownloadProgress(fraction: null)` の不定進捗
-- `RecognizeFromFile` の対応入力フォーマットはM0で確認。wav以外が通らなければMedia Foundation変換層を必須化
-- 言語指定APIの有無をM0で確認(ドキュメント上、ロケール指定の記載が未確認。指定不能ならOS言語依存としてREADME明記、ja-JP検証が最優先)
+- `AIFeatureReadyState` の実際の値は7つである: `Ready` / `NotReady` / `NotSupportedOnCurrentSystem` / `DisabledByUser` / `CapabilityMissing` / `NotCompatibleWithSystemHardware` / `OSUpdateNeeded`(うち `CapabilityMissing` / `NotCompatibleWithSystemHardware` / `OSUpdateNeeded` の3つはWinAppSDK 2.0以降の値。ドキュメント調査で確認済み。spikes/windows/RESULTS.md 参照)。FR-1の4値(available/downloadable/downloading/unavailable)への写像には課題がある: **`downloading` に一意対応する状態が存在しない**。`NotReady` はダウンロード開始前の状態であり、ダウンロード中であることを知るには `EnsureReadyAsync()` 実行中に `SpeechRecognitionModelProgress.Status`(`Installing`/`Caching`/`Loading`等)の進捗イベントを観測する必要がある
+- `RecognizeFromFile(String)` はファイルパス文字列を直接渡す(StorageFileではない)。対応入力フォーマットはドキュメントに記載が無く、実機での確認が必須である(未確定。spikes/windows/RESULTS.md 参照)。wav以外が通らなければMedia Foundation変換層を必須化。なお `BatchRecognition` には `Recognize(Byte[])` という別オーバーロードも存在する(バイト列の期待フォーマットは未確認)
+- 言語指定APIの有無: **確定**。`Microsoft.Windows.AI.Speech` 名前空間にロケール・言語を指定するAPIは存在しないことをドキュメント調査で確認した(spikes/windows/RESULTS.md 参照)。指定不能であるため、OS言語依存としてREADMEに明記する方針が確定した前提となる。ja-JPで実際に高精度認識されるかは実機未検証のまま残る
+- WinAppSDKのバージョン前提に課題がある: `Microsoft.Windows.AI.Speech` 名前空間のAPIリファレンスページは `windows-app-sdk-2.0-experimental` モニカーでのみ存在し、1.7 / 1.8 / 2.0(安定版)のいずれのモニカーにも掲載が確認できなかった。requirements.md NFR-4が前提とする「WinAppSDK 1.7.1以上」という記述の再確認が必要である(spikes/windows/RESULTS.md 参照)
 - C++/WinRT実装。WinAppSDK 1.7.1+をプラグインの依存として宣言し、MSIX + `systemAIModels` はアプリ側要件としてREADMEに記載
 
 ## 5. エラーマッピング表
@@ -189,6 +194,7 @@ AVAudioFile(任意フォーマット読込)
 
 - 注記: Darwin列のうち DecodeFailed(AVAudioFileエラー)と LocaleUnsupported(supportedLocales外)は、macOS 26.5.1実機でエラーを実発火させ動作を確認済みである(spikes/darwin/RESULTS.md 参照)。
 - 注記: Web列について、言語パック未取得のまま `start()` を呼んだ場合に返るエラー名はロケールによって異なることをChrome 153実機で確認済みである。ja-JPでは `aborted`、en-USでは `language-not-supported` が返る(いずれも上表の `available() = unavailable` や `language-not-supported` とは別に、言語パック未取得という状況で観測された実測結果である)。この状況を `ModelUnavailable` へ写像する実装は、エラー名の判定ではなく `available()` による事前確認によって行うべきである(spikes/web/RESULTS.md 参照)。
+- 注記: Windows列の ModelUnavailable に記載の「NotReady / EnsureNeeded で未同意」のうち「EnsureNeeded」という状態は、実際の `AIFeatureReadyState` enumには存在しない。実際の値は `Ready` / `NotReady` / `NotSupportedOnCurrentSystem` / `DisabledByUser` / `CapabilityMissing` / `NotCompatibleWithSystemHardware` / `OSUpdateNeeded` の7つであることをドキュメント調査で確認した(spikes/windows/RESULTS.md 参照)。本表のWindows列は実機確認のうえ確定させる必要がある。
 
 ## 6. 並行性・スレッディング
 
@@ -204,7 +210,7 @@ AVAudioFile(任意フォーマット読込)
   - 共通テスト資産: ja-JP / en-US の基準音声(10秒 / 3分 / 30分、wav・m4a・mp3)+ 期待テキスト。期待テキストは「全文文字起こし」と「評価用キーワードリスト」の2要素で構成する。キーワードは意味上重要な名詞・固有名詞・数値・専門用語から選定し、各基準音声ファイルごとに個別のキーワードリストを用意する。件数の目安は10秒で5件以上、3分で15件以上とし、件数が少なすぎる統計的に弱い判定は避ける方針とする
     - 注記: tasks.mdのM0記述は10秒・3分・wav・m4aの範囲であり、本項の30分・mp3はM0スコープ外。30分版・mp3形式は後続マイルストーン(実運用に近い長時間音声での検証等)向けの用途とする
   - 評価: WERではなくキーワード包含率での簡易判定(モデル差があるため厳密一致は不可)。算出式・正規化ルール・しきい値は下記「評価基準(キーワード包含率)」を参照
-- CI: ビルド検証のみ(Android/iOS/Windows/Webのコンパイル)。認識E2Eは手動チェックリスト運用
+- CI: ビルド検証のみ(Android/iOS/Windows/Webのコンパイル)。認識E2Eは手動チェックリスト運用。iOSシミュレータではSpeechAnalyzerが利用できないため、認識E2Eはシミュレータでは原理的に実行できず実機が必須である
 - example app: ファイルピッカー → モデル状態表示 → ダウンロード同意ダイアログ → 文字起こし進行表示、の参照実装を兼ねる
 
 ### 評価基準(キーワード包含率)
@@ -251,10 +257,14 @@ Webでも同じ基準音声 jaJP_10s(1.0x再生)で実測したところ、包�
 ## 8. 設計上の未決事項(M0の結果で確定)
 
 1. Windows: RecognizeFromFileの対応フォーマットとロケール指定可否
+   - ロケール指定可否: **確定**。下記未決事項2参照
+   - 対応フォーマット: **未確定**。`BatchRecognition.RecognizeFromFile` の公式APIリファレンスページ(および周辺ページ・名前空間全体)に、対応するコンテナ・コーデックの一覧や制約に関する記載が見つからなかった。wav / m4a / mp3 が受理されるかはWindows実機での確認が必須である(Windows機が無いため未実施。spikes/windows/RESULTS.md 参照)
 2. Windows: ja-JP対応可否
+   - ロケール指定APIの有無: **確定**。`Microsoft.Windows.AI.Speech` 名前空間の全クラス・全メンバー(`SpeechRecognitionModel`・`BatchRecognition`・`AudioConfiguration`等)を公式APIリファレンスで突き合わせた結果、ロケール・言語を指定する引数・プロパティ・メソッドは1件も存在しないことをドキュメント調査で確定した(spikes/windows/RESULTS.md 参照)。ロケール指定ができない以上、design.md §4.4にある「指定不能ならOS言語依存としてREADME明記」という方針が確定した前提となる
+   - ja-JP書き起こし可否: **未確定のまま**。ロケール指定APIが無い場合に実際にどの言語で認識されるか(OS表示言語連動か、既定入力言語連動か等)、およびja-JP音声が実際に高精度で認識されるかは、ドキュメントに記載が無くWindows実機でのみ確認可能である(Windows機が無いため未実施。spikes/windows/RESULTS.md 参照)
 3. Darwin: SpeechAnalyzerのja-JP対応可否とファイル処理速度
    - ファイル処理速度: **確定**。macOS 26.5.1実機でRTF 0.008〜0.026(実時間の約38〜125倍高速)を実測(spikes/darwin/RESULTS.md 参照)
-   - ja-JP対応可否: **部分確定**。macOS 26.5.1実機では `supportedLocales`(30件)にja-JPが含まれ、実際の文字起こしも動作することを確認済み。ただしiOS実機は未検証(iOSシミュレータでは`isAvailable=false`となったが原因未特定であり、macOSの結果をそのままiOSに外挿できない)。iOS実機での確認が残る
+   - ja-JP対応可否: **確認済み(iOS 26実機は未実施)**。macOS 26.5.1実機では `supportedLocales`(30件)にja-JPが含まれ、実際の文字起こしも動作することを確認済み。iOS 27.0実機(iPhone 17)でも `supportedLocales`(45件)にja-JPが含まれることを確認済み。ただしIssue #7が指定するiOS 26実機での確認は未実施である(iOSシミュレータでは`.app`バンドルでの再検証でも`isAvailable=false`となることを確認しており、原因はシミュレータ自体にオンデバイス音声モデルが無いことと判明している。spikes/darwin/RESULTS.md 参照)
 4. Web: `start(audioTrack)` + `processLocally: true` の併用動作
    - **確定**。Chrome 153実機(通常の対話的Chromeセッション)で実測し、成立することを確認した。`processLocally = true` の設定と読み戻しが成功し、`audioTrack.readyState = "live"` の状態で `recognition.start(audioTrack)` が受理されて `onstart` が発火、partial結果が実時間で継続的に得られた。`network` エラーは発生しなかった。ただし `continuous = true` では `AudioBufferSourceNode` の再生終了後も `MediaStreamTrack` が `live` のまま無音を流し続けるため、Chromeは入力終了を自動認識しない。`source.onended` の後に明示的に `recognition.stop()` を呼んで初めて、約25ms後に `isFinal` の結果と、その直後に `onend` が発火してセッションが正常終了する。この `stop()` 呼び出しが§4.1の終了検出フローの必須要素である(spikes/web/RESULTS.md 参照)
 5. Android: MODE_ADVANCED指定時の非対応端末での自動フォールバック有無

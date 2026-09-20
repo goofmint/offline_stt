@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  WindowsSTTSpikeCli.vcxproj
+
+  M0 Windows検証スパイク(Issue #15-18)のC++/WinRTコンソールアプリ。
+  Core(モデル管理・ロケール照会・ファイル認識・キーワード採点・capability検証)と
+  Cli(サブコマンド実装)を1プロジェクトにまとめている(README「ビルド方法」参照。
+  静的ライブラリ分割によるリンク設定の不確実性を避けるための判断)。
+
+  要確認(本スパイクはWindows機を持たずビルド未検証。README冒頭参照):
+  - Microsoft.WindowsAppSDK / Microsoft.Windows.CppWinRT の正確なバージョン番号。
+    get-started.md(2026-09-20 WebFetch)で確認できた実在バージョンは
+    "1.8.250410001-experimental1" (Phi Silica向けの例)。Speech Recognition固有の
+    最小バージョンはrequirements.md/design.mdが"1.7.1以上"とする一方、
+    Microsoft.Windows.AI.Speech の API リファレンスページ自体は
+    "windows-app-sdk-2.0-experimental" モニカーでのみ存在し、1.7/1.8/2.0(安定版)の
+    モニカーでは確認できなかった(RESULTS.md「ドキュメント調査で確定した事項」参照)。
+    そのため本ファイルではプレースホルダとして最新のExperimentalチャンネル表記を
+    コメントで残し、実際のバージョンはNuGetパッケージマネージャーで
+    「プレリリースを含める」を有効にして確認・選定することをREADMEに明記している。
+  - Microsoft.Windows.CppWinRT NuGetパッケージが自動生成する
+    Microsoft.Windows.AI.* プロジェクションヘッダーのファイル名・生成タイミング
+    (MSBuildターゲットの正確な統合方法)。
+-->
+<Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|ARM64">
+      <Configuration>Debug</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|ARM64">
+      <Configuration>Release</Configuration>
+      <Platform>ARM64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <ProjectGuid>{6E5D9B4E-6C7B-4E96-9F9E-1B7A6B2E9A11}</ProjectGuid>
+    <RootNamespace>WindowsSTTSpikeCli</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
+    <!-- design.md §4.4 / requirements.md §8: Windows 11 24H2 (build 26100) 以上。
+         MinVersionはNFR-4に合わせる。 -->
+    <ProjectName>WindowsSTTSpikeCli</ProjectName>
+    <!-- VC++プロジェクトでPackageReference形式のNuGet復元を使うために必要
+         (要確認: VC++ + PackageReferenceの組み合わせは.NET系プロジェクトほど
+          広く文書化されておらず、実機で packages.config 形式への切り替えが
+          必要になる可能性がある)。 -->
+    <RestoreProjectStyle>PackageReference</RestoreProjectStyle>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Debug'">true</UseDebugLibraries>
+    <UseDebugLibraries Condition="'$(Configuration)'=='Release'">false</UseDebugLibraries>
+    <!-- C++/WinRT (WinAppSDK) はMSIXパッケージ化されたアプリからの利用が前提。
+         本プロジェクトはあくまで通常のWin32コンソールEXEをビルドするだけであり、
+         MSIX化は packaging/WindowsSTTSpikePackage.wapproj がこのプロジェクトを
+         参照して行う(Desktop Bridge方式。README参照)。そのためUWP
+         AppContainer関連プロパティ(ApplicationType等)はここには設定しない。 -->
+    <WindowsAppContainer>false</WindowsAppContainer>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+
+  <PropertyGroup Label="CppWinRT">
+    <!-- C++/WinRTの標準的なプロジェクト設定。VS「Windows Console Application
+         (C++/WinRT)」テンプレートに準拠した値(要確認: Microsoft.Windows.CppWinRT
+         NuGetパッケージのバージョンにより既定値が変わる可能性がある)。 -->
+    <CppWinRTOptimized>true</CppWinRTOptimized>
+    <CppWinRTRootNamespaceAutoMerge>true</CppWinRTRootNamespaceAutoMerge>
+    <CppWinRTGenerateWindowsMetadata>false</CppWinRTGenerateWindowsMetadata>
+    <MinimalCoreWin>true</MinimalCoreWin>
+    <LanguageStandard>stdcpp20</LanguageStandard>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 要確認: バージョン番号は placeholder。README「NuGetパッケージの選定」参照。
+         プレリリースを含めた最新のExperimentalチャンネルを選定すること
+         (Speech RecognitionのAPIリファレンスがExperimentalチャンネルのモニカーでしか
+         確認できなかったため。RESULTS.md参照)。 -->
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="[要確認: 最新のExperimentalチャンネル版]" />
+    <PackageReference Include="Microsoft.Windows.CppWinRT" Version="[要確認: WinAppSDKと対応するバージョン]" />
+    <PackageReference Include="Microsoft.Windows.ImplementationLibrary" Version="[要確認]" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ClInclude Include="src\Core\pch.h" />
+    <ClInclude Include="src\Core\Support.h" />
+    <ClInclude Include="src\Core\Json.h" />
+    <ClInclude Include="src\Core\ModelReadiness.h" />
+    <ClInclude Include="src\Core\LocaleInquiry.h" />
+    <ClInclude Include="src\Core\FileRecognition.h" />
+    <ClInclude Include="src\Core\KeywordScoring.h" />
+    <ClInclude Include="src\Core\CapabilityCheck.h" />
+    <ClInclude Include="src\Core\CliReport.h" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ClCompile Include="src\Core\pch.cpp" />
+    <ClCompile Include="src\Core\Support.cpp" />
+    <ClCompile Include="src\Core\Json.cpp" />
+    <ClCompile Include="src\Core\ModelReadiness.cpp" />
+    <ClCompile Include="src\Core\LocaleInquiry.cpp" />
+    <ClCompile Include="src\Core\FileRecognition.cpp" />
+    <ClCompile Include="src\Core\KeywordScoring.cpp" />
+    <ClCompile Include="src\Core\CapabilityCheck.cpp" />
+    <ClCompile Include="src\Core\CliReport.cpp" />
+    <ClCompile Include="src\Cli\main.cpp" />
+  </ItemGroup>
+
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>src\Core;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <!-- Json.cpp / KeywordScoring.cpp が <icu.h> (Windows 10 SDK 同梱) を使う。
+           README「ICU利用について」参照。 -->
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <!-- Windows 10 SDK 同梱の icu.lib をリンクする
+           (KeywordScoring.cpp のUnicode一般カテゴリ判定用)。 -->
+      <AdditionalDependencies>icu.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+
+  <!-- get-started.md の指示: VSがMaxVersionTestedを上書きしないようにする。 -->
+  <PropertyGroup>
+    <AppxOSMinVersionReplaceManifestVersion>false</AppxOSMinVersionReplaceManifestVersion>
+    <AppxOSMaxVersionTestedReplaceManifestVersion>false</AppxOSMaxVersionTestedReplaceManifestVersion>
+  </PropertyGroup>
+
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

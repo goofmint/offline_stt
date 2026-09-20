@@ -1,0 +1,189 @@
+09-20 20:36:25.102  6131  6146 I TestRunner: started: jaJP_3m_m4a(com.moongift.offlinestt.spike.MediaCodecDecodeRateTest)
+09-20 20:36:25.130  6131  6146 I OfflineSttSpike.M14: === 計測開始: jaJP_3m.m4a ===
+09-20 20:36:25.179  6131  6146 I OfflineSttSpike.M14: jaJP_3m.m4a: 入力MediaFormat mime=audio/mp4a-latm sampleRate=16000 channels=1 full={max-bitrate=96000, sample-rate=16000, track-id=1, mime=audio/mp4a-latm, profile=2, bitrate=75599, language=und, aac-profile=2, encoder-delay=1024, durationUs=175237000, channel-count=1, encoder-padding=0, max-input-size=873, csd-0=java.nio.HeapByteBuffer[pos=0 lim=5 cap=5]}
+09-20 20:36:25.184  6131  6146 D MediaCodecList: codecHandlesFormat: no format, so no extra checks
+09-20 20:36:25.190  6131  6148 D CCodec  : allocate(c2.android.aac.decoder)
+09-20 20:36:25.192  6131  6148 I ApexCodecsLazy: Failed to load libcom.android.media.swcodec.apexcodecs.so: dlopen failed: library "libcom.android.media.swcodec.apexcodecs.so" not found
+09-20 20:36:25.192  6131  6148 I Codec2Client: Available Codec2 services: "default" "software"
+09-20 20:36:25.196  6131  6148 I CCodec  : setting up 'default' as default (vendor) store
+09-20 20:36:25.206  6131  6148 I CCodec  : Created component [c2.android.aac.decoder] for [c2.android.aac.decoder]
+09-20 20:36:25.208  6131  6148 D CCodecConfig: read media type: audio/mp4a-latm
+09-20 20:36:25.212  6131  6148 D ReflectedParamUpdater: extent() != 1 for single value type: algo.buffers.max-count.values
+09-20 20:36:25.214  6131  6148 D ReflectedParamUpdater: extent() != 1 for single value type: output.subscribed-indices.values
+09-20 20:36:25.214  6131  6148 D ReflectedParamUpdater: extent() != 1 for single value type: input.buffers.allocator-ids.values
+09-20 20:36:25.214  6131  6148 D ReflectedParamUpdater: extent() != 1 for single value type: output.buffers.allocator-ids.values
+09-20 20:36:25.214  6131  6148 D ReflectedParamUpdater: extent() != 1 for single value type: algo.buffers.allocator-ids.values
+09-20 20:36:25.215  6131  6148 D ReflectedParamUpdater: extent() != 1 for single value type: output.buffers.pool-ids.values
+09-20 20:36:25.215  6131  6148 D ReflectedParamUpdater: extent() != 1 for single value type: algo.buffers.pool-ids.values
+09-20 20:36:25.221  6131  6148 I CCodecConfig: query failed after returning 21 values (BAD_INDEX)
+09-20 20:36:25.221  6131  6148 D CCodecConfig: c2 config diff is Dict {
+09-20 20:36:25.221  6131  6148 D CCodecConfig:   c2::u32 coded.aac-packaging.value = 0
+09-20 20:36:25.221  6131  6148 D CCodecConfig:   c2::u32 coded.bitrate.value = 64000
+09-20 20:36:25.221  6131  6148 D CCodecConfig:   c2::u32 coded.pl.level = 0
+09-20 20:36:25.221  6131  6148 D CCodecConfig:   c2::u32 coded.pl.profile = 8192
+09-20 20:36:25.221  6131  6148 D CCodecConfig:   c2::i32 coding.drc.album-mode.value = 0
+09-20 20:36:25.221  6131  6148 D CCodecConfig:   c2::float coding.drc.attenuation-factor.value = 1
+09-20 20:36:25.221  6131  6148 D CCodecConfig:   c2::float coding.drc.boost-factor.value = 1
+09-20 20:36:25.221  6131  6148 D CCodecConfig:   c2::i32 coding.drc.compression-mode.value = 3
+09-20 20:36:25.221  6131  6148 D CCodecConfig:   c2::i32 coding.drc.effect-type.value = 3
+09-20 20:36:25.221  6131  6148 D CCodecConfig:   c2::float coding.drc.encoded-level.value = 0.25
+09-20 20:36:25.221  6131  6148 D CCodecConfig:   c2::float coding.drc.reference-level.value = -16
+09-20 20:36:25.221  6131  6148 D CCodecConfig:   c2::u32 input.buffers.max-size.value = 8192
+09-20 20:36:25.221  6131  6148 D CCodecConfig:   c2::u32 input.delay.value = 0
+09-20 20:36:25.221  6131  6148 D CCodecConfig:   string input.media-type.value = "audio/mp4a-latm"
+09-20 20:36:25.221  6131  6148 D CCodecConfig:   c2::u32 output.delay.value = 2
+09-20 20:36:25.221  6131  6148 D CCodecConfig:   c2::float output.drc.output-loudness.value = 0.25
+09-20 20:36:25.221  6131  6148 D CCodecConfig:   c2::u32 output.large-frame.max-size = 0
+09-20 20:36:25.221  6131  6148 D CCodecConfig:   c2::u32 output.large-frame.threshold-size = 0
+09-20 20:36:25.221  6131  6148 D CCodecConfig:   string output.media-type.value = "audio/raw"
+09-20 20:36:25.221  6131  6148 D CCodecConfig:   c2::u32 raw.channel-count.value = 1
+09-20 20:36:25.221  6131  6148 D CCodecConfig:   c2::u32 raw.channel-mask.value = 0
+09-20 20:36:25.221  6131  6148 D CCodecConfig:   c2::u32 raw.max-channel-count.value = 8
+09-20 20:36:25.221  6131  6148 D CCodecConfig:   c2::u32 raw.sample-rate.value = 44100
+09-20 20:36:25.221  6131  6148 D CCodecConfig: }
+09-20 20:36:25.227  6131  6146 E MediaCodec: Media Quality Service not found.
+09-20 20:36:25.231  6131  6148 D CCodec  : [c2.android.aac.decoder] buffers are bound to CCodec for this session
+09-20 20:36:25.231  6131  6148 D CCodecConfig: no c2 equivalents for track-id
+09-20 20:36:25.231  6131  6148 D CCodecConfig: no c2 equivalents for language
+09-20 20:36:25.231  6131  6148 D CCodecConfig: no c2 equivalents for encoder-delay
+09-20 20:36:25.231  6131  6148 D CCodecConfig: no c2 equivalents for durationUs
+09-20 20:36:25.231  6131  6148 D CCodecConfig: no c2 equivalents for encoder-padding
+09-20 20:36:25.231  6131  6148 D CCodecConfig: no c2 equivalents for flags
+09-20 20:36:25.232   611  4443 E Codec2-ComponentInterface: We have a failed config
+09-20 20:36:25.232  6131  6148 D CCodecConfig: config failed => CORRUPTED
+09-20 20:36:25.232  6131  6148 D CCodecConfig: c2 config diff is   c2::u32 coded.bitrate.value = 75599
+09-20 20:36:25.232  6131  6148 D CCodecConfig:   c2::u32 raw.sample-rate.value = 16000
+09-20 20:36:25.233  6131  6148 W Codec2Client: query -- param skipped: index = 1107298332.
+09-20 20:36:25.233  6131  6148 D CCodec  : client requested max input size 873, which is smaller than what component recommended (8192); overriding with component recommendation.
+09-20 20:36:25.233  6131  6148 W CCodec  : This behavior is subject to change. It is recommended that app developers double check whether the requested max input size is in reasonable range.
+09-20 20:36:25.233  6131  6148 D CCodec  : encoding statistics level = 0
+09-20 20:36:25.233  6131  6148 D CCodec  : setup formats input: AMessage(what = 0x00000000) = {
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t aac-drc-album-mode = 0
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t aac-drc-boost-level = 127
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t aac-drc-cut-level = 127
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t aac-drc-effect-type = 3
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t aac-encoded-target-level = -1
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t aac-max-output-channel_count = 8
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t aac-target-ref-level = 64
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t bitrate = 75599
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t channel-count = 1
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t channel-mask = 0
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t level = 0
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t max-input-size = 8192
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t max-output-channel-count = 8
+09-20 20:36:25.233  6131  6148 D CCodec  :   string mime = "audio/mp4a-latm"
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t profile = 2
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t sample-rate = 16000
+09-20 20:36:25.233  6131  6148 D CCodec  : }
+09-20 20:36:25.233  6131  6148 D CCodec  : setup formats output: AMessage(what = 0x00000000) = {
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t aac-drc-album-mode = 0
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t aac-drc-boost-level = 127
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t aac-drc-cut-level = 127
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t aac-drc-effect-type = 3
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t aac-drc-output-loudness = -1
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t aac-encoded-target-level = -1
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t aac-max-output-channel_count = 8
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t aac-target-ref-level = 64
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t buffer-batch-max-output-size = 0
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t buffer-batch-threshold-output-size = 0
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t channel-count = 1
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t channel-mask = 0
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t max-output-channel-count = 8
+09-20 20:36:25.233  6131  6148 D CCodec  :   string mime = "audio/raw"
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t sample-rate = 16000
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t encoder-delay = 1024
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t encoder-padding = 0
+09-20 20:36:25.233  6131  6148 D CCodec  :   int32_t android._config-pcm-encoding = 2
+09-20 20:36:25.233  6131  6148 D CCodec  : }
+09-20 20:36:25.234  6131  6148 I CCodecConfig: query failed after returning 21 values (BAD_INDEX)
+09-20 20:36:25.234  6131  6148 E fflinestt.spike: Failed to query component interface for required system resources: 6
+09-20 20:36:25.238  6131  6148 W Codec2Client: query -- param skipped: index = 1342179345.
+09-20 20:36:25.239  6131  6148 W Codec2Client: query -- param skipped: index = 2415921170.
+09-20 20:36:25.239  6131  6148 W Codec2Client: query -- param skipped: index = 1610614798.
+09-20 20:36:25.240  6131  6148 D C2Store : Using DMABUF Heaps
+09-20 20:36:25.241  6131  6148 D CCodecBufferChannel: [c2.android.aac.decoder#838] Created input block pool with allocatorID 16 => poolID 17 - OK (0)
+09-20 20:36:25.244  6131  6148 I CCodecBufferChannel: [c2.android.aac.decoder#838] Created output block pool with allocatorID 16 => poolID 144 - OK
+09-20 20:36:25.244  6131  6148 D CCodecBufferChannel: [c2.android.aac.decoder#838] Configured output block pool ids 144 => OK
+09-20 20:36:25.244   611  4443 E Codec2-ComponentInterface: We have a failed config
+09-20 20:36:25.246  6131  6148 I DMABUFHEAPS: Using DMA-BUF heap named: system
+09-20 20:36:25.249   611  6153 D SimpleC2Component: Using output block pool with poolID 144 => got 144 - 0
+09-20 20:36:25.259   611  6153 I C2SoftAacDec: Reconfiguring decoder: 0->16000 Hz, 0->1 channels
+09-20 20:36:25.308  6131  6148 D CCodecConfig: c2 config diff is   c2::u32 raw.channel-mask.value = 4
+09-20 20:36:25.309  6131  6148 D CCodecBuffers: [c2.android.aac.decoder#838:Output[N]] popFromStashAndRegister: at -64000us, output format changed to AMessage(what = 0x00000000) = {
+09-20 20:36:25.309  6131  6148 D CCodecBuffers:   int32_t aac-drc-album-mode = 0
+09-20 20:36:25.309  6131  6148 D CCodecBuffers:   int32_t aac-drc-boost-level = 127
+09-20 20:36:25.309  6131  6148 D CCodecBuffers:   int32_t aac-drc-cut-level = 127
+09-20 20:36:25.309  6131  6148 D CCodecBuffers:   int32_t aac-drc-effect-type = 3
+09-20 20:36:25.309  6131  6148 D CCodecBuffers:   int32_t aac-drc-output-loudness = -1
+09-20 20:36:25.309  6131  6148 D CCodecBuffers:   int32_t aac-encoded-target-level = -1
+09-20 20:36:25.309  6131  6148 D CCodecBuffers:   int32_t aac-max-output-channel_count = 8
+09-20 20:36:25.309  6131  6148 D CCodecBuffers:   int32_t aac-target-ref-level = 64
+09-20 20:36:25.309  6131  6148 D CCodecBuffers:   int32_t buffer-batch-max-output-size = 0
+09-20 20:36:25.309  6131  6148 D CCodecBuffers:   int32_t buffer-batch-threshold-output-size = 0
+09-20 20:36:25.309  6131  6148 D CCodecBuffers:   int32_t channel-count = 1
+09-20 20:36:25.309  6131  6148 D CCodecBuffers:   int32_t channel-mask = 4
+09-20 20:36:25.309  6131  6148 D CCodecBuffers:   int32_t max-output-channel-count = 8
+09-20 20:36:25.309  6131  6148 D CCodecBuffers:   string mime = "audio/raw"
+09-20 20:36:25.309  6131  6148 D CCodecBuffers:   int32_t sample-rate = 16000
+09-20 20:36:25.309  6131  6148 D CCodecBuffers:   int32_t encoder-delay = 1024
+09-20 20:36:25.309  6131  6148 D CCodecBuffers:   int32_t encoder-padding = 0
+09-20 20:36:25.309  6131  6148 D CCodecBuffers:   int32_t android._config-pcm-encoding = 2
+09-20 20:36:25.309  6131  6148 D CCodecBuffers: }
+09-20 20:36:25.309  6131  6146 I OfflineSttSpike.M14: jaJP_3m.m4a: INFO_OUTPUT_FORMAT_CHANGED -> {sample-rate=16000, aac-drc-boost-level=127, mime=audio/raw, aac-drc-cut-level=127, max-output-channel-count=8, aac-max-output-channel_count=8, aac-target-ref-level=64, aac-drc-album-mode=0, channel-mask=4, encoder-delay=1024, buffer-batch-max-output-size=0, buffer-batch-threshold-output-size=0, aac-drc-output-loudness=-1, channel-count=1, aac-drc-effect-type=3, aac-encoded-target-level=-1, encoder-padding=0}
+09-20 20:36:27.050   678   827 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+09-20 20:36:27.051   678   827 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+09-20 20:36:27.052   678   827 D InetDiagMessage: Destroyed live tcp sockets for uids={10198} in 2ms
+09-20 20:36:27.059   678   827 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+09-20 20:36:27.061   678   827 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+09-20 20:36:27.061   678   827 D InetDiagMessage: Destroyed live tcp sockets for uids={20198} in 8ms
+09-20 20:36:27.380   678   821 D WifiClientModeImpl[8257:wlan0]: updateLinkLayerStatsRssiSpeedFrequencyCapabilities rssi=-50 TxLinkspeed=1 freq=2447 RxLinkSpeed=2
+09-20 20:36:27.381   678   821 D WifiDataStall: tx tput in kbps: 11000
+09-20 20:36:27.382   678   821 D WifiDataStall: rx tput in kbps: 11000
+09-20 20:36:27.382   678   821 V WifiConfigManager: Updating scan detail cache freq=2447 BSSID=00:13:10:85:fe:01 RSSI=-50 for "AndroidWifi"NONE
+09-20 20:36:27.382   678   821 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+09-20 20:36:27.382   678   821 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+09-20 20:36:27.382   678   821 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+09-20 20:36:27.382   678   821 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+09-20 20:36:27.382   678   821 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+09-20 20:36:27.382   678   821 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+09-20 20:36:27.382   678   821 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+09-20 20:36:27.382   678   821 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+09-20 20:36:27.383   678   821 D WifiScoreCard: BSSID update SIGNAL_POLL ID: 740699531 SSID: "AndroidWifi", BSSID: 00:13:10:85:fe:01, MAC: 02:15:b2:00:00:00, IP: /10.0.2.16, Security type: 0, Supplicant state: COMPLETED, Wi-Fi standard: legacy, RSSI: -50, Link speed: 1Mbps, Tx Link speed: 1Mbps, Max Supported Tx Link speed: 11Mbps, Rx Link speed: 2Mbps, Max Supported Rx Link speed: 11Mbps, Frequency: 2447MHz, Net ID: 0, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: 1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none>"AndroidWifi"openMLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>
+09-20 20:36:27.383   678   821 D WifiScoreCard: txRate: 1 txSpeed: 1
+09-20 20:36:27.383   678   821 D WifiScoreCard: network update SIGNAL_POLL "AndroidWifi" ID: 1847938331 RSSI -50 txSpeed -1
+09-20 20:36:27.383   678   821 D WifiClientModeImpl[8257:wlan0]:  ClientModeImpl$L2ConnectedState screen=on 1 0 "AndroidWifi" 00:13:10:85:fe:01 rssi=-50 f=2447 sc=60 link=1 tx=0.0, 0.0, 0.0 rx=0.0 bcn=0 [on:0 tx:0 rx:0 period:3006] from screen [on:0 period:-1097175049] score=60
+09-20 20:36:28.179  3811  3825 I IPCThreadState: oneway function results for code 2 on binder at 0xb400006fbdc658c0 will be dropped but finished with status UNKNOWN_TRANSACTION
+09-20 20:36:30.215   611   660 D BufferPoolAccessor2.0: bufferpool2 0xb400006f86884998 : 0(0 size) total buffers - 0(0 size) used buffers - 0/0 (recycle/alloc) - 0/0 (fetch/transfer)
+09-20 20:36:30.217   611   660 D BufferPoolAccessor2.0: evictor expired: 1, evicted: 1
+09-20 20:36:30.250  6131  6148 D BufferPoolAccessor2.0: bufferpool2 0xb400006fddc4b338 : 5(40960 size) total buffers - 4(32768 size) used buffers - 2241/2246 (recycle/alloc) - 5/2243 (fetch/transfer)
+09-20 20:36:30.251   611  6153 D BufferPoolAccessor2.0: bufferpool2 0xb400006f8687faf8 : 2(4096 size) total buffers - 1(2048 size) used buffers - 2237/2239 (recycle/alloc) - 2/2238 (fetch/transfer)
+09-20 20:36:30.264   469   554 I netd    : tetherGetStats() -> {[]} <1.46ms>
+09-20 20:36:30.385   678   821 D WifiClientModeImpl[8257:wlan0]: updateLinkLayerStatsRssiSpeedFrequencyCapabilities rssi=-50 TxLinkspeed=1 freq=2447 RxLinkSpeed=2
+09-20 20:36:30.387   678   821 D WifiDataStall: tx tput in kbps: 11000
+09-20 20:36:30.387   678   821 D WifiDataStall: rx tput in kbps: 11000
+09-20 20:36:30.387   678   821 V WifiConfigManager: Updating scan detail cache freq=2447 BSSID=00:13:10:85:fe:01 RSSI=-50 for "AndroidWifi"NONE
+09-20 20:36:30.389   678   821 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+09-20 20:36:30.390   678   821 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+09-20 20:36:30.391   678   821 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+09-20 20:36:30.391   678   821 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+09-20 20:36:30.392   678   821 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+09-20 20:36:30.392   678   821 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+09-20 20:36:30.392   678   821 D WifiThroughputPredictor:  utilization (LLS) 80 isBluetoothConnected: false final utilization: 80
+09-20 20:36:30.392   678   821 D WifiThroughputPredictor:  BW: 0 RSSI: -50 Nss: 1 Mode: 1 symDur: 4000 snrDb 30 bitPerTone: 4500 rate: 54 throughput: 11
+09-20 20:36:30.401   678   821 D WifiScoreCard: BSSID update SIGNAL_POLL ID: 740699531 SSID: "AndroidWifi", BSSID: 00:13:10:85:fe:01, MAC: 02:15:b2:00:00:00, IP: /10.0.2.16, Security type: 0, Supplicant state: COMPLETED, Wi-Fi standard: legacy, RSSI: -50, Link speed: 1Mbps, Tx Link speed: 1Mbps, Max Supported Tx Link speed: 11Mbps, Rx Link speed: 2Mbps, Max Supported Rx Link speed: 11Mbps, Frequency: 2447MHz, Net ID: 0, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: 1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none>"AndroidWifi"openMLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>
+09-20 20:36:30.401   678   821 D WifiScoreCard: txRate: 1 txSpeed: 1
+09-20 20:36:30.403   678   821 D WifiScoreCard: network update SIGNAL_POLL "AndroidWifi" ID: 1847938331 RSSI -50 txSpeed -1
+09-20 20:36:30.404   678   821 D WifiClientModeImpl[8257:wlan0]:  ClientModeImpl$L2ConnectedState screen=on 1 0 "AndroidWifi" 00:13:10:85:fe:01 rssi=-50 f=2447 sc=60 link=1 tx=0.0, 0.0, 0.0 rx=0.0 bcn=0 [on:0 tx:0 rx:0 period:3021] from screen [on:0 period:-1097172028] score=60
+09-20 20:36:30.739  6131  6154 D ProfileInstaller: Installing profile for com.moongift.offlinestt.spike
+09-20 20:36:30.880  1038  1258 D SatelliteController: iisInCarrierRoamingNbIotNtn: satellite is disabled
+09-20 20:36:31.358  6131  6146 I OfflineSttSpike.M14: jaJP_3m.m4a: 入力側 EOS を送出した。
+09-20 20:36:31.363  6131  6146 I OfflineSttSpike.M14: jaJP_3m.m4a: 出力側 EOS を受信した。totalOutputBytes=5609472
+09-20 20:36:31.364  6131  6146 I OfflineSttSpike.M14: jaJP_3m.m4a: 出力MediaFormat sampleRate=16000 channels=1 pcmEncoding=null totalOutputBytes=5609472 durationUs=175232000 effectiveSampleRate=16005.843681519358 resampleNeeded=false
+09-20 20:36:31.366  6131  6146 I OfflineSttSpike.M14Result: {"clip":"jaJP_3m","format":"m4a","inputMime":"audio\/mp4a-latm","inputSampleRate":16000,"inputChannels":1,"outputSampleRate":16000,"outputChannels":1,"outputBytes":5609472,"durationUs":175232000,"effectiveSampleRate":16005.843681519358,"expectedSampleRate":16000,"expectedChannels":1,"resampleNeeded":false}
+09-20 20:36:31.368  6131  6148 D CCodecBufferChannel: [c2.android.aac.decoder#838] MediaCodec discarded an unknown buffer
+09-20 20:36:31.369  6131  6148 D CCodecBufferChannel: [c2.android.aac.decoder#838] MediaCodec discarded an unknown buffer
+09-20 20:36:31.369  6131  6148 D CCodecBufferChannel: [c2.android.aac.decoder#838] MediaCodec discarded an unknown buffer
+09-20 20:36:31.376   611   946 I hw-BpHwBinder: onLastStrongRef automatically unlinking death recipients
+09-20 20:36:31.376   611   946 I hw-BpHwBinder: onLastStrongRef automatically unlinking death recipients
+09-20 20:36:31.375  6131  6148 I hw-BpHwBinder: onLastStrongRef automatically unlinking death recipients
+09-20 20:36:31.376  6131  6146 I TestRunner: finished: jaJP_3m_m4a(com.moongift.offlinestt.spike.MediaCodecDecodeRateTest)
