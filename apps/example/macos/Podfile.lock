@@ -1,0 +1,30 @@
+PODS:
+  - file_picker_darwin (1.0.0):
+    - Flutter
+    - FlutterMacOS
+  - FlutterMacOS (1.0.0)
+  - offline_stt_darwin (0.1.0):
+    - Flutter
+    - FlutterMacOS
+
+DEPENDENCIES:
+  - file_picker_darwin (from `Flutter/ephemeral/.symlinks/plugins/file_picker_darwin/darwin`)
+  - FlutterMacOS (from `Flutter/ephemeral`)
+  - offline_stt_darwin (from `Flutter/ephemeral/.symlinks/plugins/offline_stt_darwin/darwin`)
+
+EXTERNAL SOURCES:
+  file_picker_darwin:
+    :path: Flutter/ephemeral/.symlinks/plugins/file_picker_darwin/darwin
+  FlutterMacOS:
+    :path: Flutter/ephemeral
+  offline_stt_darwin:
+    :path: Flutter/ephemeral/.symlinks/plugins/offline_stt_darwin/darwin
+
+SPEC CHECKSUMS:
+  file_picker_darwin: 27e043831d68462d54f1c40e724b1f53c9d1e8be
+  FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
+  offline_stt_darwin: d9e0f5e7c270305879cd1f366e54572bf91e6664
+
+PODFILE CHECKSUM: 224cb1c0d6f5312abfc2477bcb5c7f1fca2574fb
+
+COCOAPODS: 1.17.0

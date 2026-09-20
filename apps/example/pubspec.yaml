@@ -1,5 +1,8 @@
 name: example
-description: offline_stt の example app(雛形のみ、機能実装はIssue #32)。
+description: >-
+  offline_stt の参照実装example app(Issue #32・#41)。ファイルピッカー →
+  モデル状態表示 → ダウンロード同意ダイアログ → 文字起こし進行表示、の
+  一連の正しい使い方を示す(design.md §7)。
 publish_to: none
 version: 0.1.0
 
@@ -14,6 +17,21 @@ dependencies:
   flutter:
     sdk: flutter
   offline_stt: ^0.1.0
+  # offline_stt(エントリパッケージ)は現時点でOfflineTranscriberPlatform
+  # インスタンスへ処理を委譲する利用者向けAPIクラスをまだ持たない
+  # (packages/offline_stt/lib/offline_stt.dart のdocコメント参照。
+  # 「各プラットフォーム実装へ処理を委譲する具体的な公開APIクラスは
+  # 後続Issueで実装する」)。そのため、example appは暫定的に
+  # OfflineTranscriberPlatform.instance を直接使用する。本来は
+  # offline_stt にのみ依存するのが正しい使い方である(requirements.md
+  # §6)ため、facade実装後はこの依存を外すべきである。
+  offline_stt_platform_interface: ^0.1.0
+  # Web専用: file_pickerで取得したバイト列からBlob URL(ObjectURL)を
+  # 生成するために使用する(design.md §2.2「Webでは Blob URL / ObjectURL」)。
+  # lib/src/object_url_web.dart でのみ import する(条件付きexportにより
+  # 非Webプラットフォームのビルドには含まれない)。offline_stt_webが
+  # 依存する package:web と同じメジャーバージョン系列を使う。
+  web: ^1.1.1
 
 dev_dependencies:
   flutter_lints: ^6.0.0
