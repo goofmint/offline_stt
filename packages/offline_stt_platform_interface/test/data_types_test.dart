@@ -19,16 +19,16 @@ void main() {
 
   group('DownloadProgress', () {
     test('fractionにnullを許容する(不定進捗)', () {
-      const progress = DownloadProgress(fraction: null, completed: false);
+      final progress = DownloadProgress(fraction: null, completed: false);
       expect(progress.fraction, isNull);
       expect(progress.completed, isFalse);
     });
 
     test('等価性はフィールド値で判定される', () {
-      const a = DownloadProgress(fraction: 0.5, completed: false);
-      const b = DownloadProgress(fraction: 0.5, completed: false);
-      const c = DownloadProgress(fraction: 0.6, completed: false);
-      const d = DownloadProgress(fraction: 0.5, completed: true);
+      final a = DownloadProgress(fraction: 0.5, completed: false);
+      final b = DownloadProgress(fraction: 0.5, completed: false);
+      final c = DownloadProgress(fraction: 0.6, completed: false);
+      final d = DownloadProgress(fraction: 0.5, completed: true);
 
       expect(a, equals(b));
       expect(a.hashCode, equals(b.hashCode));
@@ -37,8 +37,29 @@ void main() {
     });
 
     test('toStringにフィールド値が含まれる', () {
-      const progress = DownloadProgress(fraction: 0.25, completed: false);
+      final progress = DownloadProgress(fraction: 0.25, completed: false);
       expect(progress.toString(), contains('0.25'));
+    });
+
+    test('fractionが範囲外ならArgumentErrorを投げる', () {
+      // assert はリリースビルドで無効化されるため、実行時に検証する。
+      expect(
+        () => DownloadProgress(fraction: -0.1, completed: false),
+        throwsArgumentError,
+      );
+      expect(
+        () => DownloadProgress(fraction: 1.1, completed: false),
+        throwsArgumentError,
+      );
+      expect(
+        () => DownloadProgress(fraction: double.nan, completed: false),
+        throwsArgumentError,
+      );
+    });
+
+    test('fractionの境界値0.0と1.0は許容する', () {
+      expect(DownloadProgress(fraction: 0.0, completed: false).fraction, 0.0);
+      expect(DownloadProgress(fraction: 1.0, completed: true).fraction, 1.0);
     });
   });
 

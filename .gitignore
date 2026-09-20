@@ -4,7 +4,8 @@
 .flutter-plugins
 .flutter-plugins-dependencies
 build/
-pubspec.lock
+# pubspec.lock は追跡する。Dart Pub Workspace はルートに全パッケージ共通の
+# lock を生成するため、除外すると CI と開発環境で推移的依存が食い違いうる。
 .pub-cache/
 .pub/
 
