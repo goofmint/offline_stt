@@ -173,7 +173,7 @@ Stream<TranscriptSegment> runTranscriptionSession(TranscribeRequest request) {
                 finalBuffer.write(transcript);
                 controller.add(
                   TranscriptSegment(
-                    text: stripChromeSegmentationWhitespace(transcript),
+                    text: stripChromeSegmentationWhitespace(transcript, request.locale),
                     isFinal: true,
                   ),
                 );
@@ -218,7 +218,7 @@ Stream<TranscriptSegment> runTranscriptionSession(TranscribeRequest request) {
               );
               controller.add(
                 TranscriptSegment(
-                  text: stripChromeSegmentationWhitespace(lastInterimText),
+                  text: stripChromeSegmentationWhitespace(lastInterimText, request.locale),
                   isFinal: true,
                 ),
               );
@@ -307,6 +307,12 @@ Stream<TranscriptSegment> runTranscriptionSession(TranscribeRequest request) {
           // ここまでの経路(availability確認・decode・上記catchで
           // 拾いきれない同期例外)をまとめて捕捉する。DecodeFailedException
           // もここを通る。
+          //
+          // finish() はStreamを終えるだけで teardown() を呼ばない。
+          // AudioContext の生成後に fetchAndDecode() や buildAudioTrack() が
+          // 例外を投げると AudioContext が開いたまま残るため、ここで明示的に
+          // 解放する。
+          await teardown();
           finish(error: e);
         }
       }());

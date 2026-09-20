@@ -36,11 +36,15 @@ extension type _AvailabilityOptions._(JSObject _) implements JSObject {
 /// (design.md §4.1「機能検出」、Issue #30)。
 JSFunction? findSpeechRecognitionConstructor() {
   final global = globalContext;
-  if (global.has('SpeechRecognition')) {
-    return global['SpeechRecognition'] as JSFunction;
-  }
-  if (global.has('webkitSpeechRecognition')) {
-    return global['webkitSpeechRecognition'] as JSFunction;
+  for (final name in const ['SpeechRecognition', 'webkitSpeechRecognition']) {
+    if (!global.has(name)) continue;
+    final ctor = global[name] as JSFunction;
+    // Safari 等の非Chrome系ブラウザは webkitSpeechRecognition を提供するが、
+    // Chrome固有のオンデバイス拡張である available() / install() は持たない。
+    // これらを持たない実装を返してしまうと checkModel() / downloadModel() が
+    // 未定義メソッド呼び出しで例外になり、Issue #30 の「非Chrome環境では
+    // unavailable を返す」要件に違反する。両方を持つ実装のみ対応環境とみなす。
+    if (ctor.has('available') && ctor.has('install')) return ctor;
   }
   return null;
 }
