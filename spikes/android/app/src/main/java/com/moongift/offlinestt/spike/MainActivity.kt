@@ -71,6 +71,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btn_run_basic).setOnClickListener { onRunBasicRecognition() }
         findViewById<Button>(R.id.btn_run_advanced).setOnClickListener { onRunAdvancedFallbackCheck() }
         findViewById<Button>(R.id.btn_cancel).setOnClickListener { onCancel() }
+        findViewById<Button>(R.id.btn_probe_platform).setOnClickListener { onProbePlatform() }
+        findViewById<Button>(R.id.btn_probe_file).setOnClickListener { onProbeFile() }
+        findViewById<Button>(R.id.btn_probe_platform_abc).setOnClickListener { onProbePlatformAbc() }
     }
 
     /** Issue #11: MODE_BASIC + ja-JP の checkStatus() のみを確認する (認識は実行しない)。 */
@@ -175,5 +178,111 @@ class MainActivity : AppCompatActivity() {
         textResult.text = "$label: ${score.matched.size}/${clip.keywords.size} = " +
             "${"%.1f".format(score.ratePercent)}% → ${score.verdict.label} " +
             "(pumpBytes=${result.pumpBytesSent}, firstResponseMs=${result.firstResponseLatencyMs})"
+    }
+
+    /**
+     * ML Kit GenAI が使えない端末向けの代替案調査(Android 標準 SpeechRecognizer)。
+     * モデルを同梱せず OS 側の認識エンジンを使うという方針(NFR-3)を維持したまま
+     * 利用できるかを実機で確かめる。
+     */
+    private fun onProbePlatform() {
+        SpikeLog.info("=== 代替案調査: 標準 SpeechRecognizer 開始 ===")
+        scope.launch {
+            val r = withContext(Dispatchers.Default) { PlatformSttProbe.run(applicationContext) }
+            SpikeLog.info("SDK_INT=${r.sdkInt}")
+            SpikeLog.info("isRecognitionAvailable=${r.isRecognitionAvailable}")
+            SpikeLog.info("isOnDeviceRecognitionAvailable=${r.isOnDeviceRecognitionAvailable}")
+            SpikeLog.info("supportedOnDeviceLanguages=${r.supportedOnDeviceLanguages}")
+            SpikeLog.info("installedOnDeviceLanguages=${r.installedOnDeviceLanguages}")
+            SpikeLog.info("pendingOnDeviceLanguages=${r.pendingOnDeviceLanguages}")
+            SpikeLog.info("onlineLanguages=${r.onlineLanguages}")
+            SpikeLog.info("supportError=${r.supportError}")
+            if (r.failure != null) SpikeLog.ng("failure=${r.failure}")
+            val ja = r.installedOnDeviceLanguages?.any { it.startsWith("ja") } == true
+            SpikeLog.info("ja-JP がオンデバイスでインストール済み: $ja")
+            SpikeLog.info("=== 代替案調査終了 ===")
+        }
+    }
+
+    /**
+     * 代替案調査 A(ja-JP言語パック取得)→ B(EXTRA_AUDIO_SOURCEファイル入力受理確認)→
+     * C(認識精度確認)を通しで実行する。`onProbePlatform()` (照会専用) とは別のボタン・別の処理系統。
+     */
+    private fun onProbePlatformAbc() {
+        SpikeLog.info("=== 代替案検証 A/B/C 開始 ===")
+        scope.launch {
+            try {
+                // --- A: ja-JP 言語パックのダウンロード試行 ---
+                val downloadResult = PlatformSttHarness.triggerJaJpModelDownload(applicationContext)
+                SpikeLog.info("A結果: $downloadResult")
+
+                val probeAfter = withContext(Dispatchers.Default) {
+                    PlatformSttProbe.run(applicationContext)
+                }
+                val jaInstalled = probeAfter.installedOnDeviceLanguages?.any { it.startsWith("ja") } == true
+                SpikeLog.info(
+                    "A後の installedOnDeviceLanguages=${probeAfter.installedOnDeviceLanguages}, " +
+                        "ja-JP installed = $jaInstalled",
+                )
+
+                // --- B: EXTRA_AUDIO_SOURCE ファイル入力の受理確認 ---
+                val clip = withContext(Dispatchers.IO) {
+                    BaselineAssets.loadClip(applicationContext, targetClipId)
+                }
+                val bResult = PlatformSttHarness.runFileInputProbe(applicationContext, clip)
+                SpikeLog.info("B結果: events=${bResult.events}")
+
+                // --- C: 認識精度確認 (B が確定テキストを得られた場合のみ) ---
+                val text = bResult.resultsTexts?.firstOrNull()
+                if (text != null) {
+                    val score = KeywordScoring.score(clip.locale, clip.keywords, text)
+                    val summary = "C: \"$text\" → ${score.matched.size}/${clip.keywords.size} = " +
+                        "${"%.1f".format(score.ratePercent)}% (${score.verdict.label})"
+                    SpikeLog.ok(summary)
+                    textResult.text = summary
+                } else {
+                    val summary = "代替案A/B/C: B未達 (errorCode=${bResult.errorCode}, " +
+                        "errorName=${bResult.errorCode?.let { PlatformSttHarness.errorName(it) }})"
+                    SpikeLog.warn(summary)
+                    textResult.text = summary
+                }
+            } catch (e: Exception) {
+                SpikeLog.ng("代替案検証 A/B/C で例外: ${e.javaClass.simpleName}: ${e.message}")
+                textResult.text = "エラー: ${e.message}"
+            }
+            SpikeLog.info("=== 代替案検証 A/B/C 終了 ===")
+        }
+    }
+
+    /** 代替案の本命検証: ja-JP 言語パック取得と EXTRA_AUDIO_SOURCE によるファイル入力。 */
+    private fun onProbeFile() {
+        scope.launch {
+            val before = withContext(Dispatchers.Default) {
+                PlatformSttFileRecognition.installedLanguages(applicationContext)
+            }
+            SpikeLog.info("installedOnDeviceLanguages(取得前)=$before")
+
+            val outcome = withContext(Dispatchers.Default) {
+                PlatformSttFileRecognition.downloadJaJp(applicationContext)
+            }
+            val after = withContext(Dispatchers.Default) {
+                PlatformSttFileRecognition.installedLanguages(applicationContext)
+            }
+            SpikeLog.info("triggerModelDownload 結果=$outcome")
+            SpikeLog.info("installedOnDeviceLanguages(取得後)=$after")
+            val jaReady = after?.any { it.startsWith("ja") } == true
+            SpikeLog.info("ja-JP インストール済み: $jaReady")
+
+            val r = PlatformSttFileRecognition.recognizeFile(applicationContext, "jaJP_10s")
+            SpikeLog.info("B結果: accepted=${r.accepted} note=${r.note} elapsed=${r.elapsedMs}ms partials=${r.partialCount}")
+            SpikeLog.info("確定テキスト: ${r.finalText}")
+            if (r.finalText.isNotBlank()) {
+                val clip = withContext(Dispatchers.IO) {
+                    BaselineAssets.loadClip(applicationContext, "jaJP_10s")
+                }
+                val score = KeywordScoring.score(clip.locale, clip.keywords, r.finalText)
+                SpikeLog.info("包含率: $score")
+            }
+        }
     }
 }

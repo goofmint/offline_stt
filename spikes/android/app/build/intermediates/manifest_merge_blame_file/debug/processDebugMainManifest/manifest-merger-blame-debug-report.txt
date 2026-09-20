@@ -54,37 +54,37 @@
 37-->[androidx.core:core:1.15.0] /Users/nakatsugawa/.gradle/caches/9.6.0/transforms/8456ad4d3e2710158b7fcb5a30d41a02/transformed/core-1.15.0/AndroidManifest.xml:26:22-94
 38
 39    <application
-39-->/Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:16:5-31:19
+39-->/private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:16:5-31:19
 40        android:allowBackup="false"
-40-->/Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:17:9-36
+40-->/private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:17:9-36
 41        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
 41-->[androidx.core:core:1.15.0] /Users/nakatsugawa/.gradle/caches/9.6.0/transforms/8456ad4d3e2710158b7fcb5a30d41a02/transformed/core-1.15.0/AndroidManifest.xml:28:18-86
 42        android:debuggable="true"
 43        android:extractNativeLibs="false"
 43-->INJECTED
 44        android:fullBackupContent="false"
-44-->/Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:18:9-42
+44-->/private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:18:9-42
 45        android:icon="@android:drawable/ic_menu_info_details"
-45-->/Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:19:9-62
+45-->/private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:19:9-62
 46        android:label="@string/app_name"
-46-->/Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:20:9-41
+46-->/private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:20:9-41
 47        android:theme="@style/Theme.OfflineSttSpike" >
-47-->/Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:21:9-53
+47-->/private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:21:9-53
 48        <activity
-48-->/Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:23:9-30:20
+48-->/private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:23:9-30:20
 49            android:name="com.moongift.offlinestt.spike.MainActivity"
-49-->/Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:24:13-41
+49-->/private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:24:13-41
 50            android:exported="true" >
-50-->/Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:25:13-36
+50-->/private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:25:13-36
 51            <intent-filter>
-51-->/Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:26:13-29:29
+51-->/private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:26:13-29:29
 52                <action android:name="android.intent.action.MAIN" />
-52-->/Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:27:17-69
-52-->/Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:27:25-66
+52-->/private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:27:17-69
+52-->/private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:27:25-66
 53
 54                <category android:name="android.intent.category.LAUNCHER" />
-54-->/Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:28:17-77
-54-->/Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:28:27-74
+54-->/private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:28:17-77
+54-->/private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:28:27-74
 55            </intent-filter>
 56        </activity>
 57

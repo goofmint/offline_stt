@@ -3,24 +3,24 @@
 3    package="com.moongift.offlinestt.spike.test" >
 4
 5    <uses-sdk
-5-->/Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest11170117655637476779.xml:5:5-74
+5-->/private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest10945203429268379264.xml:5:5-74
 6        android:minSdkVersion="31"
-6-->/Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest11170117655637476779.xml:5:15-41
+6-->/private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest10945203429268379264.xml:5:15-41
 7        android:targetSdkVersion="36" />
-7-->/Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest11170117655637476779.xml:5:42-71
+7-->/private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest10945203429268379264.xml:5:42-71
 8
 9    <instrumentation
-9-->/Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest11170117655637476779.xml:7:5-11:79
+9-->/private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest10945203429268379264.xml:7:5-11:79
 10        android:name="androidx.test.runner.AndroidJUnitRunner"
-10-->/Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest11170117655637476779.xml:7:22-76
+10-->/private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest10945203429268379264.xml:7:22-76
 11        android:functionalTest="false"
-11-->/Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest11170117655637476779.xml:10:22-52
+11-->/private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest10945203429268379264.xml:10:22-52
 12        android:handleProfiling="false"
-12-->/Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest11170117655637476779.xml:9:22-53
+12-->/private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest10945203429268379264.xml:9:22-53
 13        android:label="Tests for com.moongift.offlinestt.spike"
-13-->/Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest11170117655637476779.xml:11:22-77
+13-->/private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest10945203429268379264.xml:11:22-77
 14        android:targetPackage="com.moongift.offlinestt.spike" />
-14-->/Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest11170117655637476779.xml:8:22-75
+14-->/private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/build/intermediates/tmp/manifest/androidTest/debug/tempFile1ProcessTestManifest10945203429268379264.xml:8:22-75
 15
 16    <queries>
 16-->[androidx.test:runner:1.6.2] /Users/nakatsugawa/.gradle/caches/9.6.0/transforms/e9fe0120c00ebd17a07b9601d4d877be/transformed/runner-1.6.2/AndroidManifest.xml:24:5-28:15

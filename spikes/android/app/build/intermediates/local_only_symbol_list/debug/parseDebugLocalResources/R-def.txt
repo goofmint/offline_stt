@@ -2,6 +2,9 @@ R_DEF: Internal format may change without notice
 local
 id btn_cancel
 id btn_check_basic
+id btn_probe_file
+id btn_probe_platform
+id btn_probe_platform_abc
 id btn_run_advanced
 id btn_run_basic
 id text_env

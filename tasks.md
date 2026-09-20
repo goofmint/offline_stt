@@ -31,9 +31,9 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」タ�
 
 ### Android
 
-- [ ] Pixel以外のAPI 31+実機で Basic モード + ja-JP の動作確認(ハーネス実装済み。ML Kit GenAI が AICore を要するためエミュレータでは検証不可、実機待ち。spikes/android/RESULTS.md 参照)
-- [ ] `MODE_ADVANCED` 指定時の非対応端末フォールバック挙動確認(設計未決事項5)(ハーネス実装済み。ML Kit GenAI が AICore を要するためエミュレータでは検証不可、実機待ち。spikes/android/RESULTS.md 参照)
-- [ ] PFDパイプ + 実時間ポンプの最小実装で `AudioSource.fromPfd()` が受理されるか確認(ハーネス実装済み。ML Kit GenAI が AICore を要するためエミュレータでは検証不可、実機待ち。spikes/android/RESULTS.md 参照)
+- [ ] Pixel以外のAPI 31+実機で Basic モード + ja-JP の動作確認(ハーネス実装済み。Pixel 6 実機(API 37、ブートローダーロック済み)で実行したが、AICore が stub 版のため checkStatus() が PERMISSION_DENIED: Api access revoked. を返し到達せず。実体のある AICore を持つ端末が必要。**ユーザー判断によりバックエンドをML Kit GenAI Speech RecognitionからAndroid標準SpeechRecognizerへ差し替えたため、本項目が意図していた「Basicモード」自体がML Kit固有の概念であり対象外となった。標準SpeechRecognizerについてPixel 6実機ではja-JPのファイル文字起こしに成功した(包含率66.7%)が、Pixel以外の実機での動作は別途検証が必要である。** spikes/android/RESULTS.md 参照)
+- [ ] `MODE_ADVANCED` 指定時の非対応端末フォールバック挙動確認(design.md §8未決事項5)(ハーネス実装済み。Pixel 6 実機(API 37、ブートローダーロック済み)で実行したが、AICore が stub 版のため checkStatus() が PERMISSION_DENIED: Api access revoked. を返し到達せず。実体のある AICore を持つ端末が必要。**ユーザー判断によりバックエンドをML Kit GenAI Speech RecognitionからAndroid標準SpeechRecognizerへ差し替えたため、`MODE_ADVANCED`/`MODE_BASIC`という概念自体がML Kit固有であり本項目は対象外となった(design.md §8未決事項5参照)。標準SpeechRecognizerには対応するモード概念が無いため、本項目に代わる検証は不要である。** spikes/android/RESULTS.md 参照)
+- [ ] PFDパイプ + 実時間ポンプの最小実装で `AudioSource.fromPfd()` が受理されるか確認(ハーネス実装済み。Pixel 6 実機(API 37、ブートローダーロック済み)で実行したが、AICore が stub 版のため checkStatus() が PERMISSION_DENIED: Api access revoked. を返し到達せず。実体のある AICore を持つ端末が必要。**ユーザー判断によりバックエンドをML Kit GenAI Speech RecognitionからAndroid標準SpeechRecognizerへ差し替えたため、`AudioSource.fromPfd()`というML Kit固有APIでの受理確認自体は対象外となった。標準SpeechRecognizerの等価な仕組み(`RecognizerIntent.EXTRA_AUDIO_SOURCE`)については別途スパイクで受理を確認済み(Pixel 6実機、既存の実時間ポンプをそのまま流用)だが、これは本項目の代替検証であり別途実施したものである。Pixel以外の機種での受理確認は未実施のため、改めて別途検証が必要である。** spikes/android/RESULTS.md 参照)
 - [x] 手持ち音源の MediaCodec デコード出力レート調査(リサンプリング要否判定、設計未決事項6)(結論: リサンプリング必須。MediaCodecはrate/chを変換しない。spikes/android/RESULTS.md 参照)
 
 ### Windows
@@ -91,15 +91,15 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」タ�
 
 依存: M1
 
-- [ ] androidパッケージ雛形、`genai-speech-recognition` 依存追加(バージョン固定)
-- [ ] モデル管理: checkStatus → checkModel、download Flow → downloadModel進捗
+- [ ] androidパッケージ雛形(バックエンドはAndroid標準 `android.speech.SpeechRecognizer` を使用するため、`genai-speech-recognition` 等ML Kit関連の依存追加は不要。design.md §4.3参照)
+- [ ] モデル管理: `checkRecognitionSupport()` → checkModel(4値写像は`supportedOnDeviceLanguages`/`installedOnDeviceLanguages`/`pendingOnDeviceLanguages`/`onlineLanguages`の突き合わせ。requirements.md FR-1参照)、`triggerModelDownload()` → downloadModel進捗(完了判定は`ModelDownloadListener`のコールバックに依らず`checkRecognitionSupport()`の再照会で行う。spikes/android/RESULTS.md参照)
 - [ ] デコード層: MediaExtractor + MediaCodec → 16kHz/モノラル/16-bit PCM
-- [ ] リサンプリング実装 or 対応入力の限定(M0調査結果に従う)(M0結論: リサンプリング必須)
-- [ ] 実時間ポンプ: PFDパイプ、壁時計基準レート制御(100msバッファ)
-- [ ] 認識セッション: preferredMode設定、Flow → EventChannel転送、Basicリトライ(M0結果次第)
-- [ ] キャンセル(パイプclose → stopRecognition → close)
-- [ ] エラーマッピング(ブートローダーアンロック、AICoreエラー601/606)
-- [ ] Pixel系 + 非Pixel系の2機種で基準音声E2E
+- [ ] リサンプリング実装 or 対応入力の限定(M0調査結果に従う)(M0結論: リサンプリング必須。バックエンド差し替えの影響を受けない)
+- [ ] 実時間ポンプ: PFDパイプ、壁時計基準レート制御(100msバッファ)(標準SpeechRecognizerでも既存設計をそのまま流用できることをPixel 6実機で確認済み。spikes/android/RESULTS.md参照)
+- [ ] 認識セッション: `createOnDeviceSpeechRecognizer()` + `EXTRA_PREFER_OFFLINE=true`設定、`RecognitionListener`コールバック → EventChannel転送、`onResults()`のtextsがnullの場合は直前の`onPartialResults()`の最上位候補を確定結果として採用(design.md §4.3参照。preferredMode設定・Basicリトライ関連はML Kit固有のため不要)
+- [ ] キャンセル(パイプclose → `stopListening()` → `destroy()`。design.md §4.3参照)
+- [ ] エラーマッピング(`SpeechRecognizer`の`ERROR_*`定数ベース。design.md §5参照。ブートローダーアンロック・AICoreエラーはML Kit固有のため対象外)
+- [ ] Pixel系 + 非Pixel系の2機種で基準音声E2E(design.md §8未決事項8: Pixel 6以外の端末での動作、および`onResults()`がnullになる挙動が全端末共通かを確認する)
 - [ ] example appにAndroid動作を追加
 
 ## M4 Windows実装

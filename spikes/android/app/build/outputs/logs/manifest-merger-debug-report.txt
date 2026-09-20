@@ -1,9 +1,9 @@
 -- Merging decision tree log ---
 manifest
-ADDED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:14:1-33:12
-INJECTED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:14:1-33:12
-INJECTED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:14:1-33:12
-INJECTED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:14:1-33:12
+ADDED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:14:1-33:12
+INJECTED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:14:1-33:12
+INJECTED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:14:1-33:12
+INJECTED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:14:1-33:12
 MERGED from [com.google.mlkit:genai-speech-recognition:1.0.0-alpha1] /Users/nakatsugawa/.gradle/caches/9.6.0/transforms/7ebdfbf1efa6ed8d34400e237b3c0d97/transformed/genai-speech-recognition-1.0.0-alpha1/AndroidManifest.xml:2:1-16:12
 MERGED from [com.google.mlkit:common:18.11.0] /Users/nakatsugawa/.gradle/caches/9.6.0/transforms/b7bd45f354cb55cac6778aa4d13585b8/transformed/common-18.11.0/AndroidManifest.xml:2:1-26:12
 MERGED from [androidx.appcompat:appcompat-resources:1.7.0] /Users/nakatsugawa/.gradle/caches/9.6.0/transforms/b9d72bf7407f8593b6a1af8d956b41f6/transformed/appcompat-resources-1.7.0/AndroidManifest.xml:2:1-7:12
@@ -45,16 +45,16 @@ MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /Users/naka
 MERGED from [androidx.arch.core:core-runtime:2.2.0] /Users/nakatsugawa/.gradle/caches/9.6.0/transforms/c8a60b2dd55b24a3143bf3cace554619/transformed/core-runtime-2.2.0/AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.annotation:annotation-experimental:1.4.1] /Users/nakatsugawa/.gradle/caches/9.6.0/transforms/b134bf6ad8376dd846fd4af2f5cb2c86/transformed/annotation-experimental-1.4.1/AndroidManifest.xml:2:1-7:12
 	package
-		INJECTED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml
+		INJECTED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml
 	android:versionName
-		INJECTED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml
+		INJECTED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml
 	android:versionCode
-		INJECTED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml
+		INJECTED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml
 	xmlns:android
-		ADDED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:14:11-69
+		ADDED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:14:11-69
 application
-ADDED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:16:5-31:19
-INJECTED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:16:5-31:19
+ADDED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:16:5-31:19
+INJECTED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:16:5-31:19
 MERGED from [com.google.mlkit:common:18.11.0] /Users/nakatsugawa/.gradle/caches/9.6.0/transforms/b7bd45f354cb55cac6778aa4d13585b8/transformed/common-18.11.0/AndroidManifest.xml:8:5-24:19
 MERGED from [com.google.mlkit:common:18.11.0] /Users/nakatsugawa/.gradle/caches/9.6.0/transforms/b7bd45f354cb55cac6778aa4d13585b8/transformed/common-18.11.0/AndroidManifest.xml:8:5-24:19
 MERGED from [com.google.android.gms:play-services-base:18.5.0] /Users/nakatsugawa/.gradle/caches/9.6.0/transforms/fc983a38b73f06ea6dbb918509131949/transformed/play-services-base-18.5.0/AndroidManifest.xml:4:5-6:19
@@ -80,39 +80,39 @@ MERGED from [androidx.startup:startup-runtime:1.1.1] /Users/nakatsugawa/.gradle/
 MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /Users/nakatsugawa/.gradle/caches/9.6.0/transforms/b44d04e82812eecfc1e5e36e61a348f4/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:24:5-25:19
 MERGED from [androidx.versionedparcelable:versionedparcelable:1.1.1] /Users/nakatsugawa/.gradle/caches/9.6.0/transforms/b44d04e82812eecfc1e5e36e61a348f4/transformed/versionedparcelable-1.1.1/AndroidManifest.xml:24:5-25:19
 	android:extractNativeLibs
-		INJECTED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml
+		INJECTED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml
 	android:appComponentFactory
 		ADDED from [androidx.core:core:1.15.0] /Users/nakatsugawa/.gradle/caches/9.6.0/transforms/8456ad4d3e2710158b7fcb5a30d41a02/transformed/core-1.15.0/AndroidManifest.xml:28:18-86
 	android:label
-		ADDED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:20:9-41
+		ADDED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:20:9-41
 	android:fullBackupContent
-		ADDED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:18:9-42
+		ADDED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:18:9-42
 	android:icon
-		ADDED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:19:9-62
+		ADDED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:19:9-62
 	android:allowBackup
-		ADDED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:17:9-36
+		ADDED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:17:9-36
 	android:theme
-		ADDED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:21:9-53
+		ADDED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:21:9-53
 activity#com.moongift.offlinestt.spike.MainActivity
-ADDED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:23:9-30:20
+ADDED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:23:9-30:20
 	android:exported
-		ADDED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:25:13-36
+		ADDED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:25:13-36
 	android:name
-		ADDED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:24:13-41
+		ADDED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:24:13-41
 intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
-ADDED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:26:13-29:29
+ADDED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:26:13-29:29
 action#android.intent.action.MAIN
-ADDED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:27:17-69
+ADDED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:27:17-69
 	android:name
-		ADDED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:27:25-66
+		ADDED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:27:25-66
 category#android.intent.category.LAUNCHER
-ADDED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:28:17-77
+ADDED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:28:17-77
 	android:name
-		ADDED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml:28:27-74
+		ADDED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml:28:27-74
 uses-sdk
-INJECTED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml reason: use-sdk injection requested
-INJECTED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml
-INJECTED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml
+INJECTED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml reason: use-sdk injection requested
+INJECTED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml
+INJECTED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml
 MERGED from [com.google.mlkit:genai-speech-recognition:1.0.0-alpha1] /Users/nakatsugawa/.gradle/caches/9.6.0/transforms/7ebdfbf1efa6ed8d34400e237b3c0d97/transformed/genai-speech-recognition-1.0.0-alpha1/AndroidManifest.xml:5:5-44
 MERGED from [com.google.mlkit:genai-speech-recognition:1.0.0-alpha1] /Users/nakatsugawa/.gradle/caches/9.6.0/transforms/7ebdfbf1efa6ed8d34400e237b3c0d97/transformed/genai-speech-recognition-1.0.0-alpha1/AndroidManifest.xml:5:5-44
 MERGED from [com.google.mlkit:common:18.11.0] /Users/nakatsugawa/.gradle/caches/9.6.0/transforms/b7bd45f354cb55cac6778aa4d13585b8/transformed/common-18.11.0/AndroidManifest.xml:6:5-44
@@ -194,9 +194,9 @@ MERGED from [androidx.arch.core:core-runtime:2.2.0] /Users/nakatsugawa/.gradle/c
 MERGED from [androidx.annotation:annotation-experimental:1.4.1] /Users/nakatsugawa/.gradle/caches/9.6.0/transforms/b134bf6ad8376dd846fd4af2f5cb2c86/transformed/annotation-experimental-1.4.1/AndroidManifest.xml:5:5-44
 MERGED from [androidx.annotation:annotation-experimental:1.4.1] /Users/nakatsugawa/.gradle/caches/9.6.0/transforms/b134bf6ad8376dd846fd4af2f5cb2c86/transformed/annotation-experimental-1.4.1/AndroidManifest.xml:5:5-44
 	android:targetSdkVersion
-		INJECTED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml
+		INJECTED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml
 	android:minSdkVersion
-		INJECTED from /Users/nakatsugawa/Code/MOONGIFT/offline_stt/spikes/android/app/src/main/AndroidManifest.xml
+		INJECTED from /private/tmp/claude-501/-Users-nakatsugawa-Code-MOONGIFT-offline-stt/10066093-bf03-4578-aba6-6816447637d5/scratchpad/wt73/spikes/android/app/src/main/AndroidManifest.xml
 uses-permission#android.permission.ACCESS_NETWORK_STATE
 ADDED from [com.google.mlkit:genai-speech-recognition:1.0.0-alpha1] /Users/nakatsugawa/.gradle/caches/9.6.0/transforms/7ebdfbf1efa6ed8d34400e237b3c0d97/transformed/genai-speech-recognition-1.0.0-alpha1/AndroidManifest.xml:7:5-79
 MERGED from [com.google.android.datatransport:transport-backend-cct:2.3.3] /Users/nakatsugawa/.gradle/caches/9.6.0/transforms/42655dec823870d2cba8a582d68a7102/transformed/transport-backend-cct-2.3.3/AndroidManifest.xml:25:5-79

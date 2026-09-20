@@ -57,7 +57,25 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="実行中セッションをキャンセル" />
+
+        <Button
+            android:id="@+id/btn_probe_platform"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="代替案調査: 標準SpeechRecognizer" />
+
+        <Button
+            android:id="@+id/btn_probe_file"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="代替案: ja-JP取得 + ファイル入力検証" />
     </LinearLayout>
+
+    <Button
+        android:id="@+id/btn_probe_platform_abc"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="代替案検証 A+B+C: 言語DL+ファイル入力+精度" />
 
     <TextView
         android:id="@+id/text_result"

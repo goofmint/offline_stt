@@ -161,7 +161,11 @@ Android の `MediaCodec`/`MediaExtractor` APIの設計(デコーダの責務が�
 
 ## Issue #11: MODE_BASIC + ja-JP 認識・キーワード包含率判定
 
-(未実施 — 実機未接続。下記「実行環境の制約」参照)
+**未達成。** エミュレータでは AICore 自体が動作しないため未実施だった(下記「実行環境の制約」参照)。
+その後 Pixel 6 実機(API 37、ブートローダーロック済み)で実行したが、`checkStatus()` が
+`PERMISSION_DENIED: Api access revoked.` を返し、キーワード包含率判定に必要な認識そのものに到達
+しなかった(実測の詳細は「Pixel 6 実機での実測」節参照)。AICore が stub 版であることが原因であり、
+本項目は依然として未達成である。
 
 | クリップID | 形式 | 包含率 | 合否 | 所要時間 | 備考 |
 |---|---|---|---|---|---|
@@ -171,31 +175,39 @@ Android の `MediaCodec`/`MediaExtractor` APIの設計(デコーダの責務が�
 | jaJP_3m  | m4a | (未実施) | (未実施) | (未実施) | (未実施) |
 
 コードは実装済み(`RecognitionHarness.runRecognition()` + `KeywordScoring.kt`)。ビルドは通っており
-(`assembleDebug` 成功)、実機接続後にアプリの「Basic 認識実行」ボタンから即座に実行できる状態にある。
+(`assembleDebug` 成功)、Pixel 6 実機へのインストール・起動・「Basic 認識実行」ボタンからの実行自体は
+できたが、`checkStatus()` の時点で `PERMISSION_DENIED: Api access revoked.` となり認識には進めなかった。
+実体のある AICore を搭載した実機での再実行が必要である。
 
 ## Issue #12: MODE_ADVANCED フォールバック挙動
 
-(未実施 — 実機未接続。下記「実行環境の制約」参照)
+**未達成。** エミュレータでは未実施だった(下記「実行環境の制約」参照)。Pixel 6 実機(API 37、
+ブートローダーロック済み)で `preferredMode=MODE_ADVANCED` を指定して実行したところ、
+`UNAVAILABLE: Peer process crashed, exited or was killed (binderDied)` が発生し、自動フォールバックの
+有無を確認できなかった(実測の詳細は「Pixel 6 実機での実測」節参照)。
 
 | 項目 | 値 |
 |---|---|
-| `preferredMode=MODE_ADVANCED` での `checkStatus()` | (未実施) |
-| 自動フォールバックの有無 | (未実施) |
-| `MODE_BASIC` 手動リトライの結果 | (未実施) |
+| `preferredMode=MODE_ADVANCED` での `checkStatus()` | Pixel 6 実機: `UNAVAILABLE: Peer process crashed, exited or was killed (binderDied)` |
+| 自動フォールバックの有無 | 未確認(上記エラーにより判定不能) |
+| `MODE_BASIC` 手動リトライの結果 | Pixel 6 実機: `PERMISSION_DENIED: Api access revoked.`(Issue #11 と同一の失敗) |
 
 コードは実装済み(`RecognitionHarness.runAdvancedFallbackCheck()`)。design.md §8 未決事項5 は
 未確定のまま据え置く。
 
 ## Issue #13: PFDパイプ + 実時間ポンプの受理確認
 
-(未実施 — 実機未接続。下記「実行環境の制約」参照)
+**未達成。** エミュレータでは未実施だった(下記「実行環境の制約」参照)。Pixel 6 実機(API 37、
+ブートローダーロック済み)で実行したが、`checkStatus()` が `PERMISSION_DENIED: Api access revoked.`
+を返し `AVAILABLE` にならなかったため、ハーネスが `AudioSource.fromPfd()` 呼び出しの手前で処理を
+終了した(実測の詳細は「Pixel 6 実機での実測」節参照)。
 
 | 項目 | 値 |
 |---|---|
-| `AudioSource.fromPfd()` 受理可否 | (未実施) |
-| `startRecognition()` Flow 開始可否 | (未実施) |
-| 最初の応答/エラー到達までの時間 | (未実施) |
-| 実時間ポンプの実効送出レート実測 | (未実施) |
+| `AudioSource.fromPfd()` 受理可否 | 未到達(`checkStatus()` の時点で終了) |
+| `startRecognition()` Flow 開始可否 | 未到達 |
+| 最初の応答/エラー到達までの時間 | 未到達 |
+| 実時間ポンプの実効送出レート実測 | 未到達 |
 
 コードは実装済み(`RealtimePump.kt` + `RecognitionHarness.runRecognition()` のパイプ生成〜
 `AudioSource.fromPfd()` 呼び出し部分)。受理成立の判定基準はREADME「受理成立の判定基準」節を参照。
@@ -266,24 +278,124 @@ java.lang.IllegalStateException: You need to use a Theme.AppCompat theme (or des
 同じテーマ構成のまま実機で起動した場合も同様にクラッシュすると推測される。その推測が正しければ、
 エミュレータでの起動確認を行わずに実機検証へ進んだ場合、実機接続時に同じクラッシュで手戻りが発生していたことになる。
 
+## Pixel 6 実機での実測(2026-09-20 JST)
+
+**この節は上記「エミュレータでの実測」に続き、物理Android実機(Pixel 6)で実際に検証した結果である。**
+design.md §4.3 が言う「ブートローダーアンロック端末では動作しない」という条件には該当しない
+(下記「端末情報」のとおりブートローダーはロック済みである)。
+
+### 端末情報
+
+| 項目 | 値 |
+|---|---|
+| `ro.product.manufacturer` | `Google` |
+| `ro.product.model` | `Pixel 6` |
+| コードネーム | `oriole` |
+| `ro.build.version.release` | `17` |
+| `ro.build.version.sdk` | **`37`**(requirements.md NFR-4 の API 31 を大きく上回る) |
+| `ro.product.cpu.abi` | `arm64-v8a` |
+| `ro.boot.verifiedbootstate` | **`green`**(ブートローダーはロック済み) |
+| `ro.boot.flash.locked` | **`1`**(同上) |
+| `FINGERPRINT` | `google/oriole/oriole:17/CP2A.260705.006/15641320:user/release-keys` |
+
+### AICore の状態
+
+`com.google.android.aicore` はインストール済みだが、バージョンは以下である。
+
+```
+versionCode = 395592  minSdk=33  targetSdk=37
+versionName = 0.stub.stub_aicore_20260302.01_RC00.877448964
+enabled = 0(有効)
+```
+
+**`versionName` が `0.stub.stub_aicore_...` であり、実体のない stub(スタブ)版である。** Pixel 6 は
+Gemini Nano 非対応世代であり、AICore はスタブのみが配布されている。
+
+`com.google.android.as.oss` も存在する。
+
+### AICore のインストール形態
+
+```
+codePath = /product/priv-app/AICorePrebuilt-aicore_20260302.01_RC00
+installerPackageName = null
+pkgFlags = [ SYSTEM HAS_CODE ALLOW_CLEAR_USER_DATA ]
+```
+
+`/product/priv-app` 配下のシステムアプリであり、`installerPackageName` が `null`(Play ストア経由で
+インストール・更新された履歴が無い)。すなわち ROM に stub がそのまま焼き込まれている状態であり、
+アプリ側やユーザー操作で後から実体版に置き換えられる余地が無い。
+
+### 【最重要】Google Play ストアが「非対応」と明示している
+
+端末上で `market://details?id=com.google.android.aicore` を開いたところ、Play ストアのアプリページに
+以下の警告が表示された。
+
+> **このアプリはお使いのデバイスに対応しなくなりました。詳しくは、デベロッパーにお問い合わせください。**
+
+(アプリ名は「Android AICore」、提供元は「Google LLC」)。更新ボタンもインストールボタンも表示されない。
+
+**これが本検証における根本原因の決定的な証拠である。** すなわち Google 自身が Pixel 6 を Android
+AICore の非対応端末として扱っており、この端末上で実体のある AICore を入手する手段は存在しない。
+これは設定や手順の不備ではなく、**端末側の制約であり回避策が存在しない。**
+
+### 実行結果
+
+| 操作 | 結果 |
+|---|---|
+| アプリ起動 | 成功 |
+| 基準音声アセットの読み込み | 成功(`jaJP_10s.json`、locale=ja-JP、keywords=6件) |
+| `checkStatus()`(MODE_BASIC、Issue #11) | **`zzaze: PERMISSION_DENIED: Api access revoked.`** |
+| `startRecognition()`(MODE_BASIC、Issue #11/#13) | **`zzaze: PERMISSION_DENIED: Api access revoked.`** |
+| MODE_ADVANCED での検証(Issue #12) | **`zzaze: UNAVAILABLE: Peer process crashed, exited or was killed (binderDied)`** |
+
+logcat には `PhenotypeResourceReader: unable to find any Phenotype resource metadata for
+com.google.android.aicore` も出ている。
+
+`AudioSource.fromPfd()`(Issue #13)には到達していない。`checkStatus()` が `AVAILABLE` でないため、
+ハーネスが手前で処理を終了するためである(エミュレータでの実測と同様、これはハーネス側の制御による
+ものであり、`UNAVAILABLE` 時に `fromPfd()` を呼べないことをAPI仕様として定めているわけではない)。
+
+### 参考情報(実測ではない)
+
+Pixel 6 は Tensor G1 を搭載する世代であり、Gemini Nano は一般に Pixel 8 Pro(Tensor G3)以降が要件と
+されている。**ただしこれは一般に知られた情報であって本検証で実測したものではない。** どの世代・機種
+から実体のあるAICoreが提供されるかは未検証であり、断定しない。
+
+### 公式ドキュメントとの食い違い(WebFetch で確認)
+
+`https://developers.google.com/ml-kit/genai/speech-recognition/android` の記載:
+
+- **Basic Mode**: 「Android devices using API level 31 and higher」
+- **Advanced Mode**: 「Pixel 10, Pixel 11」のみ
+- 「This API is not supported on devices with an unlocked bootloader.」
+
+**しかし API 37 の Pixel 6(ブートローダーはロック済み)は、Google Play ストア自身が「対応しなくなった」
+と明示する端末であり、Basic Mode は動作しない。** したがってドキュメントが述べる Basic Mode の端末
+要件(「API level 31 and higher」)は実態と食い違っている。実際に必要なのはAPIレベルの条件ではなく、
+「Google が対応端末と認め、実体のある(stubでない)AICoreを搭載した端末」であることが、Play ストアの
+表示という一次情報によって裏付けられた。
+
 ## 実行環境の制約
 
 本検証を実行した環境には以下の制約があり、Issue #11 / #12 / #13 (ML Kit GenAI Speech Recognition
-による認識そのものの検証)は実施できなかった。
+による認識そのものの検証)は依然として実施できていない。
 
-- **物理Android端末は接続されていない。** `adb devices` は `emulator-5554  device` のみを返す。
-- 接続されているのはエミュレータ (AVD名 `Android`、target android-36、`sdk_gphone64_arm64`) のみ。
-- **ML Kit GenAI Speech Recognition は AICore を必要とし、AICore はエミュレータ上では動作しない。**
-  これは実装以前の制約であり、`checkStatus()` を呼び出しても `FeatureStatus.UNAVAILABLE` 等の
-  結果しか得られない(あるいはAICore自体が存在しないことに起因する別のエラーになる)可能性が高い。
-  本リポジトリでは実際にエミュレータ上でこれを実行して確認する時間的余地がなかったため、
-  「未実施」として明記するに留め、実機なしでの実行結果を捏造していない。
-- したがって、**認識を伴う検証(Issue #11/#12/#13)には物理Android実機が必須である。** Pixel実機は
-  Advancedモードの主対象、Pixel以外の実機はBasicモードのフォールバック確認・非対応端末での挙動確認
-  (tasks.md M0 Androidの1項目目)に必要となる。
+- **物理Android実機(Pixel 6)は接続されており、エミュレータ固有の制約(AICoreがエミュレータ上では
+  動作しない)は解消された。** しかし上記「Pixel 6 実機での実測」のとおり、接続したPixel 6の
+  `com.google.android.aicore` は `versionName = 0.stub.stub_aicore_20260302.01_RC00.877448964` という
+  実体のない stub 版であり、Google Play ストアも「このアプリはお使いのデバイスに対応しなくなりました」
+  と明示している。`checkStatus()`/`startRecognition()` はいずれも `PERMISSION_DENIED: Api access
+  revoked.` を返した。**「実機さえあれば検証できる」という前提そのものが誤りであったことが実測で
+  判明した。**
+- **真に必要なのは「物理実機」ではなく「Googleが対応端末と認め、実体のあるAICoreを搭載した実機」である。**
+  Pixel 6はrequirements.md NFR-4のAPI 31を大きく上回るAPI 37・ブートローダーロック済みという条件を
+  満たしていても、AICoreがstub版でありPlayストアからも非対応と明示されるため動作しなかった。
+- **どの機種であれば実体のあるAICoreを持つかは未検証である。** 公式ドキュメントはAdvanced Modeの対象を
+  「Pixel 10, Pixel 11」としているが、Basic Modeの対象機種についてはPixel 6が不適合と判明した以外の
+  実測情報がなく、他の機種(Pixel 8/9等)で動作するかは断定できない。実機を変えての追試が必要である。
 - Issue #14 (MediaCodecデコード出力レート調査) はAICoreに依存しない純粋なAndroidフレームワークAPI
   (`MediaExtractor`/`MediaCodec`)のみを使うため、エミュレータ上で実行可能であり、実際に実行して
-  実測値を得た(上記参照)。
+  実測値を得た(上記参照)。この制約はIssue #14には影響しない。
 
 ## design.md / requirements.md との整合性に関する注記
 
@@ -303,6 +415,198 @@ java.lang.IllegalStateException: You need to use a Theme.AppCompat theme (or des
   で確認)は design.md §5 が言及する「AICore 606」のような数値コードを含んでいない。design.md §5の
   Android列とこのライブラリの公開APIとの対応は完全には一致しないため、本スパイクの
   `ErrorMapping.kt` では断定的な対応付けを避け、実測ベースで確定させる方針とした(詳細はREADME参照)。
+
+## 代替案の検証: Android 標準 SpeechRecognizer
+
+### なぜ代替案を検討したか
+
+上記「Pixel 6 実機での実測」のとおり、ML Kit GenAI Speech Recognition が必要とする AICore は
+Pixel 6 では `versionName = 0.stub.stub_aicore_...` という実体のない stub 版であり、Google Play
+ストア自身が「このアプリはお使いのデバイスに対応しなくなりました」と明示する。`checkStatus()` /
+`startRecognition()` はいずれも `PERMISSION_DENIED: Api access revoked.` を返し、回避策が無い
+(端末側の制約であり、アプリ側の実装をどう変えても解決しない)。
+
+そこで、モデルを同梱せず OS 側の認識エンジンを使うという requirements.md NFR-3 の方針を維持した
+まま利用できる代替として、Android 標準の `android.speech.SpeechRecognizer` のオンデバイス認識を
+Pixel 6 実機で調査した。本節はその実測結果である。実装は既存の ML Kit GenAI 用コード
+(`RecognitionHarness.kt` 等)とは完全に独立した別ファイル・別ボタンで行った
+(`PlatformSttProbe.kt`(照会専用、既存)、`PlatformSttHarness.kt`(新規、A/B の本体)、
+`MainActivity.kt` の `onProbePlatformAbc()`(新規ボタン `btn_probe_platform_abc`))。
+
+### 事前に実測済みだった照会結果(本検証開始時点で既知だった値。再掲)
+
+```
+SpeechRecognizer.isRecognitionAvailable() = true
+SpeechRecognizer.isOnDeviceRecognitionAvailable() = true
+supportedOnDeviceLanguages = [de-DE, ja-JP, fr-FR, ... 全36言語]   ← ja-JP を含む
+installedOnDeviceLanguages = [en-US]                              ← ja-JP は未ダウンロード
+pendingOnDeviceLanguages = []
+onlineLanguages = []
+supportError = null
+```
+
+### A: ja-JP オンデバイス言語パックの取得(実測)
+
+`SpeechRecognizer.triggerModelDownload(Intent, Executor, ModelDownloadListener)` を試みた
+(API 36 の `android.jar` を `javap` で確認済み: `triggerModelDownload(Intent)` と
+`triggerModelDownload(Intent, Executor, ModelDownloadListener)` の両オーバーロードが存在する)。
+`ModelDownloadListener` は `onScheduled()` / `onProgress(Int)` / `onSuccess()` / `onError(Int)` の
+4メソッドを持つ。
+
+**1回目の実行(タイムアウト60秒):**
+
+```
+=== A: ja-JP オンデバイス言語パックのダウンロード開始 (triggerModelDownload) ===
+triggerModelDownload: onScheduled()
+（60秒間、onProgress/onSuccess/onError のいずれも到達しなかった）
+triggerJaJpModelDownload: 60000ms 以内に onSuccess/onError が到達しなかった。
+=== A: ダウンロード試行終了: scheduled=true, success=false, lastProgress=null, errorCode=null, timedOut=true ===
+A後の installedOnDeviceLanguages=[en-US, ja-JP], ja-JP installed = true
+```
+
+`onScheduled()` は呼ばれたが `onProgress`/`onSuccess`/`onError` はいずれも60秒以内に呼ばれず、
+`ModelDownloadListener` としては未達成(タイムアウト)だった。**しかしタイムアウト直後に
+`PlatformSttProbe.run()` で再照会したところ、`installedOnDeviceLanguages` に `ja-JP` が現れており、
+実際にはダウンロードは完了していた。** すなわち `ModelDownloadListener` のコールバックは
+信頼できるタイミングで発火しない(または本実装では正しく発火条件を捉えられていない)が、
+ダウンロード自体は OS 側で非同期に進行し、成功している。
+
+**2回目の実行(端末再起動なし、アプリ再起動後に再実行):**
+
+```
+=== A: ja-JP オンデバイス言語パックのダウンロード開始 (triggerModelDownload) ===
+（60秒間、onScheduled/onProgress/onSuccess/onError のいずれも呼ばれなかった）
+triggerJaJpModelDownload: 60000ms 以内に onSuccess/onError が到達しなかった。
+=== A: ダウンロード試行終了: scheduled=false, success=false, lastProgress=null, errorCode=null, timedOut=true ===
+A後の installedOnDeviceLanguages=[en-US, ja-JP], ja-JP installed = true
+```
+
+2回目は `onScheduled()` すら呼ばれなかった(既にダウンロード済みのため何もスケジュールされな
+かったと推測されるが、その場合でも `onSuccess()` 等で即座に通知される仕様ではないらしく、
+コールバックは一切発火しなかった)。`installedOnDeviceLanguages` は両回とも `ja-JP` を含んで
+いたため、**ja-JP 言語パックの取得そのものは成立している(1回目の実行で完了し、以後永続する)**。
+
+**A の結論:** `triggerModelDownload()` は呼び出せて `ja-JP` の実際のダウンロードも成功したが、
+`ModelDownloadListener` のコールバックはダウンロード完了を確実には通知しない(実測では一度も
+`onSuccess()` が観測できなかった)。**取得できたかどうかの確認は、コールバックではなく
+`checkRecognitionSupport()` の `installedOnDeviceLanguages` を再照会することでのみ確実に判定
+できる**という実測に基づく知見を得た。設定アプリからの手動ダウンロード経路は、A の
+`triggerModelDownload()` で目的を達成できたため試していない。
+
+### B: `EXTRA_AUDIO_SOURCE` によるファイル入力の受理確認(実測。最重要)
+
+**受理された。** design.md §4.3 の PFDパイプ + 実時間ポンプ方式(`ParcelFileDescriptor.createPipe()`
++ `RealtimePump.pump()` + `WavPcm.readMono16kHz16BitPcmOrThrow()`)をそのまま流用し、
+`RecognizerIntent.EXTRA_AUDIO_SOURCE`(読み取り側PFD)、`EXTRA_AUDIO_SOURCE_CHANNEL_COUNT=1`、
+`EXTRA_AUDIO_SOURCE_ENCODING=ENCODING_PCM_16BIT`、`EXTRA_AUDIO_SOURCE_SAMPLING_RATE=16000`、
+`EXTRA_PREFER_OFFLINE=true` を設定した `Intent` を
+`SpeechRecognizer.createOnDeviceSpeechRecognizer(context).startListening(intent)` に渡した。
+**`RECORD_AUDIO` 権限は付与していない**(AndroidManifest.xml に記載なし。本検証でも追加していない)。
+
+再現性のあるクリーンな1回分の実行ログ(force-stop → logcat clear → 起動 → ボタン1回タップ):
+
+```
+startListening() を呼び出す (EXTRA_AUDIO_SOURCE 付き)。   ← 22:58:01.028
+[RecognitionListener] onReadyForSpeech(...)                ← 22:58:01.040 (12ms後)
+[RecognitionListener] onRmsChanged(-1.88)                  ← 22:58:01.998
+[RecognitionListener] onBeginningOfSpeech()                ← 22:58:02.030
+[RecognitionListener] onPartialResults(texts=[東京])        ← 22:58:02.332
+  ... (以下、pump が送出するPCMの再生位置に追従して逐次的に
+       "東京都渋谷で" → "2024年11月3日" → "午後3時" → "株式会社モ(ー)ンギフトが" →
+       "新製品を発表しました" → "来場者は128名でした" と部分認識テキストが伸びていく)
+[OK] RealtimePump 終了: sentBytes=305988/305988, elapsedMs=9564, 実効レート=31993.7バイト/秒, cancelled=false  ← 22:58:10.596
+[RecognitionListener] onResults(texts=null)                ← 22:58:10.756
+```
+
+**受理成立の根拠:**
+1. `startListening()` 呼び出しから12ms後に `onReadyForSpeech()` が返り、権限エラー等は一切出な
+   かった(`RECORD_AUDIO` 権限が無いにもかかわらず)。マイクを実際に開こうとした場合、権限が無
+   ければ即座に `onError(ERROR_INSUFFICIENT_PERMISSIONS)` 相当のエラーになるはずだが、そのような
+   エラーは一度も発生しなかった。
+2. `onBeginningOfSpeech()` 以降の `onPartialResults()` が返すテキストが、jaJP_10s.wav の台本
+   (「東京都渋谷区で、2024年11月3日午後3時、株式会社モーンギフトが新製品を発表しました。
+   来場者は128名でした。」)と時系列に沿って完全に一致する形で少しずつ伸びていった。周囲雑音や
+   マイク入力(本機は静かな室内で無音状態)がこの台本と偶然一致することはあり得ず、
+   **`EXTRA_AUDIO_SOURCE` で渡したPFD経由の音声データが実際に認識エンジンへ供給されたことの
+   直接証拠である。**
+3. `RealtimePump` の送出完了(`elapsedMs=9564`、実効レート31,993.7バイト/秒 ≒
+   目標の32,000バイト/秒)から約160ms後に `onResults()` が呼ばれており、実時間ポンプの送出完了
+   とほぼ同期して認識が終端した。これは design.md §4.3 の実時間ポンプ方式がそのままこのAPIでも
+   機能することを示す。
+
+**ただし `onResults()` の `RESULTS_RECOGNITION`(確定テキスト)は `null` だった。** 部分認識
+(`onPartialResults`)は正しく機能し最終的な文全体に近いテキストまで到達していたが、確定結果
+(`onResults`)ではテキスト配列が得られなかった。この現象は2回の独立した実行(クリーンな1回、
+および前段でのA→B連続実行)の両方で再現した。原因は特定できていない(オンデバイスエンジン側の
+挙動か、`EXTRA_AUDIO_SOURCE` 経由特有の終端処理の違いか、本実装のIntent設定の不足かは未検証)。
+**この点は本代替案をM3で採用する場合の要検証事項として残る。**
+
+### C: ja-JP の認識精度(実測。ただし「確定テキスト」ではなく最終部分認識テキストによる)
+
+B で確定テキスト(`onResults`)が `null` だったため、design.md §7 の「確定テキストで判定する」
+という前提を厳密には満たせていない。**次善として、`onResults` 直前の最後の `onPartialResults`
+が返した最上位候補(最初の要素)を用いて `KeywordScoring.kt`(design.md §7 準拠)で判定した。**
+
+最終部分認識テキスト(最上位候補): 「東京都渋谷で2024年11月3日午後3時株式会社モンギフトが
+新製品を発表しました来場者は128名でした」
+
+| キーワード | 判定 |
+|---|---|
+| 東京都渋谷区 | 不一致(「渋谷で」であり「区」が脱落) |
+| 2024年11月3日 | 一致 |
+| 午後3時 | 一致 |
+| 株式会社モーンギフト | 不一致(「モンギフト」であり長音「ー」が脱落) |
+| 新製品 | 一致 |
+| 128名 | 一致 |
+
+包含率: 4/6 = **66.7%** → design.md §7 の ja-JP 閾値(95%以上合格、90〜94%条件付き、90%未満不成立)
+に照らすと **不成立**。
+
+参考: `onPartialResults` は同時に代替候補を複数返しており、2番目の候補は「モーンギフト」
+(長音あり)で「株式会社モーンギフト」に一致していた。その候補のみで再計算すると 5/6 = 83.3%
+だが、それでも90%には届かず、判定は変わらず **不成立** である。「東京都渋谷区」の「区」が
+どの候補でも一貫して脱落しており、これが主要因である。
+
+所要時間: `startListening()` から最後の有意な部分認識(128名でした、を含むもの)まで約9.7秒
+(22:58:01.028 → 22:58:10.753)。10秒の音声クリップに対してほぼ実時間で追従した。
+
+### requirements.md の方針を満たせるかの評価
+
+| 方針 | 満たせるか | 根拠 |
+|---|---|---|
+| NFR-3(モデル非同梱) | **満たせる** | `android.speech.SpeechRecognizer` はOS/Google Play services側が保持するオンデバイスモデルを使い、アプリはモデルを同梱しない。 |
+| NFR-2(オフライン) | **部分的に満たせる可能性がある。断定はできない** | `EXTRA_PREFER_OFFLINE=true` を設定し `createOnDeviceSpeechRecognizer()` を使用した。本機はWi-Fi接続状態(画面のWi-Fiアイコン参照)だったため、実際に通信が発生しなかったことまでは確認していない(パケットキャプチャ等は本検証の範囲外)。`INTERNET` 権限も付与していないため、少なくともアプリ自身が直接ネットワーク送信する経路は無い。 |
+| FR-3(ファイル入力) | **満たせる(実測で確認)** | B の実測により、`EXTRA_AUDIO_SOURCE` 経由でPFDパイプからのファイル入力が受理されることを確認した。マイクは使用されなかった(RECORD_AUDIO権限なしでもエラーが出ず、認識結果が台本と一致したため)。 |
+| design.md §7(評価基準) | **確定テキストでの判定はできなかった** | `onResults` が `null` を返したため、最終部分認識テキストで代用した。この代用値では ja-JP 閾値を満たさなかった(66.7%、不成立)。 |
+
+### design.md §4.3 の PFDパイプ方式の流用可否
+
+**流用できる部分が大半である。** `ParcelFileDescriptor.createPipe()`、`WavPcm`(WAVヘッダ解析)、
+`RealtimePump`(壁時計基準の自己補正ポンプ)は一切変更せずそのまま利用でき、実際に機能した
+(B参照)。変更が必要だったのは「シンク側API」のみである:
+
+| 項目 | ML Kit GenAI (design.md §4.3) | 標準 SpeechRecognizer (本代替案) |
+|---|---|---|
+| 音声入力の渡し方 | `AudioSource.fromPfd(readSide)` → `SpeechRecognizerRequest` | `Intent.putExtra(EXTRA_AUDIO_SOURCE, readSide)` + チャンネル数/エンコーディング/サンプルレートの各Extra |
+| 認識結果の受け取り方 | `Flow<SpeechRecognizerResponse>` (`collect`) | `RecognitionListener` のコールバック (`onPartialResults`/`onResults`/`onError`等) |
+| 開始/終了 | `startRecognition()` / `stopRecognition()` | `startListening()` / `stopListening()` / `cancel()` / `destroy()` |
+| キャンセル経路 | パイプclose → stopRecognition() → close() | 同様の順序が使えると考えられるが、本検証ではキャンセル経路(design.md §4.3のキャンセル手順そのもの)は検証していない |
+
+### 限界
+
+- **Pixel 6 単一機種での実測である。** 他機種(特に ja-JP の on-device 言語パックが最初から
+  インストール済みの機種、または `installedOnDeviceLanguages` にそもそも ja-JP が
+  `supportedOnDeviceLanguages` に含まれない機種)での挙動は未検証である。
+- `onResults()` が `null` を返した原因は特定していない。M3で採用する場合は、この点を
+  Android バージョン違い・他機種・`EXTRA_AUDIO_SOURCE` 以外の入力経路(マイク実入力)との
+  比較などで追加調査する必要がある。
+- キャンセル経路(design.md §4.3 のキャンセル手順)は本検証の範囲外であり未検証である。
+- NFR-2(オフライン)について、実際に通信が発生していないことをネットワークレベルで確認しては
+  いない。
+- 本検証中に一度、ABC検証フローの実行途中でアプリのプロセスが複数回再起動する事象を観測したが、
+  クリーンな単体実行(force-stop→ログクリア→起動→1回タップ)では再現せず、原因はエージェント側の
+  操作環境に起因する可能性が高いと判断し、アプリ側のバグとしては扱っていない(クリーン実行の
+  ログを本節の実測値として採用した)。
 
 ## フォローアップ(反映先。本ファイル自体の役目ではなく、呼び出し元が別途実施)
 
