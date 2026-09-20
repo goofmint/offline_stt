@@ -282,7 +282,11 @@ function buildAudioTrack(audioCtx, audioBuffer) {
     log('audioTrack.readyState === "live" を確認した。', 'ok');
   }
 
-  return { source, audioTrack };
+  // destination と stream を呼び出し側へ返して参照を保持させる。
+  // これらをローカル変数のまま捨てると、到達不能になった時点で GC により
+  // MediaStreamAudioDestinationNode が回収され、audioTrack が ended になり、
+  // 認識が "aborted" で即座に中断する。
+  return { source, destination, stream, audioTrack };
 }
 
 /**
@@ -317,8 +321,11 @@ function buildRecognition(SR, locale) {
  * 認識セッション本体。source.start() + recognition.start(audioTrack) を行い、
  * final結果を蓄積して返す。design.md §4.1 / §8 未決事項4 の検証対象。
  */
-function runRecognitionSession(recognition, source, audioTrack) {
+function runRecognitionSession(recognition, source, audioTrack, retained) {
   return new Promise((resolve, reject) => {
+    // retained (destination / stream) はこのクロージャが握り続けることで
+    // セッション中の GC を防ぐ。finish() でも参照して最適化による除去を避ける。
+    const keepAlive = retained;
     let finalText = '';
     let sessionEnded = false;
     let onendTimer = null;
@@ -332,6 +339,11 @@ function runRecognitionSession(recognition, source, audioTrack) {
       if (sessionEnded) return;
       sessionEnded = true;
       if (onendTimer) clearTimeout(onendTimer);
+      // keepAlive をここで参照し、セッション終了まで destination / stream が
+      // 到達可能であることを保証する (GC による audioTrack 終了の防止)。
+      if (keepAlive && keepAlive.stream) {
+        log(`セッション終了時の audioTrack.readyState=${audioTrack.readyState}`);
+      }
       const elapsedMs = Math.round(performance.now() - startedAt);
       if (error) {
         reject({ error, elapsedMs, finalText, networkErrorSeen });
@@ -379,10 +391,6 @@ function runRecognitionSession(recognition, source, audioTrack) {
       finish();
     };
 
-    recognition.onstart = () => {
-      log('recognition.onstart 発火。認識セッションが開始された。', 'ok');
-    };
-
     source.onended = () => {
       log('audio source.onended 発火。recognition.onend を待つ (タイムアウト' + ONEND_TIMEOUT_MS + 'ms)。');
       onendTimer = setTimeout(() => {
@@ -402,26 +410,77 @@ function runRecognitionSession(recognition, source, audioTrack) {
       }, ONEND_TIMEOUT_MS);
     };
 
-    try {
-      source.start();
-      log('AudioBufferSourceNode.start() を呼び出した。再生を開始する。');
-    } catch (err) {
-      finish(null, err);
-      return;
-    }
+    // audioTrack が途中で終了/ミュートされると認識は "aborted" になる。
+    // 原因切り分けのため、トラック側のイベントを必ず記録する。
+    audioTrack.onended = () => {
+      log(`audioTrack.onended 発火 (readyState=${audioTrack.readyState})。以降の認識入力は途切れる。`, 'ng');
+    };
+    audioTrack.onmute = () => log('audioTrack.onmute 発火。入力が無音として扱われる。', 'warn');
+    audioTrack.onunmute = () => log('audioTrack.onunmute 発火。');
+
+    // recognition を先に開始し、onstart を待ってから音声を再生する。
+    // 逆順だと先頭が認識器に渡る前に再生が進み、冒頭が欠落する。
+    let startedSource = false;
+    const startSource = () => {
+      if (startedSource) return;
+      startedSource = true;
+      try {
+        source.start();
+        log('AudioBufferSourceNode.start() を呼び出した。再生を開始する。');
+      } catch (err) {
+        finish(null, err);
+      }
+    };
+
+    const onstartTimer = setTimeout(() => {
+      if (!startedSource && !sessionEnded) {
+        finish(
+          null,
+          new Error('recognition.start(audioTrack) 後 5000ms 以内に onstart が発火しなかった。')
+        );
+      }
+    }, 5000);
+
+    recognition.onstart = () => {
+      clearTimeout(onstartTimer);
+      log('recognition.onstart 発火。認識セッションが開始された。', 'ok');
+      log(`onstart 時点の audioTrack: readyState=${audioTrack.readyState}, enabled=${audioTrack.enabled}, muted=${audioTrack.muted}`);
+      startSource();
+    };
 
     try {
       recognition.start(audioTrack);
       log('recognition.start(audioTrack) を呼び出した。design.md §8 未決事項4 の検証対象。');
     } catch (err) {
+      clearTimeout(onstartTimer);
       log(`recognition.start(audioTrack) 呼び出しで例外: ${err && err.message}`, 'ng');
       finish(null, err);
     }
   });
 }
 
+/**
+ * マイク権限の状態を記録する。start(audioTrack) はマイクを使わないが、
+ * Chrome の SpeechRecognition が権限を要求するかどうかが未確認のため、
+ * "aborted" / "not-allowed" の原因切り分け材料として必ず残す。
+ */
+async function logMicrophonePermission() {
+  if (!navigator.permissions || !navigator.permissions.query) {
+    log('navigator.permissions.query が利用できない。マイク権限状態は取得不可。', 'warn');
+    return;
+  }
+  try {
+    const status = await navigator.permissions.query({ name: 'microphone' });
+    log(`マイク権限の状態: ${status.state}`);
+  } catch (err) {
+    log(`マイク権限の照会に失敗: ${err && err.name}: ${err && err.message}`, 'warn');
+  }
+}
+
 async function runTranscription() {
   log('=== 文字起こし実行 開始 ===');
+  log(`document.visibilityState=${document.visibilityState}, document.hasFocus()=${document.hasFocus()}`);
+  await logMicrophonePermission();
   if (!selectedFile) {
     log('ファイルが選択されていない。', 'ng');
     return;
@@ -450,11 +509,11 @@ async function runTranscription() {
     audioCtx = new (window.AudioContext ?? window.webkitAudioContext)();
     const audioBuffer = await decodeToAudioBuffer(audioCtx, arrayBuffer);
 
-    const { source, audioTrack } = buildAudioTrack(audioCtx, audioBuffer);
+    const { source, destination, stream, audioTrack } = buildAudioTrack(audioCtx, audioBuffer);
     const recognition = buildRecognition(SR, clip.locale);
 
     setStatus('transcribe-status', '実行中...');
-    const sessionResult = await runRecognitionSession(recognition, source, audioTrack);
+    const sessionResult = await runRecognitionSession(recognition, source, audioTrack, { destination, stream });
 
     log(`所要時間: ${sessionResult.elapsedMs}ms (NFR-1: Webはファイル長と同程度になる想定)`);
     setStatus('transcribe-status', `完了 (${sessionResult.elapsedMs}ms)`);
