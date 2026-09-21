@@ -249,6 +249,25 @@ git push origin platform_interface-v0.2.0
 `version:` が一致することを検証した上で、format / analyze / test /
 dry-run を通してから公開する(実装は同ファイルのコメント参照)。
 
+### 6.2 publish.yml の Action は必ずコミットSHAで固定する
+
+`.github/workflows/publish.yml` は `id-token: write` を持ち、pub.dev へ
+実際に公開できる。ここで `actions/checkout@v4` のような**可変タグ**を使うと、
+タグの指す先が差し替えられた時点でそれがそのまま公開権限の乗っ取りになる。
+このため publish.yml が使う Action は**不変のコミットSHAで固定**し、
+右側の行コメントに対応するバージョンを書いてある。
+
+```yaml
+- uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+```
+
+**バージョンを上げるときは、SHAと行コメントを必ず同時に直すこと。**
+片方だけ直すと、コメントが実際に動いている版と食い違う。
+
+また、CI・publish の双方で `actions/checkout` に
+`persist-credentials: false` を指定している。どのジョブも `git push` を
+しないため `GITHUB_TOKEN` を `.git/config` に残す必要が無い。
+
 ## 7. なぜ 0.x 系で公開するか(NFR-5)
 
 requirements.md NFR-5 のとおり、本ライブラリは 0.x 系で公開する。

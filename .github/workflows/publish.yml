@@ -76,7 +76,15 @@ jobs:
       id-token: write
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      # Action は可変タグではなく不変のコミットSHAで固定する。このワークフローは
+      # `id-token: write` を持ち pub.dev へ公開できるため、タグの差し替えが
+      # そのまま公開権限の乗っ取りになりうる。**バージョンを上げるときは
+      # SHAと右側のコメントを必ず同時に直すこと。**
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # GITHUB_TOKEN を .git/config に残さない。このジョブは git push を
+          # しないため資格情報は不要である。
+          persist-credentials: false
 
       - name: タグからパッケージを判定する
         id: pkg
@@ -164,9 +172,9 @@ jobs:
       # 参照)を差し込む余地が無い。このリポジトリは Dart Pub Workspaces の
       # monorepo であり、公開前に独自の検証手順が要るため、
       # 同じSDKセットアップ手順を踏襲しつつ自前でジョブを組んだ。
-      - uses: dart-lang/setup-dart@v1
+      - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
 
-      - uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: ${{ env.FLUTTER_CHANNEL }}

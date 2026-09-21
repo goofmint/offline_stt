@@ -114,6 +114,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # GITHUB_TOKEN を .git/config に残さない。CIのどのジョブも
+          # git push をしないため資格情報は不要である。
+          persist-credentials: false
 
       - uses: subosito/flutter-action@v2
         with:
@@ -148,6 +152,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # GITHUB_TOKEN を .git/config に残さない。CIのどのジョブも
+          # git push をしないため資格情報は不要である。
+          persist-credentials: false
 
       - uses: subosito/flutter-action@v2
         with:
@@ -199,6 +207,10 @@ jobs:
     continue-on-error: ${{ matrix.continue_on_error }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # GITHUB_TOKEN を .git/config に残さない。CIのどのジョブも
+          # git push をしないため資格情報は不要である。
+          persist-credentials: false
 
       - uses: subosito/flutter-action@v2
         with:
