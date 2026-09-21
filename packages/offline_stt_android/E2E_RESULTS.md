@@ -714,11 +714,7 @@ E2E_CHECKLIST.md の合否基準は「手順1〜7がすべて期待どおりに�
 | `test-assets/keyword_score.py` | design.md §7 の正規化・判定をそのまま実装した採点スクリプト |
 | `apps/example/pubspec.yaml` | `integration_test` と `path_provider` を dev_dependency に追加 |
 
-**注意: `path_provider` の追加は `apps/example/windows/flutter/
-generated_plugins.cmake` に `jni` を追加する副作用がある**(path_provider
-の推移的依存)。`flutter pub get` が生成する差分であり、本検証で意図的に
-入れたものではない。Windows ビルド(CI の `flutter build windows --debug`)
-への影響は **未検証** である。`path_provider` を使っている理由は
+`path_provider` を使っている理由は
 `getExternalStorageDirectory()` が必要だからで、生パスに対する
 `Directory.createSync()` は `Permission denied` になる(実測)。
 

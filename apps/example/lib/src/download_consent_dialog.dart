@@ -18,12 +18,7 @@ import 'package:flutter/material.dart';
 ///   requirements.md §3)。ただし他プラットフォームはOS管理でサイズが
 ///   異なるため、Web専用の数値であることも明示する
 ///
-/// Windows(Issue #59)では、Microsoft公式ドキュメントの
-/// 「Recommended UX pattern」が同意ダイアログに含めるべき内容を具体的に
-/// 挙げているため、Windowsのときだけ専用の文面に切り替える。詳細は
-/// `packages/offline_stt_windows/README.md` §5 を参照。
-///
-/// Android(Issue #51)も専用の文面に切り替える。ダウンロードされるのは
+/// Android(Issue #51)は専用の文面に切り替える。ダウンロードされるのは
 /// 「対象ロケールのオンデバイス言語パック」であり、取得は
 /// `SpeechRecognizer.triggerModelDownload()` を通じてOS / Google Play
 /// services 側が行う。**完了通知(`ModelDownloadListener`)が発火しない
@@ -56,38 +51,10 @@ Future<bool> showDownloadConsentDialog(
   return agreed ?? false;
 }
 
-bool get _isWindows =>
-    !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
-
 bool get _isAndroid =>
     !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
 
 String _consentBody(String locale) {
-  if (_isWindows) {
-    // Microsoft公式ドキュメント(Windows AI APIs / Speech Recognition の
-    // 「Recommended UX pattern」)が、EnsureReadyAsync() を呼ぶ前に
-    // ユーザーへ伝えるべきとしている4点をすべて含めている:
-    //   (a) オプションの音声認識モデルがダウンロードされること
-    //   (b) ダウンロードは Windows Update 経由でバックグラウンドに行われること
-    //   (c) 進捗は 設定 > Windows Update で確認できること
-    //   (d) モデルは後から 設定 > システム > AI コンポーネント で削除できること
-    // 「モデル名ではなく一般名称を使う」という点は requirements.md §8 と
-    // 公式ドキュメントの双方が同じことを言っている。
-    return '文字起こしを行うには、オプションのAIコンポーネントである'
-        '音声認識モデルをこの端末にダウンロードする必要がある。'
-        'アプリ自体のサイズは増えない。\n\n'
-        'ダウンロードはWindows Update経由でバックグラウンドに行われる。'
-        '進捗は「設定 > Windows Update」で確認できる。\n\n'
-        'ダウンロードしたモデルは、後から「設定 > システム > '
-        'AIコンポーネント」でいつでも削除できる。削除するとこのアプリの'
-        '文字起こしは再びダウンロードが必要な状態に戻り、'
-        'このダイアログが改めて表示される。\n\n'
-        'なお、Windowsの音声認識APIには認識する言語を指定する手段が'
-        '存在しないため、入力欄のロケール「$locale」はWindowsでは無視される'
-        '(どの言語で認識されるかはOS側の設定に依存する。'
-        'packages/offline_stt_windows/README.md §7 参照)。\n\n'
-        'この通信で音声データや文字起こし結果が送信されることはない。';
-  }
   if (_isAndroid) {
     // Issue #51。Androidで伝えるべきことは requirements.md §8 の文言
     // ガイドライン(一般名称で呼ぶ・サイズの目安に触れる)に加えて、

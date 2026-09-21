@@ -3,10 +3,7 @@ name: Publish to pub.dev
 # offline_stt の公開ワークフロー(Issue #65、docs/PUBLISHING.md)。
 #
 # トリガはパッケージ別の git tag push である。1回のタグ push は常に
-# 1パッケージだけを公開する。公開対象は次の5パッケージであり、
-# `offline_stt_windows` は対象外である(publish_to: none。理由は
-# docs/PUBLISHING.md 1節、requirements.md NFR-4)。**offline_stt_windows
-# 用のタグパターンは存在しない。このワークフローに追加しないこと。**
+# 1パッケージだけを公開する。公開対象は次の5パッケージである。
 #
 #   タグパターン                  → パッケージ
 #   platform_interface-v*        → offline_stt_platform_interface

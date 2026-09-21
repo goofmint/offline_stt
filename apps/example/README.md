@@ -58,19 +58,11 @@ flutter run -d <実機のデバイスID>
 - **Androidは実時間方式であり、ファイル長と同等の時間がかかる。**
   デコード済みPCMを `ParcelFileDescriptor` パイプへ毎秒約32KBで供給する
   ためである(Pixel 6実機の実測: 9.56秒の音声にポンプ9,564ms、実効
-  31,993.7バイト/秒)。バッチ認識の iOS / macOS / Windows とはこの点が
+  31,993.7バイト/秒)。バッチ認識の iOS / macOS とはこの点が
   根本的に異なるため、長時間の音声ではその長さ分だけ待つことになる。
   なお **`RECORD_AUDIO` 権限は不要である**(マイクを使わない)。
   詳細は `packages/offline_stt_android/README.md` と
   `packages/offline_stt_android/E2E_CHECKLIST.md` を参照。
-- **Windowsは依存を書くだけでは動かない。** MSIXパッケージ化と
-  `systemAIModels` capability の宣言、および `winapp init`(WinAppSDKの
-  C++/WinRTプロジェクションヘッダー展開)が必要である。手順は
-  `packages/offline_stt_windows/README.md` と
-  `apps/example/windows/packaging/README.md` にある。**このexample appを
-  Windowsで動かした実績は無い**(リポジトリにWindows実機が無いため。
-  Issue #58)。`flutter build windows --debug` によるコンパイル検証のみ
-  CIで行っている。
 - **Webは Chrome 142 以上でのみ動作する。** それ以外のブラウザでは
   モデル状態が「利用不可」になる(requirements.md §8)。`localhost` または
   `https` 配信であることも必要(`on-device-speech-recognition`
@@ -88,7 +80,6 @@ Android(Pixel 6)で実行した**(Issue #40 / #50。結果は
 通っていない。** UI を通した確認は人手で別途行う必要がある。
 
 Web は M0 スパイクでの実測のみで、本番実装での再測定は未実施である。
-Windows は v1 対象外である(リポジトリルートの README 冒頭を参照)。
 
 ## モデルダウンロードの同意について
 

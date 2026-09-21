@@ -2,7 +2,7 @@
 
 対応 Issue: #66。対応する設計: design.md §7「テスト戦略」。
 
-design.md §7 は **「CI: ビルド検証のみ(Android/iOS/Windows/Webのコンパイル)。
+design.md §7 は **「CI: ビルド検証のみ(Android/iOS/Webのコンパイル)。
 認識E2Eは手動チェックリスト運用」** と定めている。本書はその手動チェック
 リスト群の入口であり、**リリース前に人手で実行する検証手順**である。
 
@@ -15,7 +15,6 @@ design.md §7 は **「CI: ビルド検証のみ(Android/iOS/Windows/Webのコ�
 | iOS / macOS | iOSシミュレータでは `SpeechTranscriber.isAvailable` が `false`、`supportedLocales` が0件になる。正しい .app バンドルでも同じ結果であり、原因はシミュレータにオンデバイス音声モデルが無いこと | spikes/darwin/RESULTS.md |
 | Android | エミュレータではオンデバイス認識のモデルが無く、実機が要る。かつM0検証で、実機であっても機種によっては成立しないことが判明している | spikes/android/RESULTS.md |
 | Web | CDP等の自動化制御下のクリーンな一時プロファイルではオーディオレンダリングが動作しない(`AudioContext.currentTime` が停止したまま進行しない)。通常の対話的Chromeセッションでのみ動作した | spikes/web/RESULTS.md |
-| Windows | **Windows機が本リポジトリに存在しない。** CIはWinRTバックエンドを除外した構成しかコンパイルしない | spikes/windows/RESULTS.md、.github/workflows/ci.yml |
 
 ## プラットフォーム別チェックリスト
 
@@ -24,7 +23,6 @@ design.md §7 は **「CI: ビルド検証のみ(Android/iOS/Windows/Webのコ�
 | Web (Chrome) | [packages/offline_stt_web/E2E_CHECKLIST.md](packages/offline_stt_web/E2E_CHECKLIST.md) | M0スパイクで実測あり(本番実装での再測定は未実施) | — |
 | iOS / macOS | [packages/offline_stt_darwin/E2E_CHECKLIST.md](packages/offline_stt_darwin/E2E_CHECKLIST.md) | **2026-09-21 に本番実装を macOS 26.5.1 と iPad Pro (iOS 26.6.2) で実行済み(手順1〜6は全て期待どおり。包含率は8ファイル全て未達)。[結果](packages/offline_stt_darwin/E2E_RESULTS.md)。iOS 27実機は未実施** | #40、#7(iOS 26実機) |
 | Android | [packages/offline_stt_android/E2E_CHECKLIST.md](packages/offline_stt_android/E2E_CHECKLIST.md) | **2026-09-21 に本番実装をPixel 6で実行済み。初回は不合格(バグ4件を発見)、B-1〜B-4 修正後の最終実行は手順3が8/8成功。包含率は未達(enUS_10s のみ 100% で合格)。[結果](packages/offline_stt_android/E2E_RESULTS.md)。非Pixel機は未実施** | #50 |
-| Windows | [packages/offline_stt_windows/E2E_CHECKLIST.md](packages/offline_stt_windows/E2E_CHECKLIST.md) | **全項目未実行。** Windows機が無く、ビルドすら一度も通していない | #58 |
 
 **本番実装(`packages/` 配下)に対して通して実行したのは Android と
 Darwin である(いずれも 2026-09-21。Pixel 6 / macOS 26.5.1 + iPad Pro
@@ -77,7 +75,7 @@ iOS 26.6.2)。** Web の「実測あり」は M0 スパイク(`spikes/` 配下�
 
 ### 精度に関する既知の事実(重要)
 
-**ja-JP は、実測できた Darwin / Web / Android の3つすべてでしきい値に達していない**(`jaJP_10s` はいずれも 66.7%)。Windows は v1 対象外であり測定していない。**en-US は Android(Pixel 6)の `enUS_10s` が 100.0% でしきい値(95%以上)を満たしている**唯一の例である。
+**ja-JP は、実測できた Darwin / Web / Android の3つすべてでしきい値に達していない**(`jaJP_10s` はいずれも 66.7%)。**en-US は Android(Pixel 6)の `enUS_10s` が 100.0% でしきい値(95%以上)を満たしている**唯一の例である。
 
 | プラットフォーム | 基準音声 jaJP_10s の包含率 | 出典 |
 |---|---|---|
@@ -85,7 +83,6 @@ iOS 26.6.2)。** Web の「実測あり」は M0 スパイク(`spikes/` 配下�
 | Darwin (iOS 26.6.2 実機) | 66.7%(4/6) | packages/offline_stt_darwin/E2E_RESULTS.md |
 | Web (Chrome 153) | 66.7%(4/6) | spikes/web/RESULTS.md |
 | Android (Pixel 6) | 66.7%(4/6) | spikes/android/RESULTS.md |
-| Windows | 未測定 | — |
 
 いずれも同率だが、落としているキーワードは同一ではない(Darwin の macOS と iOS 実機は内訳まで完全に一致した)。
 なお 2026-09-21 に `keywords` の許容表記を是正した(design.md §7 参照)が、
@@ -109,7 +106,6 @@ TTS合成であること、(b)プリセット等の設定、(c)認識モデル�
 |---|---|
 | Darwin(iOS / macOS) | #40 |
 | Android | #50 |
-| Windows | #58 |
 | Web | **専用の実機E2E Issueが無い。** Web は #31(チェックリストの作成)と #66(収録)で扱っており、実行結果を記録するIssueが立っていない。実行する際は Web 用の検証Issueを新規に立て、その番号を本表へ追記すること |
 
 **未実施の項目は「合格」ではなく「未実施」と書くこと。**

@@ -65,5 +65,3 @@ Future<String> transcribe(String path, String locale) async {
 - **日本語の精度はしきい値に届いていない**(基準音声 `jaJP_10s` で 66.7%)。
   採用前に [README の「既知の制約」](https://github.com/goofmint/offline_stt/blob/main/packages/offline_stt/README.md#既知の制約採用前に読むこと)
   を読むこと。
-- **Windows は v1 では対象外である。** 呼び出すとプラットフォーム実装が
-  未登録のため `StateError` になる。

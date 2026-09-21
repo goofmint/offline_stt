@@ -11,40 +11,16 @@ requirements.md NFR-5「バージョニング」、`.github/workflows/publish.ym
 成功は確認済みだが、`dart pub publish`(dry-run でない方)は本書を書いた
 PR では**実行していない**。初回公開は本書に従って人間が手動で行う。
 
-## 1. 公開対象は5パッケージ(6ではない)
+## 1. 公開対象は5パッケージ
 
-このリポジトリには6つのパッケージ(`packages/` 配下)があるが、公開対象は
-次の **5パッケージ**である。
+このリポジトリの `packages/` 配下にある次の **5パッケージ**すべてが
+公開対象である。
 
 - `offline_stt_platform_interface`
 - `offline_stt_darwin`
 - `offline_stt_android`
 - `offline_stt_web`
 - `offline_stt`(利用者が直接依存するエントリパッケージ)
-
-`offline_stt_windows` は **v1では公開しない**。`packages/offline_stt_windows/pubspec.yaml`
-に `publish_to: none` が設定されている。理由は次のとおりで、Windows 11
-実機で確認済みの事実である(requirements.md NFR-4、
-`packages/offline_stt_windows/README.md` §1)。
-
-- Windows 実装が使う `Microsoft.Windows.AI.Speech` は WinAppSDK の
-  **安定版に存在しない**。NuGet の `Microsoft.WindowsAppSDK.AI` を実際に
-  展開して確認したところ、安定版(2.5.5系まで確認)にも 1.7系
-  (`1.7.250401001` / `1.7.260224002`)にも当該名前空間の `.winmd` は含まれず、
-  `2.4.8-experimental` などの **experimental チャンネルにのみ存在する**。
-- Windows 11 実機(10.0.26200 / 25H2)でクリーンビルドし、安定版の
-  WinAppSDK では WinRT 実装4ファイルがコンパイル対象から外れることも
-  確認済みである。
-- 公式ドキュメント(<https://learn.microsoft.com/en-us/windows/ai/apis/speech-recognition>)
-  の Prerequisites は「WinAppSDK version: Version 1.7.1 or later」と書いて
-  いるが、これは実際の出荷物と食い違っている。
-- 利用者に experimental チャンネルの WinAppSDK を要求することはできない
-  ため、stable 化するまで公開対象から外す。stable 化した時点で
-  `publish_to` を外して公開対象へ戻す(`packages/offline_stt_windows/pubspec.yaml`
-  冒頭コメント参照)。
-
-`.github/workflows/publish.yml` も `offline_stt_windows` を対象に含めない
-(タグパターンを用意しない)。
 
 ## 2. 公開順序とその理由
 
@@ -105,8 +81,7 @@ resets the `resolution` setting... Now running `dart pub get` inside
       リンク切れが無いことを検証する)。
 - [ ] `melos run publish:dry-run` が5パッケージすべてで警告0件で通る
       (ルート `pubspec.yaml` の melos scripts。`packageFilters: { private: false }`
-      により `publish_to: none` の `offline_stt_windows` と `apps/example`
-      は自動的に対象から外れる)。
+      により `publish_to: none` の `apps/example` は自動的に対象から外れる)。
 - [ ] 公開する各パッケージの `CHANGELOG.md` に、公開するバージョンの
       エントリが存在し、`pubspec.yaml` の `version:` と一致している。
 - [ ] 依存関係の宣言(`offline_stt_platform_interface: ^0.1.0` 等)が
@@ -272,7 +247,7 @@ dry-run を通してから公開する(実装は同ファイルのコメント�
 
 requirements.md NFR-5 のとおり、本ライブラリは 0.x 系で公開する。
 
-> 土台のAPIが新しく、Windows AI APIs は Experimental 段階であり、
+> 土台のAPIが新しく、
 > iOS/macOSのSpeechAnalyzerもOS 26で導入されたばかりである。また各OSの
 > オンデバイス認識の挙動には実測で判明した未確定要素が残る(design.md §8)。
 > そのためライブラリは0.x系で公開し、各OS APIのstable化までstableを

@@ -12,7 +12,6 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」技�
       └── <name>_platform_interface(共通抽象)
            ├── <name>_android   … Pigeon → Kotlin(標準 SpeechRecognizer + MediaCodecポンプ)
            ├── <name>_darwin    … Pigeon → Swift(SpeechAnalyzer + AVFoundation)
-           ├── <name>_windows   … Pigeon → C++/WinRT(Windows AI + Media Foundation)
            └── <name>_web       … Dart JS interop(Web Speech + Web Audio)
 ```
 
@@ -40,7 +39,7 @@ abstract class OfflineTranscriberPlatform extends PlatformInterface {
 enum ModelState { available, downloadable, downloading, unavailable }
 
 class DownloadProgress {
-  final double? fraction;   // null = 不定進捗(Windows想定)
+  final double? fraction;   // null = 不定進捗(Web想定)
   final bool completed;
 }
 
@@ -66,13 +65,11 @@ class PlatformException_ extends TranscribeException { final String code; final 
 
 ### 2.3 ブリッジ方式
 
-- Android / Darwin / Windows: Pigeonでスキーマ駆動生成。手書きMethodChannelは使わない
-  - 理由: 3ネイティブ言語(Kotlin / Swift / C++)への型安全な同時生成、enum・sealedのシリアライズ事故防止
+- Android / Darwin: Pigeonでスキーマ駆動生成。手書きMethodChannelは使わない
+  - 理由: 2ネイティブ言語(Kotlin / Swift)への型安全な同時生成、enum・sealedのシリアライズ事故防止
 - ストリームはPigeonのEventChannel対応(`@EventChannelApi`)で `segments` / `downloadProgress` の2本を定義
-  - **ただしWindowsは例外**。PigeonのC++ジェネレータはEventChannelに未対応であり、`@EventChannelApi` を含むスキーマに `--cpp_header_out` を指定すると `C++ does not support event channels` で生成が失敗する(Pigeon 27.3.0 / 29.0.2 の両方で実行確認済み。Pigeon の README にも「Event channels are supported only on the Swift, Kotlin, and Dart generators.」と明記されている)
-  - そのためWindowsのみ **HostApi + FlutterApi のコールバック**で同等のストリーム機能を実現する。スキーマファイルを Android/Darwin 用と Windows 用の2本に分ける。手書きMethodChannel/EventChannelは使わないという方針は維持する
-- 共通エラー列挙型 `TranscribeErrorCode`(`modelUnavailable` / `localeUnsupported` / `decodeFailed` / `deviceUnsupported` / `cancelled` / `platformError`)をPigeonスキーマに定義する。§2.2 の sealed 例外階層に対応するが、C++ は sealed class を持てないため列挙型でワイヤを渡す。Android/Darwin ではEventChannelの組み込みエラーシンクを使うため、スキーマ上は定義のみとする
-- 生成物(`.g.dart` / `.g.kt` / `.g.swift` / `.g.h` / `.g.cpp`)は**リポジトリにコミットする**。ネイティブビルド(Gradle / Xcode / CMake)はDart・Pigeonツールチェーンを経由せず生成済みコードを直接コンパイルするため、コミットしないとネイティブビルドが成立しない。再生成は melos スクリプト(`melos run pigeon`)で行う
+- 共通エラー列挙型 `TranscribeErrorCode`(`modelUnavailable` / `localeUnsupported` / `decodeFailed` / `deviceUnsupported` / `cancelled` / `platformError`)をPigeonスキーマに定義する。§2.2 の sealed 例外階層に対応する。Android/Darwin ではEventChannelの組み込みエラーシンクを使うため、スキーマ上は定義のみとする
+- 生成物(`.g.dart` / `.g.kt` / `.g.swift`)は**リポジトリにコミットする**。ネイティブビルド(Gradle / Xcode)はDart・Pigeonツールチェーンを経由せず生成済みコードを直接コンパイルするため、コミットしないとネイティブビルドが成立しない。再生成は melos スクリプト(`melos run pigeon`)で行う
 - Web: Pigeon不要。`package:web` + `dart:js_interop` で直接実装
 - `HostApi` はネイティブ側実装が非同期APIの完了を待って結果を返す必要があるメソッド(例: Darwinの `checkModel`、`AssetInventory`/`SpeechTranscriber` の async API に依存)には `@async` を使う。プラットフォームスレッドを `DispatchSemaphore` 等でブロックして待ち合わせる実装は禁止とする(ANR・デッドロックの危険があるため)
 
@@ -197,47 +194,15 @@ AVAudioFile(任意フォーマット読込)
 - リサンプリングの実装は、全チャンネルの単純平均によるモノラル化と線形補間による 16kHz への変換の2段構成とする。線形補間はローパスフィルタを持たないためダウンサンプリング時のエイリアシングを理論上抑制できない。これは意図的な設計判断であり、将来 windowed-sinc 等へ置き換える余地がある
 - エラー写像は `SpeechRecognizer.ERROR_*` 定数に対して行う(§5 参照)
 
-### 4.4 Windows(<name>_windows)
-
-> **v1では対象外である。** `Microsoft.Windows.AI.Speech` が WinAppSDK の
-> 安定版に存在せず(experimental チャンネルにのみ存在)、Windows 11 実機で
-> クリーンビルドして WinRT 実装がコンパイル対象から外れることを確認した。
-> 安定版で使える代替(`Windows.Media.SpeechRecognition` はファイル入力
-> 非対応かつ既定の口述文法がオンライン、Windows ML はモデル同梱が前提で
-> NFR-3 違反、等)も調査したが、制約をすべて満たすものは見つかっていない。
-> 唯一残った候補は SAPI 5 だが未検証であり、非推奨扱いでもある。
-> 詳細は `spikes/windows/ALTERNATIVES.md`。本節の設計は、Speech API が
-> 安定版に入った場合に備えて残す。
-
-
-パイプライン:
-
-```
-入力ファイル
-  → (必要時) Media Foundation で wav へ変換
-  → SpeechRecognitionModel.TryCreateAsync()
-  → BatchRecognition.RecognizeFromFile(path)
-  → 最終テキスト1件を isFinal=true でemit → close
-```
-
-- モデル管理: `GetReadyState()` → FR-1、`EnsureReadyAsync()` → FR-2。進捗APIの粒度が粗い場合は `DownloadProgress(fraction: null)` の不定進捗
-- `AIFeatureReadyState` の実際の値は7つである: `Ready` / `NotReady` / `NotSupportedOnCurrentSystem` / `DisabledByUser` / `CapabilityMissing` / `NotCompatibleWithSystemHardware` / `OSUpdateNeeded`(うち `CapabilityMissing` / `NotCompatibleWithSystemHardware` / `OSUpdateNeeded` の3つはWinAppSDK 2.0以降の値。ドキュメント調査で確認済み。spikes/windows/RESULTS.md 参照)。FR-1の4値(available/downloadable/downloading/unavailable)への写像には課題がある: **`downloading` に一意対応する状態が存在しない**。`NotReady` はダウンロード開始前の状態であり、ダウンロード中であることを知るには `EnsureReadyAsync()` 実行中に `SpeechRecognitionModelProgress.Status`(`Installing`/`Caching`/`Loading`等)の進捗イベントを観測する必要がある
-- `RecognizeFromFile(String)` はファイルパス文字列を直接渡す(StorageFileではない)。対応入力フォーマットはドキュメントに記載が無く、実機での確認が必須である(未確定。spikes/windows/RESULTS.md 参照)。wav以外が通らなければMedia Foundation変換層を必須化。なお `BatchRecognition` には `Recognize(Byte[])` という別オーバーロードも存在する(バイト列の期待フォーマットは未確認)
-- 言語指定APIの有無: **確定**。`Microsoft.Windows.AI.Speech` 名前空間にロケール・言語を指定するAPIは存在しないことをドキュメント調査で確認した(spikes/windows/RESULTS.md 参照)。指定不能であるため、OS言語依存としてREADMEに明記する方針が確定した前提となる。ja-JPで実際に高精度認識されるかは実機未検証のまま残る
-- WinAppSDKのバージョン前提は**M4実装時に解消した**: M0調査時点では `Microsoft.Windows.AI.Speech` のAPIリファレンスが `windows-app-sdk-2.0-experimental` モニカーでのみ存在し、requirements.md NFR-4の「WinAppSDK 1.7.1以上」と齟齬があった。M4実装時(2026-09)に公式ドキュメント https://learn.microsoft.com/en-us/windows/ai/apis/speech-recognition (最終更新 2026-07-07、モニカー指定なしの本線ドキュメント)を再確認したところ、Prerequisitesに「**WinAppSDK version: Version 1.7.1 or later**」「Windows 11, version 24H2 (build 26100) or later」と明記されており、**NFR-4の記述が正しい**ことが確認できた。APIはexperimentalチャンネル限定ではなくなっている。NuGetで「1.7.1」に相当するのは `Microsoft.WindowsAppSDK` の `1.7.250401001` である。**ただし実装側にバージョンを書く場所は現在存在しない。** M4 実装時に `VS_PACKAGE_REFERENCES` で NuGet を参照する方式が CI で失敗したため、winapp CLI(`winapp init`)がアプリ側に展開する `.winapp/include` を自動検出する方式へ切り替えた結果、実際に使われるバージョンは `winapp init` が展開したものに決まる。プラグイン側は下限を機械的に強制していない(`docs/VERSION_POLICY.md` 1.4節)
-- 同ドキュメントで新たに確認できた事項: MSIXマニフェストの `MaxVersionTested` を `10.0.26226.0` 以降にしておく必要がある(古い値のままだと「Not declared by app」エラーになる)。またバッチ認識のサンプルコードは `RecognizeFromFile("path/to/audio.wav")` とwavを渡しており、**wav以外の受理可否は依然としてドキュメントに記載が無い**(設計未決事項1は未解決のまま)
-- 同ドキュメントの「Recommended UX pattern」は `GetReadyState()` の分岐として `Ready` / `NotReady` または `EnsureNeeded` / `NotSupportedOnCurrentSystem` を挙げている。`EnsureNeeded` は本設計書§5の注記が「実際のenumには存在しない」と記録した名称であり、**ドキュメント間で不一致がある**。実装(`model_availability.cpp`)は全バージョンに存在する値のみを明示列挙し残りを `default` で `unavailable` に倒すため、この不一致があっても壊れない。確定はIssue #58の実機検証に委ねる
-- C++/WinRT実装。**WinAppSDK 1.7.1+ は「アプリ側が満たすべき互換性要件」であり、プラグインがバージョンを宣言・検証するわけではない。** `windows/CMakeLists.txt` は `winrt/Microsoft.Windows.AI.Speech.h` の有無だけを見ており、バージョンは検証しない(`OFFLINE_STT_WINDOWS_WINAPP_INCLUDE_DIR` で任意の配置も指定できる)。MSIX + `systemAIModels` も同様にアプリ側要件であり、いずれもREADMEに記載する
-
 ## 5. エラーマッピング表
 
-| 共通例外 | Android | Darwin | Windows | Web |
-|---|---|---|---|---|
-| ModelUnavailable | `supportedOnDeviceLanguages` にのみ含まれる / いずれのリストにも無い | アセット取得不可 | NotReady / EnsureNeeded で未同意 | available() = unavailable |
-| LocaleUnsupported | `ERROR_LANGUAGE_NOT_SUPPORTED` / `ERROR_LANGUAGE_UNAVAILABLE` | supportedLocales外 | (M0確認後に確定) | language-not-supported |
-| DecodeFailed | MediaCodecエラー | AVAudioFileエラー | Media Foundation失敗 | decodeAudioData reject |
-| DeviceUnsupported | `ERROR_CANNOT_CHECK_SUPPORT`(API 31/32 は `checkModel()` が `unavailable` を返すためこの例外にはならない) | OS 26未満 | NotSupportedOnCurrentSystem | 非Chrome系 |
-| Cancelled | コルーチンcancel → パイプclose | Task cancel | 認識中断 | stop/abort |
+| 共通例外 | Android | Darwin | Web |
+|---|---|---|---|
+| ModelUnavailable | `supportedOnDeviceLanguages` にのみ含まれる / いずれのリストにも無い | アセット取得不可 | available() = unavailable |
+| LocaleUnsupported | `ERROR_LANGUAGE_NOT_SUPPORTED` / `ERROR_LANGUAGE_UNAVAILABLE` | supportedLocales外 | language-not-supported |
+| DecodeFailed | MediaCodecエラー | AVAudioFileエラー | decodeAudioData reject |
+| DeviceUnsupported | `ERROR_CANNOT_CHECK_SUPPORT`(API 31/32 は `checkModel()` が `unavailable` を返すためこの例外にはならない) | OS 26未満 | 非Chrome系 |
+| Cancelled | コルーチンcancel → パイプclose | Task cancel | stop/abort |
 
 - 注記: Android列は ML Kit GenAI(AICore)前提から `android.speech.SpeechRecognizer` 前提へ書き換えたものである(§4.3 の冒頭参照)。**`ERROR_*` 定数の対応表は暫定である。** 上記3つのみ個別に分類し、残りは `PlatformError` へ倒している。実機で実際に発火させた確認は行っていないため、Issue #50 の実機E2Eで確定させる必要がある。
 - 注記: Darwin列のうち DecodeFailed(AVAudioFileエラー)と LocaleUnsupported(supportedLocales外)は、macOS 26.5.1実機でエラーを実発火させ動作を確認済みである(spikes/darwin/RESULTS.md 参照)。
@@ -245,13 +210,11 @@ AVAudioFile(任意フォーマット読込)
 - 注記(採用しなかったバックエンドに関する記録): Pixel 6実機(API 37、ブートローダーロック済み)でのML Kit GenAI Speech Recognitionの実測では、`checkStatus()`/`startRecognition()` が `PERMISSION_DENIED: Api access revoked.`(AICoreがGoogle Playストアからも「対応しなくなりました」と明示されるstub版であることが原因)を、`MODE_ADVANCED` 指定時には `UNAVAILABLE: Peer process crashed, exited or was killed (binderDied)` を返すことを確認していた(spikes/android/RESULTS.md 参照)。この実測結果自体がAndroid標準SpeechRecognizerへの差し替えの根拠になったが、上表のAndroid列はすでに新バックエンドの `ERROR_*` 定数に置き換え済みであり、これらのML Kit固有エラーコードの写像は不要になった。
 - 注記: 上表のAndroid列(標準SpeechRecognizerの `ERROR_*` 定数)は、Pixel 6実機での実測(`ERROR_INSUFFICIENT_PERMISSIONS` が発生しないこと等)に基づき初期版を記載したが、各 `ERROR_*` 定数と共通例外の対応付けは、`ERROR_LANGUAGE_UNAVAILABLE` / `ERROR_CANNOT_CHECK_SUPPORT` 等を含め実機でエラーを実発火させたわけではないため、M3実装時に確定させる必要がある。
 - 注記: Web列について、言語パック未取得のまま `start()` を呼んだ場合に返るエラー名はロケールによって異なることをChrome 153実機で確認済みである。ja-JPでは `aborted`、en-USでは `language-not-supported` が返る(いずれも上表の `available() = unavailable` や `language-not-supported` とは別に、言語パック未取得という状況で観測された実測結果である)。この状況を `ModelUnavailable` へ写像する実装は、エラー名の判定ではなく `available()` による事前確認によって行うべきである(spikes/web/RESULTS.md 参照)。
-- 注記: Windows列の ModelUnavailable に記載の「NotReady / EnsureNeeded で未同意」のうち「EnsureNeeded」という状態は、実際の `AIFeatureReadyState` enumには存在しない。実際の値は `Ready` / `NotReady` / `NotSupportedOnCurrentSystem` / `DisabledByUser` / `CapabilityMissing` / `NotCompatibleWithSystemHardware` / `OSUpdateNeeded` の7つであることをドキュメント調査で確認した(spikes/windows/RESULTS.md 参照)。本表のWindows列は実機確認のうえ確定させる必要がある。
 
 ## 6. 並行性・スレッディング
 
 - Android: デコード・リサンプリング・実時間ポンプはDispatchers.IO上で1本のJobとして連結する。`SpeechRecognizer`はメインスレッドから生成・操作する契約であり、`RecognitionListener`と`checkRecognitionSupport()`のコールバックもメインスレッドのExecutorで受ける。EventChannelへの転送はメインスレッドへpost
 - Darwin: SpeechAnalyzerのAsyncSequenceをTaskで消費、FlutterEventSinkへはmain actor経由
-- Windows: WinRT asyncをcoroutine(C++/WinRT)で待機、結果はplatform threadへdispatch
 - Web: シングルスレッド。長時間ファイルでもdecodeAudioDataは非同期なのでUIブロックなし
 
 ## 7. テスト戦略
@@ -261,7 +224,7 @@ AVAudioFile(任意フォーマット読込)
   - 共通テスト資産: ja-JP / en-US の基準音声(10秒 / 3分 / 30分、wav・m4a・mp3)+ 期待テキスト。期待テキストは「全文文字起こし」と「評価用キーワードリスト」の2要素で構成する。キーワードは意味上重要な名詞・固有名詞・数値・専門用語から選定し、各基準音声ファイルごとに個別のキーワードリストを用意する。件数の目安は10秒で5件以上、3分で15件以上とし、件数が少なすぎる統計的に弱い判定は避ける方針とする
     - 注記: tasks.mdのM0記述は10秒・3分・wav・m4aの範囲であり、本項の30分・mp3はM0スコープ外。30分版・mp3形式は後続マイルストーン(実運用に近い長時間音声での検証等)向けの用途とする
   - 評価: WERではなくキーワード包含率での簡易判定(モデル差があるため厳密一致は不可)。算出式・正規化ルール・しきい値は下記「評価基準(キーワード包含率)」を参照
-- CI: ビルド検証のみ(Android/iOS/Windows/Webのコンパイル)。認識E2Eは手動チェックリスト運用。iOSシミュレータではSpeechAnalyzerが利用できないため、認識E2Eはシミュレータでは原理的に実行できず実機が必須である
+- CI: ビルド検証のみ(Android/iOS/Webのコンパイル)。認識E2Eは手動チェックリスト運用。iOSシミュレータではSpeechAnalyzerが利用できないため、認識E2Eはシミュレータでは原理的に実行できず実機が必須である
 - example app: ファイルピッカー → モデル状態表示 → ダウンロード同意ダイアログ → 文字起こし進行表示、の参照実装を兼ねる
 
 ### 評価基準(キーワード包含率)
@@ -324,27 +287,21 @@ Webでも同じ基準音声 jaJP_10s(1.0x再生)で実測したところ、包�
 
 ## 8. 設計上の未決事項(M0の結果で確定)
 
-1. Windows: RecognizeFromFileの対応フォーマットとロケール指定可否
-   - ロケール指定可否: **確定**。下記未決事項2参照
-   - 対応フォーマット: **未確定のまま。M4では「常に変換する」という処置で回避した。** `BatchRecognition.RecognizeFromFile` は Media Foundation で 16kHz・モノラル・16-bit PCM の RIFF WAVE へ変換してから渡す。素通しして失敗したら変換する方式は「どのエラーがフォーマット拒否か」を知っている必要があり、それ自体が未確定の当の対象であるうえ、フォールバックそのものになるため採らなかった。**出力形式(16kHz・モノラル)の選定も推定である**(Windows AI 側の要求サンプルレートは非公開)。Issue #58 で確定させる。以下は調査時点の記録である。`BatchRecognition.RecognizeFromFile` の公式APIリファレンスページ(および周辺ページ・名前空間全体)に、対応するコンテナ・コーデックの一覧や制約に関する記載が見つからなかった。wav / m4a / mp3 が受理されるかはWindows実機での確認が必須である(Windows機が無いため未実施。spikes/windows/RESULTS.md 参照)
-2. Windows: ja-JP対応可否
-   - ロケール指定APIの有無: **確定**。`Microsoft.Windows.AI.Speech` 名前空間の全クラス・全メンバー(`SpeechRecognitionModel`・`BatchRecognition`・`AudioConfiguration`等)を公式APIリファレンスで突き合わせた結果、ロケール・言語を指定する引数・プロパティ・メソッドは1件も存在しないことをドキュメント調査で確定した(spikes/windows/RESULTS.md 参照)。ロケール指定ができない以上、design.md §4.4にある「指定不能ならOS言語依存としてREADME明記」という方針が確定した前提となる
-   - ja-JP書き起こし可否: **未確定のまま**。ロケール指定APIが無い場合に実際にどの言語で認識されるか(OS表示言語連動か、既定入力言語連動か等)、およびja-JP音声が実際に高精度で認識されるかは、ドキュメントに記載が無くWindows実機でのみ確認可能である(Windows機が無いため未実施。spikes/windows/RESULTS.md 参照)
-3. Darwin: SpeechAnalyzerのja-JP対応可否とファイル処理速度
+1. Darwin: SpeechAnalyzerのja-JP対応可否とファイル処理速度
    - ファイル処理速度: **確定**。macOS 26.5.1実機でRTF 0.008〜0.026(実時間の約38〜125倍高速)を実測(spikes/darwin/RESULTS.md 参照)
    - ja-JP対応可否: **確定**。macOS 26.5.1実機では `supportedLocales`(30件)にja-JPが含まれ、実際の文字起こしも動作することを確認済み。**iOS 26.6.2実機(iPad Pro 11-inch M4)でも `supportedLocales`(30件)にja-JPが含まれることを確認した(Issue #7)**。iOS 27.0実機(iPhone 17)では45件でありja-JPを含む。**`supportedLocales` はOSバージョンで実際に変わる(26系30件 / 27系45件)ため、27系の結果から下限である26系を外挿することはできず、下限での確認が必要だった。** iOSシミュレータでは`.app`バンドルでの再検証でも`isAvailable=false`となる(シミュレータ自体にオンデバイス音声モデルが無い)。spikes/darwin/RESULTS.md 参照
-4. Web: `start(audioTrack)` + `processLocally: true` の併用動作
+2. Web: `start(audioTrack)` + `processLocally: true` の併用動作
    - **確定**。Chrome 153実機(通常の対話的Chromeセッション)で実測し、成立することを確認した。`processLocally = true` の設定と読み戻しが成功し、`audioTrack.readyState = "live"` の状態で `recognition.start(audioTrack)` が受理されて `onstart` が発火、partial結果が実時間で継続的に得られた。`network` エラーは発生しなかった。ただし `continuous = true` では `AudioBufferSourceNode` の再生終了後も `MediaStreamTrack` が `live` のまま無音を流し続けるため、Chromeは入力終了を自動認識しない。`source.onended` の後に明示的に `recognition.stop()` を呼んで初めて、約25ms後に `isFinal` の結果と、その直後に `onend` が発火してセッションが正常終了する。この `stop()` 呼び出しが§4.1の終了検出フローの必須要素である(spikes/web/RESULTS.md 参照)
-5. Android: MODE_ADVANCED指定時の非対応端末での自動フォールバック有無
+3. Android: MODE_ADVANCED指定時の非対応端末での自動フォールバック有無
    - **ML Kit GenAI Speech Recognitionを採用しないため本項目は対象外となった。** バックエンドをAndroid標準 `android.speech.SpeechRecognizer` へ差し替えたことにより、ML Kit固有の概念である `MODE_ADVANCED`/`MODE_BASIC` およびそのフォールバック挙動自体が存在しなくなった(経緯はspikes/android/RESULTS.md「代替案の検証: Android 標準 SpeechRecognizer」節、および本ドキュメント§4.3冒頭参照)。
-6. Android: リサンプリング実装の要否(実ファイルのMediaCodec出力レート調査)
+4. Android: リサンプリング実装の要否(実ファイルのMediaCodec出力レート調査)
    - **確定: リサンプリングは必須**。MediaCodecはコーデックのデコードのみを行い、サンプルレート変換・チャンネルのダウンミックスは一切行わないことを実測で確認した。実環境相当の音源7ファイル(44.1kHz/48kHzステレオのwav・m4a・mp3、22.05kHzモノラル、8kHzモノラル)全てで`resampleNeeded=true`となった(spikes/android/RESULTS.md 参照)。エミュレータ(`sdk_gphone64_arm64`, Android 16/API 36)単一環境での実測であり、実機での追試は引き続き望ましい。この結論は認識バックエンド(ML Kit GenAI Speech Recognition / 標準SpeechRecognizer)とは無関係なMediaCodecの挙動であり、バックエンド差し替えの影響を受けない
-7. Web: 再生速度オプション(`playbackRate`)の上限値と、精度低下に関する利用者への提示方法(M1で決定。§4.1参照)
+5. Web: 再生速度オプション(`playbackRate`)の上限値と、精度低下に関する利用者への提示方法(M1で決定。§4.1参照)
    - **確定: 利用者が指定できるAPIオプションとして公開する**。`TranscribeRequest.playbackRate`(既定 1.0)であり、範囲外の値は `ArgumentError` で明確に失敗させる。上限は設けていない
    - Chrome 153 実機での実測(jaJP_10s、spikes/web/RESULTS.md): 1.0x で 66.7%、1.5x で 50.0%、2.0x で 33.3% と**単調に低下する**。1.1x / 1.25x も測定し、この範囲は選択肢に入りうると判断した
    - **注意**: `spikes/web/RESULTS.md` は M0 時点で「実用的なスループット向上の余地はない。倍速再生は非対応の方針とする」と結論していたが、**その後の判断でこれを覆し、利用者が速度を指定できるようにする方針が採られた**。ライブラリが勝手に速度を選ぶのではなく、トレードオフを提示したうえで利用者に選ばせるという整理である。RESULTS.md の当該結論は M0 時点の記録として残っている
    - Web専用オプションであり、他プラットフォームは無視する(§2.2)
-8. Android: 標準SpeechRecognizerのPixel 6以外の端末での動作、および `onResults()` が `null` になる挙動が全端末共通かどうか
+6. Android: 標準SpeechRecognizerのPixel 6以外の端末での動作、および `onResults()` が `null` になる挙動が全端末共通かどうか
    - **未確定。M3で確認する必要がある。** §4.3記載のとおり、ja-JPオンデバイス言語パックの取得・`EXTRA_AUDIO_SOURCE`経由のファイル入力受理・`onResults()`が`null`になる挙動は、いずれもPixel 6(API 37、ブートローダーロック済み)単一機種での実測にとどまる(spikes/android/RESULTS.md「限界」参照)。他機種(特にja-JPのオンデバイス言語パックが最初から導入済みの機種や、`supportedOnDeviceLanguages`自体にja-JPを含まない機種)での挙動、および`onResults()`が`null`になる挙動がAndroidバージョン・機種によらず一貫するかは未検証である
 
 確定事項: `available()` / `install()` のja-JP実機確認結果(クリーンプロファイルで `downloadable` → `install()` で `available`。Chrome 153、spikes/web/RESULTS.md 参照)

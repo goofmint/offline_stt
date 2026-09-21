@@ -7,7 +7,7 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」タ�
 
 ## M0 検証スパイク(実装前の関門)
 
-ゴール: 4プラットフォームで ja-JP のファイル文字起こしが成立するか判定する。不成立があれば構成再検討に戻る。
+ゴール: 3プラットフォームで ja-JP のファイル文字起こしが成立するか判定する。不成立があれば構成再検討に戻る。
 
 ### 共通
 
@@ -36,16 +36,9 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」タ�
 - [ ] PFDパイプ + 実時間ポンプの最小実装で `AudioSource.fromPfd()` が受理されるか確認(ハーネス実装済み。Pixel 6 実機(API 37、ブートローダーロック済み)で実行したが、AICore が stub 版のため checkStatus() が PERMISSION_DENIED: Api access revoked. を返し到達せず。実体のある AICore を持つ端末が必要。**ユーザー判断によりバックエンドをML Kit GenAI Speech RecognitionからAndroid標準SpeechRecognizerへ差し替えたため、`AudioSource.fromPfd()`というML Kit固有APIでの受理確認自体は対象外となった。標準SpeechRecognizerの等価な仕組み(`RecognizerIntent.EXTRA_AUDIO_SOURCE`)については別途スパイクで受理を確認済み(Pixel 6実機、既存の実時間ポンプをそのまま流用)だが、これは本項目の代替検証であり別途実施したものである。Pixel以外の機種での受理確認は未実施のため、改めて別途検証が必要である。** spikes/android/RESULTS.md 参照)
 - [x] 手持ち音源の MediaCodec デコード出力レート調査(リサンプリング要否判定、設計未決事項6)(結論: リサンプリング必須。MediaCodecはrate/chを変換しない。spikes/android/RESULTS.md 参照)
 
-### Windows
-
-- [ ] Windows 11 24H2機で `EnsureReadyAsync` → モデル取得確認(CPU機 / 可能ならCopilot+ PC両方)(スパイク実装済み。Windows機が無いため未実施。spikes/windows/RESULTS.md 参照)
-- [ ] `RecognizeFromFile` の対応フォーマット確認: wav / m4a / mp3(設計未決事項1)(スパイク実装済み。ドキュメントに記載が無く実機確認が必須。Windows機が無いため未実施。spikes/windows/RESULTS.md 参照)
-- [ ] ロケール指定APIの有無確認、ja-JP 書き起こし確認(設計未決事項2)(ロケール指定APIは存在しないことをドキュメント調査で確定。ja-JP 書き起こしは Windows機が無いため未実施。spikes/windows/RESULTS.md 参照)
-- [ ] MSIX + `systemAIModels` capability の最小構成アプリで動作確認(スパイク実装済み。capability あり/なし両方の manifest を用意済み。Windows機が無いため未実施。spikes/windows/RESULTS.md 参照)
-
 ### M0 出口判定
 
-- [ ] 4プラットフォームの判定結果を requirements.md の対応表に反映(不成立項目は対象外化 or 構成変更)
+- [ ] 3プラットフォームの判定結果を requirements.md の対応表に反映(不成立項目は対象外化 or 構成変更)
 - [x] design.md の未決事項1〜6を確定値で更新(あわせて §4.3 Android を標準 `SpeechRecognizer` 前提へ全面書き換え、§5 の Android 列を `ERROR_*` 写像へ更新、§7 しきい値表の内部矛盾(ja-JP 90% と「90〜94% は条件付き合格」の併記)を3区分に分けて解消、未決事項7(`playbackRate`)を追加して確定させた)
 
 ## M1 基盤 + Web実装
@@ -54,10 +47,10 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」タ�
 
 ### パッケージ基盤
 
-- [ ] モノレポ構成作成(melos)、6パッケージの雛形
+- [ ] モノレポ構成作成(melos)、5パッケージの雛形
 - [ ] `<name>_platform_interface`: データ型・例外階層・抽象クラス実装
 - [ ] 状態遷移とセッション排他(同時1本)のユニットテスト
-- [ ] Pigeonスキーマ定義(Method + EventChannel、Android/Darwin/Windows向け生成確認)
+- [ ] Pigeonスキーマ定義(Method + EventChannel、Android/Darwin向け生成確認)
 - [ ] CI: 全パッケージのanalyze + test + 各プラットフォームビルド検証
 
 ### Web実装
@@ -102,33 +95,18 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」タ�
 - [ ] Pixel系 + 非Pixel系の2機種で基準音声E2E(design.md §8未決事項8: Pixel 6以外の端末での動作、および`onResults()`がnullになる挙動が全端末共通かを確認する)
 - [ ] example appにAndroid動作を追加
 
-## M4 Windows実装
-
-依存: M1
-
-- [ ] windowsパッケージ雛形(C++/WinRT、WinAppSDK 1.7.1+依存宣言)
-- [ ] モデル管理: GetReadyState → checkModel、EnsureReadyAsync → downloadModel(不定進捗対応)
-- [ ] (M0結果次第)Media Foundation wav変換層
-- [ ] 認識セッション: TryCreateAsync → BatchRecognition → final 1件emit
-- [ ] キャンセルとエラーマッピング(NotSupportedOnCurrentSystem等)
-- [ ] MSIXセットアップ手順ドキュメント(manifest記載例、AIコンポーネント削除時の再同意フロー)
-- [ ] CPU機で基準音声E2E(可能ならCopilot+ PCでも)
-- [ ] example appにWindows動作を追加(MSIX構成)
-
 ## M5 公開
 
-依存: M2〜M4完了
+依存: M2〜M3完了
 
 - [ ] README: 対応状況マトリクス(OS / 最低バージョン / 所要時間特性 / ja-JP検証結果)
-- [ ] README: アプリ側要件(MSIX、同意ダイアログ、AICore初期化、非Chrome分岐)
+- [ ] README: アプリ側要件(同意ダイアログ、AICore初期化、非Chrome分岐)
 - [ ] README: モデル同梱型代替(sherpa-onnx等)との使い分け記載
 - [ ] APIドキュメント(dartdoc)整備
 - [ ] CHANGELOG / LICENSE / pubspec整備(0.1.0、全パッケージ)
 - [x] pub.dev dry-run(公開対象5パッケージすべてで `Package has 0 warnings.`)
 - [ ] pub.dev 公開(publish順: platform_interface → 各実装 → エントリ)
-  - **公開対象は5パッケージである。** `offline_stt_windows` は `publish_to: none` であり
-    v1 の公開対象外である(WinAppSDK の安定版に `Microsoft.Windows.AI.Speech` が
-    存在しないため。#88)。当初の「6パッケージ」はこの決定より前の記述である。
+  - **公開対象は5パッケージである。**
   - 手順は [docs/PUBLISHING.md](docs/PUBLISHING.md) を参照。
   - **`dart pub publish` は取り消せない操作であるため、リポジトリの所有者が
     明示的に実行する。**
@@ -144,8 +122,7 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」タ�
 - [ ] 依存プラットフォームの変更監視(四半期ごとに基準音声E2E再実行)。
       手順は [docs/MONITORING.md](./docs/MONITORING.md)(Issue #67)。
       **監視対象は `android.speech.SpeechRecognizer` + Google Play services /
-      Chromeのオンデバイス Web Speech / WinAppSDK・Windows AI APIs /
-      iOS・macOS・Android・Windows のOSベータである。**
+      Chromeのオンデバイス Web Speech / iOS・macOS・Android のOSベータである。**
       当初ここに書いてあった「ML Kit alpha」は**対象外である**。M0検証で
       AICoreがPixel 6で使えないことが判明し、バックエンドを Android 標準の
       `android.speech.SpeechRecognizer` へ差し替えたため

@@ -22,10 +22,10 @@ requirements.md NFR-4「最低動作環境」・NFR-5「バージョニング」
 | 固定しているもの | 値 | 場所 |
 |---|---|---|
 | Flutter SDK(CIが使う版) | `3.47.5` / `stable` | `.github/workflows/ci.yml` の `env.FLUTTER_VERSION` / `FLUTTER_CHANNEL` |
-| Flutter SDK(パッケージが要求する下限) | `>=3.47.0` | `packages/offline_stt{,_android,_darwin,_windows,_web}/pubspec.yaml` と `apps/example/pubspec.yaml` の `environment.flutter`(計6ファイル) |
-| Dart SDK | `^3.9.0` | 上記6ファイル + `packages/offline_stt_platform_interface/pubspec.yaml` + ルート `pubspec.yaml`(計8ファイル) |
+| Flutter SDK(パッケージが要求する下限) | `>=3.47.0` | `packages/offline_stt{,_android,_darwin,_web}/pubspec.yaml` と `apps/example/pubspec.yaml` の `environment.flutter`(計5ファイル) |
+| Dart SDK | `^3.9.0` | 上記5ファイル + `packages/offline_stt_platform_interface/pubspec.yaml` + ルート `pubspec.yaml`(計7ファイル) |
 | melos | `8.2.2`(CI)/ `^8.2.2`(dev依存) | `.github/workflows/ci.yml` の `dart pub global activate melos 8.2.2`、ルート `pubspec.yaml` の `dev_dependencies.melos` |
-| Pigeon | `^27.3.0` | `packages/offline_stt_{android,darwin,windows}/pubspec.yaml` の `dev_dependencies.pigeon` |
+| Pigeon | `^27.3.0` | `packages/offline_stt_{android,darwin}/pubspec.yaml` の `dev_dependencies.pigeon` |
 
 `apps/example/.metadata` に記録されている Flutter revision
 `00b0c91f06209d9e4a41f71b7a512d6eb3b9c694` は、`flutter create` が
@@ -95,73 +95,7 @@ SpeechAnalyzer がそのOSバージョンで追加されたAPIであるためで
 コードが生成されるため、Pigeon の更新では解決しない。**Pigeon 側が
 生成コードを直したら、この固定は外せる。**
 
-### 1.4 Windows
-
-| 固定しているもの | 値 | 場所 |
-|---|---|---|
-| WinAppSDK の要求下限 | `1.7.1` 以降 | requirements.md NFR-4、`packages/offline_stt_windows/README.md` §1、`packages/offline_stt_windows/windows/CMakeLists.txt` の冒頭コメント |
-| Windows の要求下限 | Windows 11 24H2(build 26100)以降 | 同上 |
-| `MaxVersionTested` | `10.0.26226.0` | `apps/example/windows/packaging/Package.appxmanifest` |
-| `TargetDeviceFamily` の `MinVersion` | `10.0.17763.0` | 同上 |
-| WinAppSDKヘッダーの探索先 | `.winapp/include` の自動検出(`OFFLINE_STT_WINDOWS_WINAPP_INCLUDE_DIR` で上書き可) | `packages/offline_stt_windows/windows/CMakeLists.txt` |
-| CMake | `cmake_minimum_required(VERSION 3.15)` | 同上 |
-
-> **経緯(Issue #68 で見つけ、同じPRで解消した)。**
-> かつて design.md §4.4、`packages/offline_stt_windows/README.md` §1、
-> `.github/workflows/ci.yml` の冒頭コメントの3箇所が、「実装は1.7系の最新
-> サービシング `1.7.260224002` を既定としている」と書いていた。
-> **しかしその時点の `CMakeLists.txt` はNuGetのバージョンを一切参照して
-> いなかった。** M4の途中で `VS_PACKAGE_REFERENCES` による NuGet
-> PackageReference 方式がCIで失敗し(`error C1083: Cannot open include file:
-> 'winrt/Microsoft.Windows.AI.h'`)、winapp CLI が展開する `.winapp/include`
-> を自動検出する方式へ切り替えた際に、バージョン番号を書く場所自体が
-> 無くなったためである。**3箇所とも現在は「実際に使われるバージョンは
-> `winapp init` が展開したものに決まり、プラグイン側は下限を機械的に
-> 強制していない」という事実に書き換え済みである。**
->
-> したがって現時点で固定されているWinAppSDKのバージョンは存在しない。
-> CMake側にバージョン検証を入れるかどうかは、Windows実機での検証
-> (Issue #58)に合わせて判断する。
-
-### 1.4-b Windows AI Speech は experimental チャンネルにしか無い(実機で確定)
-
-**Issue #15〜#18 の作業中に、Windows 11 実機で確定した事実である。**
-
-`winapp init --setup-sdks stable` が展開する WinAppSDK **2.5.1(安定版)**には
-`Microsoft.Windows.AI.Speech` が**存在しない**。生成されるプロジェクション
-ヘッダーは次のとおりで、Speech が無い。
-
-```
-Microsoft.Windows.AI.ContentSafety.h
-Microsoft.Windows.AI.Foundation.h
-Microsoft.Windows.AI.Imaging.h
-Microsoft.Windows.AI.MachineLearning.h
-Microsoft.Windows.AI.Text.h
-Microsoft.Windows.AI.Video.h
-```
-
-`--setup-sdks experimental`(WindowsAppSDK.AI **2.4.8-experimental**)にすると
-`Microsoft.Windows.AI.Speech.h` が現れ、WinRT 実装のコンパイルが通る。
-
-**公式ドキュメントの記述と実際の出荷物が食い違っている。**
-<https://learn.microsoft.com/en-us/windows/ai/apis/speech-recognition> の
-Prerequisites は「WinAppSDK version: Version 1.7.1 or later」と書いているが、
-安定版 1.7 系にも 2.5 系にも当該名前空間は入っていない。
-
-**M0 の記録(`spikes/windows/RESULTS.md`)が「API リファレンスは
-`windows-app-sdk-2.0-experimental` モニカーでのみ存在する」と書いていたのが
-正しく、M4 実装時に本線ドキュメントの Prerequisites を根拠に
-「齟齬は解消した」と判断したのは誤りだった。** SDK を実際に展開せず
-ドキュメントだけで結論を出したことが原因である。
-
-したがって現時点では:
-
-- Windows 実装は **experimental チャンネルの WinAppSDK を要求する**
-- requirements.md NFR-4 の「WinAppSDK 1.7.1以上」は**出荷物と一致しない**
-- 利用者に experimental チャンネルを要求することの是非は、公開(Issue #65)の
-  判断に直結する
-
-### 1.5 Web
+### 1.4 Web
 
 | 固定しているもの | 値 | 場所 |
 |---|---|---|
@@ -173,11 +107,11 @@ Prerequisites は「WinAppSDK version: Version 1.7.1 or later」と書いてい�
 `SpeechRecognition.available()` の機能検出だけを見て `unavailable` を返す。
 142 という数字はドキュメント上の記述にすぎない。
 
-### 1.6 CI のランナーとアクション
+### 1.5 CI のランナーとアクション
 
 | 固定しているもの | 値 | 場所 |
 |---|---|---|
-| ランナーラベル | `ubuntu-latest` / `windows-2025` / `macos-26` | `.github/workflows/ci.yml` の build マトリクス |
+| ランナーラベル | `ubuntu-latest` / `macos-26` | `.github/workflows/ci.yml` の build マトリクス |
 | GitHub Actions | `actions/checkout@v4` / `subosito/flutter-action@v2` / `actions/setup-java@v4` / `actions/cache@v4` | 同上 |
 
 `ubuntu-latest` だけがメジャー固定になっていない。GitHubがラベルの指す
@@ -187,7 +121,7 @@ Prerequisites は「WinAppSDK version: Version 1.7.1 or later」と書いてい�
 
 「破壊的変更」には2種類ある。**扱いが違うので最初に切り分ける。**
 
-- **(A) 外部プラットフォームAPI側の変更** — OS / ブラウザ / WinAppSDK の挙動が
+- **(A) 外部プラットフォームAPI側の変更** — OS / ブラウザの挙動が
   変わり、こちらのコードを変えていないのに動作が変わった。
 - **(B) こちらが固定している値を動かした結果の破壊** — Flutter / Kotlin /
   AGP / Pigeon 等を上げたらビルドやテストが壊れた。
@@ -209,12 +143,7 @@ Prerequisites は「WinAppSDK version: Version 1.7.1 or later」と書いてい�
      なく、**CHANGELOG に何が壊れるかを明記する**ことで扱う。
 4. **回避策を入れるなら、黙って倒さない。** リポジトリの方針として
    **フォールバックは禁止**である。値が取れないときに既定値で取り繕うのでは
-   なく、明示的に失敗させる。現に Windows 実装は、WinAppSDK ヘッダーが
-   見つからない場合に黙って `unavailable` を返すのではなく「`winapp init`
-   を実行せよ」という明示的なエラーで失敗させている。正確には、CMake は
-   ビルドを中止せず音声認識を無効にした実装(`speech_backend_unavailable.cpp`)
-   を組み込み、そのバックエンドがモデル状態の照会・モデル取得・文字起こしを
-   `kPlatformError` で失敗させる(`cancel()` は止める対象が無いため何もしない)。
+   なく、明示的に失敗させる。
 5. **E2Eを再実行する。** 範囲の決め方は [MONITORING.md](./MONITORING.md) 3節。
 6. **文書を直す。** 下記「どこを直すか」。
 7. **推測を実測として書かない。** 確認できなかったことは「未確認」と書く。
@@ -235,9 +164,6 @@ Prerequisites は「WinAppSDK version: Version 1.7.1 or later」と書いてい�
   - Web: `source.onended` で明示的に `recognition.stop()` を呼んで
     終了検出する(design.md §4.1・§8 未決事項4)
   - Web: `isFinal` が立たない場合に末尾のinterim結果を採用する(同上)
-  - Windows: `RecognizeFromFile()` に渡す前に常に Media Foundation で
-    16kHz・モノラル・16-bit PCM の wav へ変換する(design.md §8 未決事項1。
-    **対応フォーマットもこの出力形式の妥当性も未確定のままである**)
 - **依存先の要求下限が上がった場合**は requirements.md NFR-4 の改定に
   なる。対応端末・対応OSの範囲が狭まるため、実装判断ではなく要件判断
   として扱う。
@@ -246,17 +172,14 @@ Prerequisites は「WinAppSDK version: Version 1.7.1 or later」と書いてい�
 
 1. **1つずつ動かす。** 複数のバージョンを同時に上げると、壊れたときに
    どれが原因か切り分けられない。
-2. **表1.1〜1.6で「同時に直す場所」を確認する。** 同じ値が複数ファイルに
-   書かれているものは片方だけ直さない。特に Dart SDK(8ファイル)と
-   Flutter SDK(CI 1箇所 + pubspec 6箇所)。
+2. **表1.1〜1.5で「同時に直す場所」を確認する。** 同じ値が複数ファイルに
+   書かれているものは片方だけ直さない。特に Dart SDK(7ファイル)と
+   Flutter SDK(CI 1箇所 + pubspec 5箇所)。
 3. **CIを通す。** `melos run analyze` / `melos run test` / `melos run format`
-   / `melos run doc` と、5プラットフォームのビルド。
-4. **CIでは検証できない部分を意識する。** 特に Windows ジョブは
-   winapp CLI を持たないため **WinRT実装をコンパイルしていない**。
-   CIが緑でも、Windows AI に触れる部分が壊れていないことの証明にはならない。
-5. **E2Eを再実行する。** ビルドが通ることと認識が成立することは別である。
-6. **変更の理由をコメントとして残す。** このリポジトリは
-   `podspec` の `swift_version` や Windows の `CMakeLists.txt` のように、
+   / `melos run doc` と、4プラットフォームのビルド。
+4. **E2Eを再実行する。** ビルドが通ることと認識が成立することは別である。
+5. **変更の理由をコメントとして残す。** このリポジトリは
+   `podspec` の `swift_version` のように、
    「なぜその値なのか」を固定箇所そのものに書く流儀で通っている。
 
 ### 2.4 どこを直すか
@@ -279,14 +202,7 @@ Prerequisites は「WinAppSDK version: Version 1.7.1 or later」と書いてい�
 |---|---|---|---|
 | — | — | — | **本書の手順を実際に回した実績は無い。** |
 
-現時点で判明している未処理事項は次の2件である。
+現時点で判明している未処理事項は次の1件である。
 
-- ~~1.4節の `1.7.260224002` の記述が3箇所に残っているが、現在の
-  `CMakeLists.txt` からは効いていない~~ → **本 PR で処理済み。**
-  `design.md` §4.4 / `packages/offline_stt_windows/README.md` §1 /
-  `.github/workflows/ci.yml` 冒頭コメントの3箇所から「既定は
-  `1.7.260224002`」という記述を除き、**実際のバージョンは
-  `winapp init` が `.winapp/include` へ展開したものに決まり、
-  プラグイン側は下限を機械的に強制していない**という事実に書き換えた。
 - 1.1節のとおり、Pigeon を `^27.3.0` に留める積極的な理由が記録されて
   いない(現在 `29.0.2` が存在する)。

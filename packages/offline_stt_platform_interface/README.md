@@ -8,7 +8,7 @@
 - データ型: `ModelState` / `DownloadProgress` / `TranscribeRequest` / `TranscriptSegment`
 - 例外階層: `TranscribeException`(sealed class)とその派生
 
-各プラットフォーム実装パッケージ(`offline_stt_android` / `offline_stt_darwin` / `offline_stt_windows` / `offline_stt_web`)はこのパッケージに依存し、`OfflineTranscriberPlatform` を継承したうえで `OfflineTranscriberPlatform.instance` を自身に差し替えることで登録する。
+各プラットフォーム実装パッケージ(`offline_stt_android` / `offline_stt_darwin` / `offline_stt_web`)はこのパッケージに依存し、`OfflineTranscriberPlatform` を継承したうえで `OfflineTranscriberPlatform.instance` を自身に差し替えることで登録する。
 
 ## 契約の出典
 

@@ -60,7 +60,7 @@ Web は再生しながら認識する実時間方式である。Chrome 153 の�
 
 ### 制約3: `playbackRate` で短縮できるが、精度が落ちる
 
-`TranscribeRequest.playbackRate`(既定 1.0)は **Web専用のオプション**である(Darwin / Windows はバッチ認識で速度という概念が無く、Android は実時間ポンプ方式だが未実装のため、いずれも無視される)。
+`TranscribeRequest.playbackRate`(既定 1.0)は **Web専用のオプション**である(Darwin はバッチ認識で速度という概念が無く、Android は実時間ポンプ方式だが未実装のため、いずれも無視される)。
 
 Chrome 153 での `jaJP_10s` 実測では、**所要時間は短縮される一方で精度は単調に低下した**。
 

@@ -9,7 +9,6 @@ workspace:
   - packages/offline_stt_platform_interface
   - packages/offline_stt_android
   - packages/offline_stt_darwin
-  - packages/offline_stt_windows
   - packages/offline_stt_web
   - apps/example
 
@@ -48,13 +47,13 @@ melos:
         -print0 | xargs -0 dart format --output=none --set-exit-if-changed
     doc:
       description: >-
-        apps/example を除く6パッケージ(offline_stt_windows を含む)で
-        dart doc を実行し、APIドキュメントが生成できることを検証する
-        (Issue #63)。`--validate-links` により、docコメント中の `[...]`
+        apps/example を除く5パッケージで dart doc を実行し、
+        APIドキュメントが生成できることを検証する(Issue #63)。
+        `--validate-links` により、docコメント中の `[...]`
         参照切れとREADMEの相対リンク切れを検出する。出力先の `doc/api/` は
-        .gitignore 済み。apps/example は公開しないため除外する。**pub.dev
-        への公開対象は offline_stt_windows を除く5パッケージのみである**
-        (publish_to: none。理由は docs/PUBLISHING.md 1節)。公開対象の
+        .gitignore 済み。apps/example は公開しないため除外する。pub.dev
+        への公開対象も同じ5パッケージである(apps/example のみ
+        publish_to: none。理由は docs/PUBLISHING.md 1節)。公開対象の
         絞り込みは publish:dry-run script(下記)の
         `packageFilters.private: false` を参照。
       exec:
@@ -69,11 +68,10 @@ melos:
         offline_stt_darwin / offline_stt_android / offline_stt_web /
         offline_stt)で `dart pub publish --dry-run` を実行し、公開できる
         状態であることを検証する(Issue #65、docs/PUBLISHING.md)。
-        `offline_stt_windows` は publish_to: none(v1では公開対象外。
-        理由は docs/PUBLISHING.md 1節)、apps/example も publish_to: none
-        であるため、`packageFilters.private: false`(melos 8の
-        `--no-private` 相当。`publish_to: none` のパッケージを除外する)
-        だけで自動的にこの2つを除外できる。個別の ignore リストは書かない。
+        apps/example は publish_to: none であるため、
+        `packageFilters.private: false`(melos 8の `--no-private` 相当。
+        `publish_to: none` のパッケージを除外する)だけで自動的に除外できる。
+        個別の ignore リストは書かない。
       exec:
         command: dart pub publish --dry-run
         concurrency: 1
@@ -100,27 +98,11 @@ melos:
         --package_name offline_stt_darwin
         --dart_out lib/src/pigeon.g.dart
         --swift_out darwin/Classes/Pigeon.g.swift
-    pigeon:windows:
-      description: >-
-        pigeons/offline_stt_windows.dart から offline_stt_windows 向けの
-        Dart + C++ を生成する(design.md §2.3、Issue #24)。EventChannelは
-        Pigeon の C++ 生成器が未対応のため、Android/Darwinとはスキーマ
-        ファイル自体を分けている(pigeons/offline_stt_windows.dart 冒頭
-        コメント参照)。
-      run: >-
-        ROOT="$(pwd)" && cd packages/offline_stt_windows && dart run pigeon
-        --input "$ROOT/pigeons/offline_stt_windows.dart"
-        --package_name offline_stt_windows
-        --dart_out lib/src/pigeon.g.dart
-        --cpp_header_out windows/pigeon.g.h
-        --cpp_source_out windows/pigeon.g.cpp
-        --cpp_namespace offline_stt_windows
     pigeon:
       description: >-
-        pigeons/ 配下の全スキーマから Android/Darwin/Windows 向けの生成物を
-        再生成する(Issue #24)。個別実行は pigeon:android / pigeon:darwin /
-        pigeon:windows を参照。
+        pigeons/ 配下の全スキーマから Android/Darwin 向けの生成物を
+        再生成する(Issue #24)。個別実行は pigeon:android / pigeon:darwin
+        を参照。
       run: >-
         melos run pigeon:android &&
-        melos run pigeon:darwin &&
-        melos run pigeon:windows
+        melos run pigeon:darwin
