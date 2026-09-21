@@ -36,8 +36,23 @@ class OfflineSttApiImpl(
 
     override fun checkModel(locale: String, callback: (Result<ModelState>) -> Unit) {
         mainScope.launch {
-            val state = ModelAvailability.checkModel(context, locale)
-            callback(Result.success(state))
+            // **例外を必ず callback へ渡す。** `mainScope.launch` の中で
+            // 例外が外へ抜けると、Pigeon のコールバックが呼ばれないまま
+            // コルーチンが異常終了し、Dart 側は応答を待ち続けるか
+            // アプリごと落ちる(実機で確認した)。
+            try {
+                callback(Result.success(ModelAvailability.checkModel(context, locale)))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: AndroidTranscribeError) {
+                callback(Result.failure(e.toFlutterError()))
+            } catch (e: Exception) {
+                callback(
+                    Result.failure(
+                        AndroidTranscribeError.PlatformError("$e").toFlutterError(),
+                    ),
+                )
+            }
         }
     }
 

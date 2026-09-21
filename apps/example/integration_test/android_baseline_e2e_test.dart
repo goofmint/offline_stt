@@ -233,6 +233,10 @@ void main() {
         log('REPEAT|$i|${state.name}|ms=${stopwatch.elapsedMilliseconds}');
       } on TimeoutException {
         log('REPEAT|$i|TIMEOUT|ms=${stopwatch.elapsedMilliseconds}');
+      } catch (e) {
+        // B-2 の修正後、照会の一時的な失敗は `unavailable` に畳まれず
+        // 例外として上がる。偽の `unavailable` と区別して記録する。
+        log('REPEAT|$i|THREW:${e.runtimeType}:$e|ms=${stopwatch.elapsedMilliseconds}');
       }
     }
     // 連続呼び出しではなく1秒間隔を空けた場合との対照。
@@ -246,6 +250,8 @@ void main() {
         log('SPACED|$i|${state.name}|ms=${stopwatch.elapsedMilliseconds}');
       } on TimeoutException {
         log('SPACED|$i|TIMEOUT|ms=${stopwatch.elapsedMilliseconds}');
+      } catch (e) {
+        log('SPACED|$i|THREW:${e.runtimeType}:$e|ms=${stopwatch.elapsedMilliseconds}');
       }
     }
   });
