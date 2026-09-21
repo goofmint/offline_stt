@@ -41,7 +41,7 @@
 | プラットフォーム | バックエンドAPI | 最低OSバージョン | 所要時間特性 | ja-JP検証結果 |
 |---|---|---|---|---|
 | Android | 標準 `android.speech.SpeechRecognizer`(`createOnDeviceSpeechRecognizer`)+ MediaCodecデコード + 実時間ポンプ | Android 12 / API 31(`minSdk 31`) | **実時間**。PFDパイプへ毎秒約32KBで供給するため、ファイル長と同等の時間がかかる(Pixel 6実機: 9.56秒の音声に対しポンプ9,564ms、実効31,993.7バイト/秒) | **不成立**。Pixel 6(Android 17 / API 37)実機で jaJP_10s 66.7%(4/6) |
-| iOS / macOS | SpeechAnalyzer + SpeechTranscriber(AVFoundationデコード) | iOS 26 / macOS 26(podspec の deployment target も 26.0) | **非実時間・高速**。macOS 26.5.1実機でRTF 0.008〜0.026(実時間の約38〜125倍速)。**iOSでのファイル処理速度は未測定** | **不成立**。macOS 26.5.1実機で jaJP_10s 66.7%(4/6)。**iOS実機では `supportedLocales` にja-JPが含まれることを確認したのみで、文字起こし自体は未実施** |
+| iOS / macOS | SpeechAnalyzer + SpeechTranscriber(AVFoundationデコード) | iOS 26 / macOS 26(podspec の deployment target も 26.0) | **非実時間・高速**。macOS 26.5.1実機でRTF 0.0067〜0.0245、**iPad Pro (iOS 26.6.2) 実機で RTF 0.0059〜0.0511**(いずれも実時間の約20〜170倍速) | **不成立**。macOS 26.5.1実機・iPad Pro (iOS 26.6.2) 実機とも jaJP_10s 66.7%(4/6)、enUS_10s 80.0%。**両プラットフォームで率もHIT/MISSの内訳も完全一致** |
 | Windows | Windows AI APIs Speech Recognition(`BatchRecognition`)+ Media Foundation変換 | Windows 11 24H2 (build 26100) / WinAppSDK 1.7.1 以上。加えて **MSIXパッケージ化が必須** | **未検証**。設計上は非実時間のバッチ認識だが、一度も実行していないため実測値が無い | **未検証**。Windows実機がそもそも存在しない。加えて**ロケール指定APIが存在しない**ため、ja-JPを指定する手段自体が無い(後述の「Windows: `locale` は無視される」参照) |
 | Web | Chrome オンデバイス Web Speech(`processLocally: true`)+ Web Audio | Chrome 142 以上(オンデバイスWeb Speechのリグレッション修正済みバージョン)。実機検証は Chrome 153 | **実時間**。Chrome 153で9.56秒の音声に9,676ms。`playbackRate` で短縮できるが精度が落ちる(後述) | **不成立**。Chrome 153で jaJP_10s(1.0x)66.7%(4/6) |
 
@@ -53,7 +53,7 @@ Linuxは対象外である(OSネイティブのASR APIが存在しないため�
 |---|---|
 | Android | Pixel 6(`oriole`、Android 17 / API 37、ブートローダーはロック済み) |
 | macOS | macOS 26.5.1 (build 25F80) / Apple Silicon |
-| iOS | iPhone 17 / iOS 27.0。**requirements.md NFR-4 が定める下限は iOS 26 だが、iOS 26 実機での確認は未実施である**(Issue #7)。`supportedLocales` はOSバージョンで件数・内容が異なることが実測で判明しており(macOS 26.5.1: 30件、iOS 27.0: 45件)、iOS 27.0の結果をiOS 26へ外挿することはできない |
+| iOS | **iPad Pro 11-inch (M4) / iOS 26.6.2**(requirements.md NFR-4 が定める下限)と iPhone 17 / iOS 27.0。`supportedLocales` はOSバージョンで件数が異なる(macOS 26.5.1: 30件、iOS 26.6.2: 30件、iOS 27.0: 45件)ため、iOS 27.0 の結果を下限へ外挿することはできない。**下限での確認は Issue #7 で完了済み** |
 | Windows | **無し。** このプロジェクトにWindows実機は存在せず、Windowsでの実行は一度も行われていない |
 | Web | Chrome 153.0.8010.48 / macOS 26.5.1、localhost配信 |
 
@@ -81,9 +81,9 @@ Chrome 153 での jaJP_10s 実測では、所要時間は短縮される一方�
 | プラットフォーム | 実装E2Eの状況 |
 |---|---|
 | Web | 手動チェックリストあり([packages/offline_stt_web/E2E_CHECKLIST.md](./packages/offline_stt_web/E2E_CHECKLIST.md))。本番実装での再測定は未実施 |
-| Darwin | 未実施(Issue #40) |
-| Android | 未実施(Issue #50) |
-| Windows | 未実施(Issue #58)。実機が無いため、MSIX生成・インストール・認識のいずれも一度も行っていない |
+| Darwin | **2026-09-21 に本番実装を macOS 26.5.1 + iPad Pro (iOS 26.6.2) で実行済み(Issue #40)。手順1〜6は全て期待どおりで実装バグ0件。16回すべて1回目で完走。包含率は8ファイルとも未達**([結果](./packages/offline_stt_darwin/E2E_RESULTS.md))。iOS 27実機は未実施 |
+| Android | **2026-09-21 に本番実装を Pixel 6 で実行済み(Issue #50)。初回は不合格でバグ4件を発見し、修正後の最終実行は手順3が8/8成功**([結果](./packages/offline_stt_android/E2E_RESULTS.md))。包含率は enUS_10s のみ合格。非Pixel機は未実施(利用者判断により対象外) |
+| Windows | **v1 対象外**(README 冒頭参照)。ビルドが通ることは Windows 11 実機で確認したが、`Microsoft.Windows.AI.Speech` が安定版に無いため認識は未実施 |
 
 上の表の「ja-JP検証結果」はいずれも**M0スパイク実装での実測値**であり、本リポジトリの実装パッケージで取り直したものではない。
 

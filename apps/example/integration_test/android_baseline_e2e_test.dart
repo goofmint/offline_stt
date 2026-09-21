@@ -18,7 +18,8 @@
 // ## 実行方法
 //
 // 1. 基準音声を端末のアプリ専用外部ストレージへ push する
-//    (`tool/push_baseline_audio.sh` が実施する)。
+//    (`tool/stage_baseline_audio.sh` が `assets/baseline-audio/` へ複製し、
+//    `setUpAll` が `rootBundle` からアプリのテンポラリディレクトリへ書き出す)。
 // 2. 次を実行する(JDK 17 が必要。既定JDKが 26 系だと Kotlin コンパイラが
 //    バージョン文字列を解釈できずビルドが失敗する)。
 //
@@ -44,7 +45,8 @@ import 'package:integration_test/integration_test.dart';
 import 'package:offline_stt_platform_interface/offline_stt_platform_interface.dart';
 import 'package:path_provider/path_provider.dart';
 
-/// `tool/push_baseline_audio.sh` が push する先。アプリ専用外部ストレージで
+/// `setUpAll` が `rootBundle` から音声を書き出す先。アプリのテンポラリ
+/// ディレクトリで
 /// あり、Android 11 以降も追加の実行時権限なしで読める。
 /// `setUpAll` が `getTemporaryDirectory()` から求めて設定する。
 late final String deviceAssetDir;
@@ -328,24 +330,30 @@ void main() {
   testWidgets('手順3: transcribeFile(基準音声8ファイル)', (tester) async {
     for (final (clip, locale) in baselineClips) {
       final path = '$deviceAssetDir/$clip';
-      if (!File(path).existsSync()) {
-        log('CLIP|$clip|MISSING|$path');
-        continue;
-      }
+      // アセットが無ければ測定そのものが成立しない。以前これを `continue` で
+      // 見逃した結果、全ファイル MISSING のまま「成功」した実行があった。
+      expect(File(path).existsSync(), isTrue, reason: '基準音声が配置されていない: $path');
       final run = await runTranscription(clip, locale);
       reportRun(run);
+      // **エラーや「final 0件で正常終了」をテスト失敗にする。** 以前は
+      // ログに出すだけだったため、`ERROR_SERVER_DISCONNECTED` で即座に
+      // 失敗した実行も「成功」として通っていた(E2E_RESULTS.md の B-1)。
+      // 包含率は合否ゲートではなく記録項目のままにする(design.md §7)。
+      expect(run.error, isNull, reason: '$clip の文字起こしが失敗した');
+      expect(run.completedNormally, isTrue, reason: '$clip が正常終了しなかった');
+      expect(run.finals, isNotEmpty, reason: '$clip の確定結果が得られなかった');
     }
   });
 
   testWidgets('手順3-3: リサンプリング経路(48kHz/44.1kHz ステレオ)', (tester) async {
     for (final (clip, locale) in resampleClips) {
       final path = '$deviceAssetDir/$clip';
-      if (!File(path).existsSync()) {
-        log('CLIP|$clip|MISSING|$path');
-        continue;
-      }
+      expect(File(path).existsSync(), isTrue, reason: '基準音声が配置されていない: $path');
       final run = await runTranscription(clip, locale);
       reportRun(run);
+      expect(run.error, isNull, reason: '$clip の文字起こしが失敗した');
+      expect(run.completedNormally, isTrue, reason: '$clip が正常終了しなかった');
+      expect(run.finals, isNotEmpty, reason: '$clip の確定結果が得られなかった');
     }
   });
 

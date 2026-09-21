@@ -23,7 +23,7 @@ design.md §7 は **「CI: ビルド検証のみ(Android/iOS/Windows/Webのコ�
 |---|---|---|---|
 | Web (Chrome) | [packages/offline_stt_web/E2E_CHECKLIST.md](packages/offline_stt_web/E2E_CHECKLIST.md) | M0スパイクで実測あり(本番実装での再測定は未実施) | — |
 | iOS / macOS | [packages/offline_stt_darwin/E2E_CHECKLIST.md](packages/offline_stt_darwin/E2E_CHECKLIST.md) | **2026-09-21 に本番実装を macOS 26.5.1 と iPad Pro (iOS 26.6.2) で実行済み(手順1〜6は全て期待どおり。包含率は8ファイル全て未達)。[結果](packages/offline_stt_darwin/E2E_RESULTS.md)。iOS 27実機は未実施** | #40、#7(iOS 26実機) |
-| Android | [packages/offline_stt_android/E2E_CHECKLIST.md](packages/offline_stt_android/E2E_CHECKLIST.md) | **2026-09-21 に本番実装をPixel 6で実行済み(結果は不合格)。[結果](packages/offline_stt_android/E2E_RESULTS.md)。非Pixel機は未実施** | #50 |
+| Android | [packages/offline_stt_android/E2E_CHECKLIST.md](packages/offline_stt_android/E2E_CHECKLIST.md) | **2026-09-21 に本番実装をPixel 6で実行済み。初回は不合格(バグ4件を発見)、B-1〜B-4 修正後の最終実行は手順3が8/8成功。包含率は未達(enUS_10s のみ 100% で合格)。[結果](packages/offline_stt_android/E2E_RESULTS.md)。非Pixel機は未実施** | #50 |
 | Windows | [packages/offline_stt_windows/E2E_CHECKLIST.md](packages/offline_stt_windows/E2E_CHECKLIST.md) | **全項目未実行。** Windows機が無く、ビルドすら一度も通していない | #58 |
 
 **本番実装(`packages/` 配下)に対して通して実行したのは Android と

@@ -5,7 +5,7 @@
 #
 # ## なぜ「Flutterアセット」なのか(Android の push 方式との違い)
 #
-# Android (tool/push_baseline_audio.sh) は adb でアプリ専用外部ストレージへ
+# Android も同じアセット方式である(以前は adb push 方式だったが、
 # push している。Darwin では同じ方式を採れない。
 #
 # - **macOS**: example app は App Sandbox 有効
@@ -17,7 +17,8 @@
 # - **iOS 実機**: ホストのファイルシステムが見えない。
 #   `xcrun devicectl device copy to` でアプリのデータコンテナへ送る方式も
 #   あるが、`flutter test` は実行のたびにアプリを入れ直すためコンテナごと
-#   消える(Android で実測済み。tool/push_baseline_audio.sh 冒頭参照)。
+#   消える(Android で実測済み。packages/offline_stt_android/E2E_RESULTS.md
+#   「この手順を実行するときの必須条件」参照)。
 #   Android と同様に「インストールを待ってから送る」バックグラウンド
 #   スクリプトを書くこともできるが、USB 経由で 15MB を送る時間と競合の
 #   不確実さが増えるだけである。

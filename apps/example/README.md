@@ -77,13 +77,18 @@ flutter run -d <実機のデバイスID>
   Permissions Policy)。詳細な手動E2E手順は
   `packages/offline_stt_web/E2E_CHECKLIST.md` を参照。
 
-**検証状況について**: Android / iOS / macOS / Windows / Web のいずれについて
-も、**本appを使って実機E2Eチェックリストを通して実行した実績は無い**
-(`E2E_CHECKLIST.md` の「実行実績」欄を参照)。ローカルでビルド成功を確認
-しているのは web / macOS / iOS / Android の4つであり(Androidは
-`flutter build apk --debug` のみ。実機へのインストールと認識は未実施)、
-windows はCIのコンパイル検証のみである。実機E2Eは Issue #40(Darwin)/
-#50(Android)/ #58(Windows)の対象である。
+**検証状況について**: 2026-09-21 に、本 app の `integration_test/` から
+**本番実装に対する実機E2Eを Darwin(macOS 26.5.1 + iPad Pro / iOS 26.6.2)と
+Android(Pixel 6)で実行した**(Issue #40 / #50。結果は
+`packages/offline_stt_darwin/E2E_RESULTS.md` と
+`packages/offline_stt_android/E2E_RESULTS.md`)。
+
+ただし **`integration_test` は `OfflineTranscriberPlatform.instance` を直接
+呼ぶため、本 app の UI 経路(ファイルピッカー → 同意ダイアログ → 進行表示)は
+通っていない。** UI を通した確認は人手で別途行う必要がある。
+
+Web は M0 スパイクでの実測のみで、本番実装での再測定は未実施である。
+Windows は v1 対象外である(リポジトリルートの README 冒頭を参照)。
 
 ## モデルダウンロードの同意について
 

@@ -100,8 +100,7 @@ Windowsの手順は [offline_stt_windows/README.md](https://github.com/goofmint/
 
 - **精度がしきい値に届いていない。** design.md §7 のしきい値(クリーン基準音声 ja-JP 90%以上)を満たしたプラットフォームは1つも無い。実測できた Darwin(macOS 26.5.1)/ Web(Chrome 153)/ Android(Pixel 6)の3つはいずれも基準音声 `jaJP_10s` で**ちょうど 66.7%(4/6)**であり、3つとも `株式会社モーンギフト` を落としている。**この原因は未確定である**(基準音声がTTS合成音声であること、キーワード選定と正規化規則、認識モデル自体の精度、のいずれが支配的かを分離する対照実験を行っていない)。「OSネイティブだから十分な精度が出る」と期待して採用してはいけない段階である。
 - **最低OSバージョンが高い。** 特に iOS 26 / macOS 26 の下限は、採用できるユーザー母数を大きく制限する。
-- **Windowsは一度も動かしていない。** リポジトリにWindows実機が無く、MSIX生成・インストール・認識のいずれも未実施である(Issue #58)。
-- **Windowsでは認識言語を指定できない。** `Microsoft.Windows.AI.Speech` にロケール指定APIが存在しないため `locale` 引数が無視される。
+- **Windowsはv1の対象外である。** `Microsoft.Windows.AI.Speech` が WinAppSDK の安定版に存在しない(experimental チャンネルのみ)ことを Windows 11 実機で確認したため、`flutter.plugin.platforms` から windows を外し `offline_stt_windows` も公開していない。Windows 上で呼び出すとプラットフォーム実装が未登録のため `StateError` になる。
 - **マイク入力のリアルタイム認識は対象外**である(v1はファイル入力専用)。
 - **Linuxは対象外**である。
 - 土台のOS APIにalpha / Experimental段階のものを含むため、0.x系で公開している(NFR-5)。
@@ -112,7 +111,13 @@ Windowsの手順は [offline_stt_windows/README.md](https://github.com/goofmint/
 
 認識のE2E(実際に音声ファイルが正しく文字起こしされること)はCIでは検証していない(実機・実ブラウザ依存であることが実測済みのため)。リリース前の手動チェックリストで運用する: [E2E_CHECKLIST.md](https://github.com/goofmint/offline_stt/blob/main/E2E_CHECKLIST.md)。
 
-**本番実装に対して通して実行されたチェックリストは、現時点で1つも無い。** 実機E2Eは Issue #40(Darwin)/ #50(Android)/ #58(Windows)、および iOS 26 実機の確認は Issue #7 が対象である。
+2026-09-21 に **Darwin(macOS 26.5.1 + iPad Pro / iOS 26.6.2)と Android(Pixel 6)で本番実装に対する実機E2Eを実行済み**である(Issue #40 / #50)。Darwin は手順1〜6が全て期待どおりで実装バグ0件、Android は初回に4件の不具合を発見し修正後は手順3が8/8成功した。**いずれも包含率はしきい値未達**である。
+
+未実施として残るのは次の3つである。
+
+- **example app の UI 経路**(ファイルピッカー → 同意ダイアログ → 進行表示)。`integration_test` は API を直接呼ぶため通っていない
+- **Web の本番実装での再測定**(M0 スパイクでの実測のみ)
+- **Windows**(v1対象外)
 
 ## ライセンス
 

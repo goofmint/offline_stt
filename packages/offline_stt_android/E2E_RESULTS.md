@@ -58,7 +58,7 @@ E2E_CHECKLIST.md が想定する「example app の UI を人手で操作する�
 # 2. 音声配置スクリプトをバックグラウンドで起動しておく
 #    (flutter test がアプリを入れ直すため、事前 push では消える)
 cd apps/example
-./tool/push_baseline_audio.sh &
+./tool/stage_baseline_audio.sh
 
 # 3. テスト実行
 JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home \
@@ -292,7 +292,7 @@ texts が null になり得る。その場合は直前の `onPartialResults()` �
 ### リサンプリング(手順3の3.)
 
 48kHz ステレオ / 44.1kHz ステレオへ変換した10秒クリップ
-(`tool/push_baseline_audio.sh` が ffmpeg で生成)を用意したが、**2回の実行
+(`tool/stage_baseline_audio.sh` が ffmpeg で生成)を用意したが、**2回の実行
 とも B-1 で即時失敗したため、リサンプリング経路が正しく動くかは確認できて
 いない。未実施である。**
 
@@ -685,7 +685,7 @@ E2E_CHECKLIST.md の合否基準は「手順1〜7がすべて期待どおりに�
 | パス | 内容 |
 |---|---|
 | `apps/example/integration_test/android_baseline_e2e_test.dart` | 本検証の実行本体。手順1〜6と追加測定 |
-| `apps/example/tool/push_baseline_audio.sh` | 基準音声・実環境相当音源・不正ファイルを端末へ配置する |
+| `apps/example/tool/stage_baseline_audio.sh` | 基準音声・実環境相当音源・不正ファイルを `assets/baseline-audio/` へ複製する(APKへ焼き込まれ、`setUpAll` が端末上へ書き出す)。**以前の `push_baseline_audio.sh`(adb push 方式)は競合するため削除した** |
 | `test-assets/keyword_score.py` | design.md §7 の正規化・判定をそのまま実装した採点スクリプト |
 | `apps/example/pubspec.yaml` | `integration_test` と `path_provider` を dev_dependency に追加 |
 
