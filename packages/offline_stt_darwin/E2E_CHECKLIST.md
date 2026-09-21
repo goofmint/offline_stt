@@ -6,8 +6,15 @@ Darwin列。共通の前提・包含率の算出方法・しきい値は
 [リポジトリルートの E2E_CHECKLIST.md](../../E2E_CHECKLIST.md) を参照。
 
 **リリース前に人手で実行する手順書である。** 土台は M0 スパイク
-(`spikes/darwin/README.md` / `RESULTS.md`)だが、**本チェックリストを本番
-実装(本パッケージ)に対して通して実行した実績は無い。**
+(`spikes/darwin/README.md` / `RESULTS.md`)である。
+
+**2026-09-21 に本チェックリストを本番実装(本パッケージ)へ通して実行した。
+結果は [E2E_RESULTS.md](E2E_RESULTS.md) にある**(macOS 26.5.1 と
+iPad Pro 11-inch (M4) / iOS 26.6.2)。そのときは example app の UI を人手で
+操作する代わりに `apps/example/integration_test/darwin_baseline_e2e_test.dart`
+から本番実装の API を直接呼んでいる。**UI 経路(ファイルピッカー → 同意
+ダイアログ → 進行表示)の確認は依然として未実施であり、本手順書を人手で
+実行する意義はそこに残っている。**
 
 ## なぜCIで検証できないのか
 
@@ -25,11 +32,11 @@ ja-JP / en-US のオンデバイスモデルが取得済みである保証は無
 
 ## 前提
 
-- **OS**: macOS 26 以上 / iOS 26 以上(requirements.md NFR-4)。M0検証で
-  確認できたのは macOS 26.5.1 と **iOS 27.0**(iPhone 17実機)である。
+- **OS**: macOS 26 以上 / iOS 26 以上(requirements.md NFR-4)。
   `supportedLocales` の件数・内容はOSバージョンで変動することが実測されて
-  いるため(macOS 26.5.1: 30件、iOS 27.0: 45件)、**iOS 26 実機での確認は
-  未実施の残課題である(Issue #7)。**
+  いる(macOS 26.5.1: 30件、iOS 26.6.2: 30件、iOS 27.0: 45件)。
+  **対応下限である iOS 26 実機での確認は済んでいる**(iPad Pro 11-inch (M4)
+  / iOS 26.6.2。spikes/darwin/RESULTS.md と E2E_RESULTS.md)。
 - **iOSは実機であること。** シミュレータでは上記のとおり実行できない。
 - 基準音声: `test-assets/baseline-audio/`。
 - 実行対象: `apps/example`(`flutter run -d macos` / 実機を指定して
@@ -112,6 +119,10 @@ ja-JP / en-US のオンデバイスモデルが取得済みである保証は無
 | `CancelledException` | 手順4のキャンセル | **未発火**(M0では意図的なキャンセルを行っていない) |
 
 M0で未発火だった3件は、本チェックリストで実際に発火させて確認すること。
+**ただし 2026-09-21 の実行で、`LocaleUnsupportedException` と
+`CancelledException` は実装の構造上 Dart 側から観測できないことが実測で
+確定した**(E2E_RESULTS.md の F-1 / F-2)。上表の「発火方法」はこの2件に
+ついては現状の実装では成立しない。
 
 ### 7. キーワード包含率の記録
 
@@ -137,8 +148,9 @@ M0で未発火だった3件は、本チェックリストで実際に発火さ�
 
 ## このチェックリストで確認できないこと
 
-- **iOS 26 実機での動作**(Issue #7)。手元にある実機が iOS 27.0 である限り、
-  iOS 26 での `supportedLocales` は確認できない。
+- **iOS 27 実機での動作。** 2026-09-21 の実行は対応下限である iOS 26.6.2 の
+  iPad Pro で行った。iOS 27.0 の `supportedLocales` は 45件であり 26系の
+  30件と異なることが実測されているため、供給範囲は同一ではない。
 - **人間の自然発話に対する精度。** 基準音声はTTS合成音声である。
 - **実環境(ノイズあり)での精度。** 基準音声セットはクリーン音声のみで
   ある。

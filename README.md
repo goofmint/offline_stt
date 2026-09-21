@@ -222,12 +222,12 @@ CI の Android ジョブが `actions/setup-java` で JDK 17 を用意してい�
 
 **その他の注意点**:
 
-- ネイティブプロジェクトは **5プラットフォームすべてリポジトリにコミット済み**である(ios / macos / web は Issue #41、windows は Issue #59、android は Issue #51)。**CIジョブ内で `flutter create` を実行することはもう無い。** いずれも CI と同じ Flutter 3.41.9 の `flutter create . --platforms=<platform> --org com.moongift` の出力をそのままコミットしてある。
-- `apps/example/windows` をコミット対象に含めたのは、**MSIXパッケージ化に必要な `Package.appxmanifest` が `flutter create` の生成物に含まれない**ためである。CIと同じ Flutter 3.41.9 で `flutter create . --platforms=windows --org com.moongift` を実行した出力をそのままコミットし、`flutter create` が作らないMSIX関連ファイルを `apps/example/windows/packaging/` に追加している。
+- ネイティブプロジェクトは **5プラットフォームすべてリポジトリにコミット済み**である(ios / macos / web は Issue #41、windows は Issue #59、android は Issue #51)。**CIジョブ内で `flutter create` を実行することはもう無い。** いずれも Flutter 3.41.9 の `flutter create . --platforms=<platform> --org com.moongift` の出力をそのままコミットしてある(**生成時点のバージョンであり、CI が使う版とは別である**。CI は現在 3.47.5。`flutter create` の生成物は SDK 更新のたびに作り直す性質のものではないため、生成時点のまま据え置いている)。
+- `apps/example/windows` をコミット対象に含めたのは、**MSIXパッケージ化に必要な `Package.appxmanifest` が `flutter create` の生成物に含まれない**ためである。Flutter 3.41.9 で `flutter create . --platforms=windows --org com.moongift` を実行した出力をそのままコミットし、`flutter create` が作らないMSIX関連ファイルを `apps/example/windows/packaging/` に追加している。
 - **CIのWindowsジョブが検証するのは `flutter build windows --debug` が通ること(コンパイル・リンク)だけであり、MSIXパッケージ化は検証しない。** `flutter build windows` が生成するのはパッケージ化されていない素のWin32 EXEであり、Windows AIのモデルへアクセスするのに必要な `systemAIModels` capability はMSIXの `Package.appxmanifest` にしか書けない。MSIX化は `flutter build windows` の外側の工程である(→ [packages/offline_stt_windows/README.md](./packages/offline_stt_windows/README.md))。Windows実機が無いため、MSIX生成・インストール・認識E2Eはいずれも未実施であり、Issue #58 の対象である。
 - macOS/iOSのDeployment Target引き上げ(26.0、`offline_stt_darwin.podspec` の要求)は、ネイティブプロジェクトをコミットした時点で反映済みであり、CI内での `sed` は不要になったため削除した。
 - `apps/example/android` をコミット対象に含めたのは、(a) 他の4プラットフォームと扱いを揃えるため、(b) `minSdk 31` の要件をリポジトリ内で表明でき、CI内の `sed` による書き換えという間接的な手当を無くせるため、(c) 実機E2E(Issue #50)を行う人が `flutter create` を自分で再実行せずに `flutter build apk` できるため、の3点である。
-- `apps/example/android/app/build.gradle.kts` の `minSdk` は `flutter.minSdkVersion`(Flutter 3.41.9 の既定は 24)ではなく **`31` を直接書いてある**。`offline_stt_android` が要求する 31(requirements.md NFR-4: Android 12 / API 31 以上)より低いと、マニフェストのマージが `uses-sdk:minSdkVersion 24 cannot be smaller than version 31 declared in library [:offline_stt_android]` で失敗することを CI の実行で実際に確認している(Issue #82)。**以前は CI 内の `sed` で引き上げていたが、Issue #51 でこのステップは削除した。** macOS/iOS の Deployment Target を `sed` で引き上げるステップを Issue #41 で削除したのと同じ理由である。
+- `apps/example/android/app/build.gradle.kts` の `minSdk` は `flutter.minSdkVersion`(生成時点の Flutter 3.41.9 の既定は 24)ではなく **`31` を直接書いてある**。`offline_stt_android` が要求する 31(requirements.md NFR-4: Android 12 / API 31 以上)より低いと、マニフェストのマージが `uses-sdk:minSdkVersion 24 cannot be smaller than version 31 declared in library [:offline_stt_android]` で失敗することを CI の実行で実際に確認している(Issue #82)。**以前は CI 内の `sed` で引き上げていたが、Issue #51 でこのステップは削除した。** macOS/iOS の Deployment Target を `sed` で引き上げるステップを Issue #41 で削除したのと同じ理由である。
 
 ## プラットフォーム別の追加セットアップ
 

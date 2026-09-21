@@ -25,7 +25,7 @@ flutter run -d macos   # または -d chrome 等
 
 ### Android(Issue #51)
 
-`apps/example/android/` はリポジトリにコミット済みである(Flutter 3.41.9 の
+`apps/example/android/` はリポジトリにコミット済みである(生成時点の Flutter 3.41.9 の
 `flutter create . --platforms=android --org com.moongift` の出力に、
 `app/build.gradle.kts` の `minSdk = 31` だけを加えたもの)。`flutter create`
 を再実行する必要は無い。

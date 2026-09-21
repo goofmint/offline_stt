@@ -38,6 +38,7 @@ library;
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:offline_stt_platform_interface/offline_stt_platform_interface.dart';
@@ -45,7 +46,7 @@ import 'package:path_provider/path_provider.dart';
 
 /// `tool/push_baseline_audio.sh` が push する先。アプリ専用外部ストレージで
 /// あり、Android 11 以降も追加の実行時権限なしで読める。
-/// `setUpAll` が `getExternalStorageDirectory()` から求めて設定する。
+/// `setUpAll` が `getTemporaryDirectory()` から求めて設定する。
 late final String deviceAssetDir;
 
 /// 基準音声(E2E_CHECKLIST.md 手順3の8ファイル)。
@@ -65,6 +66,22 @@ const List<(String clip, String locale)> baselineClips = <(String, String)>[
 const List<(String clip, String locale)> resampleClips = <(String, String)>[
   ('jaJP_10s_48k_stereo.m4a', 'ja-JP'),
   ('enUS_10s_44k1_stereo.m4a', 'en-US'),
+];
+
+/// APKへ焼き込む音声。`tool/stage_baseline_audio.sh` が
+/// `assets/baseline-audio/` へ複製したものと一致させること。
+const List<String> bundledFiles = <String>[
+  'jaJP_10s.wav',
+  'jaJP_10s.m4a',
+  'jaJP_3m.wav',
+  'jaJP_3m.m4a',
+  'enUS_10s.wav',
+  'enUS_10s.m4a',
+  'enUS_3m.wav',
+  'enUS_3m.m4a',
+  'jaJP_10s_48k_stereo.m4a',
+  'enUS_10s_44k1_stereo.m4a',
+  'not_audio.wav',
 ];
 
 void log(String line) {
@@ -149,27 +166,28 @@ void main() {
     log(
       'DEVICE|${Platform.operatingSystem}|${Platform.operatingSystemVersion}',
     );
-    // `flutter test` はアプリをインストールし直すため、事前に push した
-    // ファイルはこの時点では存在しない。`tool/push_baseline_audio.sh` が
-    // 置く番兵ファイルを待つ(スクリプトの冒頭コメント参照)。
+    // **音声は Flutter アセットとしてAPKに焼き込み、起動時にアプリ自身の
+    // テンポラリディレクトリへ書き出す。**
     //
-    // 配置先ディレクトリは **アプリ自身が作る**。adb shell(shell ユーザー)
-    // が作ったディレクトリはアプリから読めない(実測: File.existsSync() が
-    // 一貫して false を返した)。さらに生パスへの Directory.createSync() は
-    // Permission denied になるため、Context.getExternalFilesDir() 相当の
-    // path_provider 経由で取得する。
-    final externalDir = await getExternalStorageDirectory();
-    if (externalDir == null) {
-      fail('getExternalStorageDirectory() が null を返した');
-    }
-    deviceAssetDir = '${externalDir.path}/baseline-audio';
+    // 以前は `adb push` + 番兵ファイル待ちにしていたが、`flutter test` は
+    // 実行のたびにアプリをインストールし直すため、push したディレクトリが
+    // 消える。push するタイミングを待ち合わせる方式は競合し、実測で
+    // 「全ファイル MISSING のまま空振りで成功」「セットアップで停止したまま
+    // 90分経過」という2通りの壊れ方をした。アセット方式なら
+    // インストールのタイミングに依存せず、Darwin 側の
+    // `darwin_baseline_e2e_test.dart` とも経路が揃う。
+    final tempDir = await getTemporaryDirectory();
+    deviceAssetDir = '${tempDir.path}/baseline-audio';
     Directory(deviceAssetDir).createSync(recursive: true);
-    final ready = File('$deviceAssetDir/READY');
-    final deadline = DateTime.now().add(const Duration(minutes: 5));
-    while (!ready.existsSync() && DateTime.now().isBefore(deadline)) {
-      await Future<void>.delayed(const Duration(seconds: 1));
+    for (final name in bundledFiles) {
+      final data = await rootBundle.load('assets/baseline-audio/$name');
+      final file = File('$deviceAssetDir/$name');
+      file.writeAsBytesSync(
+        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes),
+      );
+      log('ASSET|$name|bytes=${file.lengthSync()}');
     }
-    log('ASSETS|ready=${ready.existsSync()}|dir=$deviceAssetDir');
+    log('ASSETS|dir=$deviceAssetDir');
   });
 
   testWidgets('手順1: checkModel', (tester) async {
@@ -236,7 +254,9 @@ void main() {
       } catch (e) {
         // B-2 の修正後、照会の一時的な失敗は `unavailable` に畳まれず
         // 例外として上がる。偽の `unavailable` と区別して記録する。
-        log('REPEAT|$i|THREW:${e.runtimeType}:$e|ms=${stopwatch.elapsedMilliseconds}');
+        log(
+          'REPEAT|$i|THREW:${e.runtimeType}:$e|ms=${stopwatch.elapsedMilliseconds}',
+        );
       }
     }
     // 連続呼び出しではなく1秒間隔を空けた場合との対照。
@@ -251,7 +271,9 @@ void main() {
       } on TimeoutException {
         log('SPACED|$i|TIMEOUT|ms=${stopwatch.elapsedMilliseconds}');
       } catch (e) {
-        log('SPACED|$i|THREW:${e.runtimeType}:$e|ms=${stopwatch.elapsedMilliseconds}');
+        log(
+          'SPACED|$i|THREW:${e.runtimeType}:$e|ms=${stopwatch.elapsedMilliseconds}',
+        );
       }
     }
   });

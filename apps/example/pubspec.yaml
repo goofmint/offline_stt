@@ -8,7 +8,7 @@ version: 0.1.0
 
 environment:
   sdk: ^3.9.0
-  flutter: ">=3.41.0"
+  flutter: ">=3.47.0"
 
 resolution: workspace
 
@@ -49,3 +49,13 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    # Darwin 実機/デスクトップE2E(Issue #40)で使う基準音声。
+    # macOS の example app は App Sandbox 有効でリポジトリ配下を直接読めず、
+    # iOS 実機にはホストのファイルシステムが見えないため、両プラットフォーム
+    # 共通の唯一の経路としてアセットへ焼き込む(理由の詳細は
+    # tool/stage_baseline_audio.sh 冒頭)。
+    # 中身は tool/stage_baseline_audio.sh が test-assets/baseline-audio/
+    # から複製する。**リポジトリには .gitkeep しか入っていない**ため、
+    # E2E を実行する前に必ずこのスクリプトを走らせること。
+    - assets/baseline-audio/

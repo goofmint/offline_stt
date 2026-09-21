@@ -21,8 +21,8 @@ requirements.md NFR-4「最低動作環境」・NFR-5「バージョニング」
 
 | 固定しているもの | 値 | 場所 |
 |---|---|---|
-| Flutter SDK(CIが使う版) | `3.41.9` / `stable` | `.github/workflows/ci.yml` の `env.FLUTTER_VERSION` / `FLUTTER_CHANNEL` |
-| Flutter SDK(パッケージが要求する下限) | `>=3.41.0` | `packages/offline_stt{,_android,_darwin,_windows,_web}/pubspec.yaml` と `apps/example/pubspec.yaml` の `environment.flutter`(計6ファイル) |
+| Flutter SDK(CIが使う版) | `3.47.5` / `stable` | `.github/workflows/ci.yml` の `env.FLUTTER_VERSION` / `FLUTTER_CHANNEL` |
+| Flutter SDK(パッケージが要求する下限) | `>=3.47.0` | `packages/offline_stt{,_android,_darwin,_windows,_web}/pubspec.yaml` と `apps/example/pubspec.yaml` の `environment.flutter`(計6ファイル) |
 | Dart SDK | `^3.9.0` | 上記6ファイル + `packages/offline_stt_platform_interface/pubspec.yaml` + ルート `pubspec.yaml`(計8ファイル) |
 | melos | `8.2.2`(CI)/ `^8.2.2`(dev依存) | `.github/workflows/ci.yml` の `dart pub global activate melos 8.2.2`、ルート `pubspec.yaml` の `dev_dependencies.melos` |
 | Pigeon | `^27.3.0` | `packages/offline_stt_{android,darwin,windows}/pubspec.yaml` の `dev_dependencies.pigeon` |

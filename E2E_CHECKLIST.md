@@ -22,13 +22,14 @@ design.md §7 は **「CI: ビルド検証のみ(Android/iOS/Windows/Webのコ�
 | プラットフォーム | チェックリスト | 実行実績 | 対応する実機E2E Issue |
 |---|---|---|---|
 | Web (Chrome) | [packages/offline_stt_web/E2E_CHECKLIST.md](packages/offline_stt_web/E2E_CHECKLIST.md) | M0スパイクで実測あり(本番実装での再測定は未実施) | — |
-| iOS / macOS | [packages/offline_stt_darwin/E2E_CHECKLIST.md](packages/offline_stt_darwin/E2E_CHECKLIST.md) | M0スパイクで実測あり(本番実装での実機E2Eは未実施) | #40、#7(iOS 26実機) |
+| iOS / macOS | [packages/offline_stt_darwin/E2E_CHECKLIST.md](packages/offline_stt_darwin/E2E_CHECKLIST.md) | **2026-09-21 に本番実装を macOS 26.5.1 と iPad Pro (iOS 26.6.2) で実行済み(手順1〜6は全て期待どおり。包含率は8ファイル全て未達)。[結果](packages/offline_stt_darwin/E2E_RESULTS.md)。iOS 27実機は未実施** | #40、#7(iOS 26実機) |
 | Android | [packages/offline_stt_android/E2E_CHECKLIST.md](packages/offline_stt_android/E2E_CHECKLIST.md) | **2026-09-21 に本番実装をPixel 6で実行済み(結果は不合格)。[結果](packages/offline_stt_android/E2E_RESULTS.md)。非Pixel機は未実施** | #50 |
 | Windows | [packages/offline_stt_windows/E2E_CHECKLIST.md](packages/offline_stt_windows/E2E_CHECKLIST.md) | **全項目未実行。** Windows機が無く、ビルドすら一度も通していない | #58 |
 
-**本番実装(`packages/` 配下)に対して通して実行したのは Android のみで
-ある(2026-09-21、Pixel 6)。** 他プラットフォームの「実測あり」は M0
-スパイク(`spikes/` 配下の独立した検証コード)での実測を指す。
+**本番実装(`packages/` 配下)に対して通して実行したのは Android と
+Darwin である(いずれも 2026-09-21。Pixel 6 / macOS 26.5.1 + iPad Pro
+iOS 26.6.2)。** Web の「実測あり」は M0 スパイク(`spikes/` 配下の独立した
+検証コード)での実測を指す。
 
 ## 全プラットフォーム共通の前提
 
@@ -70,12 +71,13 @@ design.md §7 は **「CI: ビルド検証のみ(Android/iOS/Windows/Webのコ�
 
 | プラットフォーム | 基準音声 jaJP_10s の包含率 | 出典 |
 |---|---|---|
-| Darwin (macOS 26.5.1) | 66.7%(4/6) | spikes/darwin/RESULTS.md |
+| Darwin (macOS 26.5.1) | 66.7%(4/6) | spikes/darwin/RESULTS.md。**本番実装でも同値**(packages/offline_stt_darwin/E2E_RESULTS.md) |
+| Darwin (iOS 26.6.2 実機) | 66.7%(4/6) | packages/offline_stt_darwin/E2E_RESULTS.md |
 | Web (Chrome 153) | 66.7%(4/6) | spikes/web/RESULTS.md |
 | Android (Pixel 6) | 66.7%(4/6) | spikes/android/RESULTS.md |
 | Windows | 未測定 | — |
 
-3プラットフォームが同率だが、落としているキーワードは同一ではない。
+いずれも同率だが、落としているキーワードは同一ではない(Darwin の macOS と iOS 実機は内訳まで完全に一致した)。
 **不成立の原因は未確定である。** design.md §7 が挙げる候補((a)基準音声が
 TTS合成であること、(b)プリセット等の設定、(c)認識モデル自体の精度、
 (d)キーワード選定と正規化規則が表記差を吸収できていないこと)のどれが

@@ -3,6 +3,8 @@ PODS:
     - Flutter
     - FlutterMacOS
   - Flutter (1.0.0)
+  - integration_test (0.0.1):
+    - Flutter
   - offline_stt_darwin (0.1.0):
     - Flutter
     - FlutterMacOS
@@ -10,6 +12,7 @@ PODS:
 DEPENDENCIES:
   - file_picker_darwin (from `.symlinks/plugins/file_picker_darwin/darwin`)
   - Flutter (from `Flutter`)
+  - integration_test (from `.symlinks/plugins/integration_test/ios`)
   - offline_stt_darwin (from `.symlinks/plugins/offline_stt_darwin/darwin`)
 
 EXTERNAL SOURCES:
@@ -17,13 +20,16 @@ EXTERNAL SOURCES:
     :path: ".symlinks/plugins/file_picker_darwin/darwin"
   Flutter:
     :path: Flutter
+  integration_test:
+    :path: ".symlinks/plugins/integration_test/ios"
   offline_stt_darwin:
     :path: ".symlinks/plugins/offline_stt_darwin/darwin"
 
 SPEC CHECKSUMS:
   file_picker_darwin: 27e043831d68462d54f1c40e724b1f53c9d1e8be
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
-  offline_stt_darwin: d9e0f5e7c270305879cd1f366e54572bf91e6664
+  integration_test: 252f60fa39af5e17c3aa9899d35d908a0721b573
+  offline_stt_darwin: fdda55dc5335cb0eb33e76db64f00b33c0b38216
 
 PODFILE CHECKSUM: 915e58fd71f05ae99fabdd8ac2991c68108b3464
 
