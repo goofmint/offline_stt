@@ -1,6 +1,37 @@
 # offline_stt
 
-録音済み音声ファイルを、OSネイティブの音声認識APIのみでオフライン文字起こしするFlutterライブラリ(モノレポ)。詳細な要件・設計は [requirements.md](./requirements.md) / [design.md](./design.md) / [tasks.md](./tasks.md) を参照。
+録音済み音声ファイルを、OSネイティブの音声認識APIのみでオフライン文字起こしするFlutterライブラリ(モノレポ)。
+
+> ## v1 の対象は Android / iOS / macOS / Web の4つである。**Windows は対象外。**
+>
+> `Microsoft.Windows.AI.Speech`(`SpeechRecognitionModel` / `BatchRecognition`)が
+> **WinAppSDK の安定版に存在しない**ためである。experimental チャンネル
+> (`Microsoft.WindowsAppSDK.AI 2.4.8-experimental`)にのみ含まれる。
+>
+> Windows 11(10.0.26200 / 25H2)の実機で次を確認した。
+>
+> - NuGet の `Microsoft.WindowsAppSDK.AI` を直接展開すると、安定版 **2.5.5 / 2.4.4 に
+>   `Microsoft.Windows.AI.Speech.winmd` が無く**、`2.4.8-experimental` にはある
+> - `winapp init --setup-sdks stable` が生成するプロジェクションヘッダーに
+>   `Microsoft.Windows.AI.Speech.h` が含まれない
+> - **その状態でクリーンビルドすると、WinRT 実装4ファイル
+>   (`speech_backend_winrt` / `model_availability` / `model_acquisition` /
+>   `recognition_session`)がコンパイル対象から外れる**
+>
+> 公式ドキュメントは「WinAppSDK version: Version 1.7.1 or later」と書いているが、
+> **1.7 系のパッケージにも当該 winmd は入っていない**(`1.7.250401001` /
+> `1.7.260224002` を展開して確認)。ドキュメントと出荷物が食い違っている。
+>
+> 安定版で使える代替も調査したが、**制約(ファイル入力・完全オフライン・
+> モデル非同梱)をすべて満たすものは見つかっていない**。詳細と候補ごとの
+> 評価は [`spikes/windows/ALTERNATIVES.md`](./spikes/windows/ALTERNATIVES.md)。
+>
+> **`packages/offline_stt_windows` の実装はリポジトリに残す。** Speech API が
+> 安定版に入った時点で有効化できる状態にしてある。ただし **pub.dev には公開せず**、
+> `offline_stt` の `flutter.plugin.platforms` からも windows を外してある。
+> Windows 上でこのライブラリを呼ぶと、プラットフォーム実装が登録されていない
+> ため `StateError` になる(黙って `unavailable` を返すフォールバックはしない)。
+詳細な要件・設計は [requirements.md](./requirements.md) / [design.md](./design.md) / [tasks.md](./tasks.md) を参照。
 
 ## 対応状況マトリクス
 

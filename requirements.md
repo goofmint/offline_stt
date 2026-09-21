@@ -20,7 +20,7 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」要�
 |---|---|---|---|
 | Android | 標準 `android.speech.SpeechRecognizer`(`createOnDeviceSpeechRecognizer`)**(構成変更済み。下記「M0判定の反映」参照)** | OS / Google Play services のオンデバイス言語パック(`triggerModelDownload` / `checkRecognitionSupport`) | 技術成立(Pixel 6実機)。**精度は不成立**(jaJP_10s 66.7%) |
 | iOS / macOS | SpeechAnalyzer | OS (AssetInventory) | 技術成立(macOS 26.5.1実機)。**精度は不成立**(jaJP_10s 66.7%)。iOS は `supportedLocales` 照会のみ実施 |
-| Windows | Windows AI APIs Speech Recognition | OS (NPUプリインストール / Windows Update) | **未検証**(Windows実機が存在しない)。ロケール指定APIが無いことのみドキュメント調査で確定 |
+| ~~Windows~~ | ~~Windows AI APIs Speech Recognition~~ | — | **v1では対象外**。`Microsoft.Windows.AI.Speech` が WinAppSDK の安定版に存在しない(experimental のみ)ことを Windows 11 実機で確認した。実装は残すが公開せず、`offline_stt` のプラットフォームからも外した。README 冒頭・`spikes/windows/ALTERNATIVES.md` 参照 |
 | Web | Chrome オンデバイスWeb Speech (processLocally) | Chrome (言語パック約60MB。ja-JP言語パックの取得はChrome 153で実機確認済み) | 技術成立(Chrome 153実機)。**精度は不成立**(jaJP_10s 1.0x 66.7%) |
 
 ### M0判定の反映(Issue #19)
@@ -142,7 +142,17 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」要�
 
 - Android 12 (API 31) 以上
 - iOS 26 以上 / macOS 26 以上
-- Windows 11 24H2 (build 26100) 以上、WinAppSDK 1.7.1以上(**M4実装時に再確認して確定**: 公式ドキュメント https://learn.microsoft.com/en-us/windows/ai/apis/speech-recognition の Prerequisites に「Windows 11, version 24H2 (build 26100) or later」「WinAppSDK version: Version 1.7.1 or later」と明記されている。M0調査時点ではAPIリファレンスが `windows-app-sdk-2.0-experimental` モニカーにしか無く本記述との齟齬を疑っていたが、本記述が正しかった。design.md §4.4 参照)
+- ~~Windows 11 24H2 (build 26100) 以上、WinAppSDK 1.7.1以上~~ → **v1では対象外**。
+  公式ドキュメントの Prerequisites は「WinAppSDK version: Version 1.7.1 or later」と
+  書いているが、**実際の出荷物と食い違っている**。NuGet の
+  `Microsoft.WindowsAppSDK.AI` を展開して確認したところ、安定版(2.5.5 / 2.4.4)にも
+  1.7 系(`1.7.250401001` / `1.7.260224002`)にも `Microsoft.Windows.AI.Speech.winmd` が
+  含まれず、`2.4.8-experimental` にのみ存在する。Windows 11 実機
+  (10.0.26200 / 25H2)でクリーンビルドし、安定版では WinRT 実装4ファイルが
+  コンパイル対象から外れることも確認済みである。
+  **M0調査(`spikes/windows/RESULTS.md`)の「experimental モニカーにしか API
+  リファレンスが無い」という記録が正しく、M4実装時に「本記述が正しかった」と
+  した判断が誤りだった。** SDK を展開せずドキュメントだけで判断したことが原因である
 - Chrome 142 以上(オンデバイスWeb Speechのリグレッション修正済みバージョン)
 
 ### NFR-5 バージョニング

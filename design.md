@@ -199,6 +199,17 @@ AVAudioFile(任意フォーマット読込)
 
 ### 4.4 Windows(<name>_windows)
 
+> **v1では対象外である。** `Microsoft.Windows.AI.Speech` が WinAppSDK の
+> 安定版に存在せず(experimental チャンネルにのみ存在)、Windows 11 実機で
+> クリーンビルドして WinRT 実装がコンパイル対象から外れることを確認した。
+> 安定版で使える代替(`Windows.Media.SpeechRecognition` はファイル入力
+> 非対応かつ既定の口述文法がオンライン、Windows ML はモデル同梱が前提で
+> NFR-3 違反、等)も調査したが、制約をすべて満たすものは見つかっていない。
+> 唯一残った候補は SAPI 5 だが未検証であり、非推奨扱いでもある。
+> 詳細は `spikes/windows/ALTERNATIVES.md`。本節の設計は、Speech API が
+> 安定版に入った場合に備えて残す。
+
+
 パイプライン:
 
 ```

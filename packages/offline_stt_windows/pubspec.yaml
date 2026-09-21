@@ -1,8 +1,16 @@
 name: offline_stt_windows
 description: >-
   offline_stt のWindows実装(C++/WinRT、Windows AI Speech Recognition +
-  Media Foundation、design.md §4.4)。
+  Media Foundation、design.md §4.4)。**v1では対象外であり公開しない。**
+  Microsoft.Windows.AI.Speech が WinAppSDK の安定版に存在しないため。
+  詳細は README.md 冒頭を参照。
 version: 0.1.0
+# **v1では公開しない。** Microsoft.Windows.AI.Speech は WinAppSDK の
+# experimental チャンネルにしか存在せず、安定版(2.5.5系まで確認)には
+# 含まれない。実機でクリーンビルドして、安定版では WinRT 実装4ファイルが
+# コンパイル対象から外れることを確認済みである(README.md 冒頭)。
+# 安定版に入った時点で publish_to を外して公開対象へ戻す。
+publish_to: none
 homepage: https://github.com/goofmint/offline_stt
 repository: https://github.com/goofmint/offline_stt
 issue_tracker: https://github.com/goofmint/offline_stt/issues

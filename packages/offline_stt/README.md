@@ -1,5 +1,10 @@
 # offline_stt
 
+> **v1 の対象は Android / iOS / macOS / Web の4つである。Windows は対象外。**
+> `Microsoft.Windows.AI.Speech` が WinAppSDK の安定版に存在しないため
+> (Windows 11 実機で確認)。Windows 上で呼び出すとプラットフォーム実装が
+> 未登録のため `StateError` になる。詳細はリポジトリの README 冒頭を参照。
+
 録音済み音声ファイルを、**OSネイティブの音声認識APIだけで**オフライン文字起こしするFlutterライブラリ。認識モデルも推論エンジンも同梱せず、モデルの取得・更新・削除はすべてOSに委ねる。音声も書き起こし結果もネットワークに出ない([requirements.md](https://github.com/goofmint/offline_stt/blob/main/requirements.md) NFR-2)。
 
 **これはfederated pluginのエントリパッケージである。アプリが依存するのはこのパッケージだけでよい。** `offline_stt_android` / `offline_stt_darwin` / `offline_stt_windows` / `offline_stt_web` は endorsed な実装パッケージであり、`flutter.plugin.platforms.*.default_package` によって自動的に選択される。直接依存に書く必要は無い([design.md](https://github.com/goofmint/offline_stt/blob/main/design.md) §1)。
