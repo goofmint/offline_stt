@@ -857,3 +857,107 @@ design.md §7 は「表記が複数あり得るキーワードは `.json` の `k
   チェックリストと実装のどちらを正とするかは設計判断であり、本E2Eの範囲外
 - **非Pixel機での検証は未実施。Issue #50 はこれで閉じない**
 - 手順2 / 手順7 / example app の UI 経路は初回実行と同じく未実施
+
+---
+
+# 追記2: 実行条件の確定と、修正後の最終実行
+
+「B-1 修正後も不安定さが残る」と一度書いたが、**それは誤りだった。**
+不安定に見えた原因は**すべて実行条件側**にあり、ライブラリの不具合ではない。
+同じ罠にはまらないよう、判明した3つを先に書く。
+
+## この手順を実行するときの必須条件
+
+### 1. 端末の画面を起こし続ける
+
+**3分クリップを含む通し実行は13分以上かかる。** その間に画面が消えると
+Android の Doze がアプリを凍結し、音声認識サービスとの接続が切れる。
+
+```
+mWakefulness=Dozing
+RemoteSpeechRecognitionService: Connection to speech recognition service lost
+```
+
+実測では、放置した実行が 68分・90分と停止したまま戻らなかった。実行前に
+次を設定すること。
+
+```
+adb shell svc power stayon usb
+adb shell input keyevent KEYCODE_WAKEUP
+```
+
+### 2. 音声は APK へ焼き込む(`adb push` しない)
+
+`flutter test` は実行のたびにアプリをインストールし直すため、事前に
+`adb push` したディレクトリは消える。番兵ファイルで待ち合わせる方式は
+競合し、実測で2通りに壊れた。
+
+- 全ファイルが `MISSING` のままテストが「成功」する(空振り)
+- セットアップで停止したまま戻らない
+
+`tool/stage_baseline_audio.sh` が `assets/baseline-audio/` へ複製し、
+`setUpAll` が `rootBundle` からアプリのキャッシュディレクトリへ書き出す。
+Darwin 側の `darwin_baseline_e2e_test.dart` と同じ経路である。
+
+### 3. 直前に音声認識サービスを止める
+
+テストを途中で中断すると、端末側の `SpeechRecognitionManagerServiceImpl` が
+セッションを掴んだまま残ることがある。この状態では `transcribeFile()` が
+`checkModel()` の段階から先へ進まず、**logcat にも認識サービスの活動が
+1行も出ない**(通常出るはずの `#onCheckRecognitionSupport` すら出ない)。
+
+```
+adb shell am force-stop com.moongift.example
+adb shell am force-stop com.google.android.as
+```
+
+## 最終実行の結果(8/8 成功)
+
+上記3条件を満たして実行した結果である。
+
+| クリップ | 所要 | partials | finals | done | error |
+|---|---|---|---|---|---|
+| jaJP_10s.wav | 10,257ms | 61 | 1 | true | null |
+| jaJP_10s.m4a | 10,056ms | 61 | 1 | true | null |
+| enUS_10s.wav | 12,468ms | 71 | 1 | true | null |
+| enUS_10s.m4a | 12,513ms | 73 | 1 | true | null |
+| jaJP_3m.wav | 175,803ms | 1,344 | 1 | true | null |
+| jaJP_3m.m4a | 175,856ms | 1,345 | 1 | true | null |
+| enUS_3m.wav | 178,831ms | 1,164 | 1 | true | null |
+| enUS_3m.m4a | 178,761ms | 1,157 | 1 | true | null |
+
+`All tests passed!`。**B-1 修正後、条件を満たした実行は3回とも 8/8 成功
+している**(修正直後の2回と本実行)。修正前は20回中3回(15%)だった。
+
+## キーワード包含率(最終)
+
+| クリップ | 修正前 | 最終 | 判定 | 確定テキスト長 / 期待 |
+|---|---|---|---|---|
+| jaJP_10s.wav | 66.7% | **66.7%** | 不成立 | 51 / 57 |
+| jaJP_10s.m4a | 66.7% | **66.7%** | 不成立 | 51 / 57 |
+| enUS_10s.wav | 100.0% | **100.0%** | **合格** | 154 / 159 |
+| enUS_10s.m4a | 100.0% | **100.0%** | **合格** | 154 / 159 |
+| jaJP_3m.wav | 17.9% | **82.1%** | 不成立 | 1,059 / 1,151 |
+| jaJP_3m.m4a | 17.9% | **78.6%** | 不成立 | 1,059 / 1,151 |
+| enUS_3m.wav | 4.0% | **40.0%** | 不成立 | 4,305 / 2,888 |
+| enUS_3m.m4a | 4.0% | **40.0%** | 不成立 | 4,311 / 2,888 |
+
+**10秒クリップの値は B-1〜B-4 の修正を通して1文字も変わっていない。**
+修正が認識結果そのものに影響していないことの裏付けである。
+
+**`enUS_3m` には依然として約1,400文字の重複が残る**(4,305 / 期待2,888)。
+`joinWithOverlap()` は完全一致の重なりしか除かず、再認識のたびに細部が
+揺れる(`Moji tall core` / `Mojit tall core`、`ISO 2701` / `ISO 27001`)ため
+拾いきれない。曖昧一致での除去は本文を削る危険があるため採っていない。
+包含率への影響は無い(重複は部分文字列の集合を減らさない)。
+
+`enUS_3m` が 40.0% に留まるのは**基準音声セット側の不備**である。期待
+キーワードが英単語綴り(`three hundred and twenty thousand`)なのに認識結果は
+数字表記(`320 000`)になる。design.md §7 は「許容表記を列挙する」と定めて
+いるが `enUS_3m.json` が従っていない。M0 出口判定(Issue #19 / #20)で
+保留になっている論点であり、ライブラリの不具合ではない。
+
+## Issue #50 の扱い
+
+本 Issue は当初「Pixel系 + 非Pixel系の2機種」を求めていたが、**利用者の判断に
+より1機種(Pixel 6)で完了とした。** 非Pixel機での検証は実施していない。
