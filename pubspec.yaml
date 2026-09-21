@@ -48,17 +48,37 @@ melos:
         -print0 | xargs -0 dart format --output=none --set-exit-if-changed
     doc:
       description: >-
-        公開パッケージ6つで dart doc を実行し、APIドキュメントが生成できる
-        ことを検証する(Issue #63)。`--validate-links` により、docコメント
-        中の `[...]` 参照切れとREADMEの相対リンク切れを検出する。出力先の
-        `doc/api/` は .gitignore 済み。apps/example は公開しないため除外
-        する。
+        apps/example を除く6パッケージ(offline_stt_windows を含む)で
+        dart doc を実行し、APIドキュメントが生成できることを検証する
+        (Issue #63)。`--validate-links` により、docコメント中の `[...]`
+        参照切れとREADMEの相対リンク切れを検出する。出力先の `doc/api/` は
+        .gitignore 済み。apps/example は公開しないため除外する。**pub.dev
+        への公開対象は offline_stt_windows を除く5パッケージのみである**
+        (publish_to: none。理由は docs/PUBLISHING.md 1節)。公開対象の
+        絞り込みは publish:dry-run script(下記)の
+        `packageFilters.private: false` を参照。
       exec:
         command: dart doc --validate-links --output doc/api
         concurrency: 1
       packageFilters:
         ignore:
           - example
+    publish:dry-run:
+      description: >-
+        pub.dev への公開対象5パッケージ(offline_stt_platform_interface /
+        offline_stt_darwin / offline_stt_android / offline_stt_web /
+        offline_stt)で `dart pub publish --dry-run` を実行し、公開できる
+        状態であることを検証する(Issue #65、docs/PUBLISHING.md)。
+        `offline_stt_windows` は publish_to: none(v1では公開対象外。
+        理由は docs/PUBLISHING.md 1節)、apps/example も publish_to: none
+        であるため、`packageFilters.private: false`(melos 8の
+        `--no-private` 相当。`publish_to: none` のパッケージを除外する)
+        だけで自動的にこの2つを除外できる。個別の ignore リストは書かない。
+      exec:
+        command: dart pub publish --dry-run
+        concurrency: 1
+      packageFilters:
+        private: false
     pigeon:android:
       description: >-
         pigeons/offline_stt_events.dart から offline_stt_android 向けの

@@ -1,0 +1,218 @@
+name: Publish to pub.dev
+
+# offline_stt の公開ワークフロー(Issue #65、docs/PUBLISHING.md)。
+#
+# トリガはパッケージ別の git tag push である。1回のタグ push は常に
+# 1パッケージだけを公開する。公開対象は次の5パッケージであり、
+# `offline_stt_windows` は対象外である(publish_to: none。理由は
+# docs/PUBLISHING.md 1節、requirements.md NFR-4)。**offline_stt_windows
+# 用のタグパターンは存在しない。このワークフローに追加しないこと。**
+#
+#   タグパターン                  → パッケージ
+#   platform_interface-v*        → offline_stt_platform_interface
+#   darwin-v*                    → offline_stt_darwin
+#   android-v*                   → offline_stt_android
+#   web-v*                       → offline_stt_web
+#   offline_stt-v*               → offline_stt
+#
+# pub.dev の Automated publishing 設定(Admin → Automated publishing の
+# Tag pattern)は、上記と対になる `<prefix>-v{{version}}` を各パッケージに
+# 登録すること。手順は docs/PUBLISHING.md 6.1節。
+#
+# --- 依存順の強制について(設計判断) ---
+# 公開順序は platform_interface → 各実装 → offline_stt でなければならない
+# (Pub Workspaces では `resolution: workspace` によりワークスペース内では
+# 依存が常にローカル解決されるため、dry-run/publish 単体では「依存先が
+# 実際に pub.dev 上に存在するか」を検証できない。docs/PUBLISHING.md 2節)。
+#
+# しかし、このワークフローは**タグ単位でトリガされ、1回の実行につき
+# パッケージは常に1つ**である。複数パッケージを同時に公開するのでなければ
+# `needs:` でジョブ同士を連結して順序を強制する対象が無い(連結すべき
+# 「同時に走る複数ジョブ」が存在しない)。公開順序そのものは、タグを
+# 打つ人間が docs/PUBLISHING.md の手順に従うことで守られる、
+# リポジトリ外の運用上の制約である。
+#
+# 代わりにこのワークフローは、公開直前に「依存先が pub.dev 上に実際に
+# 存在すること」を検証する。対象パッケージ直下に一時的な
+# `pubspec_overrides.yaml`(`resolution:` を空にする内容)を置いて
+# ワークスペースのローカル解決から切り離し、その状態で `dart pub get` と
+# `dart pub publish --dry-run` を実行する(公式手順:
+# https://dart.dev/tools/pub/workspaces#temporarily-resolving-a-package-outside-its-workspace)。
+# `offline_stt` のように platform_interface / android / darwin / web に
+# 依存するパッケージをこの状態で `dart pub get` すると、それらが
+# pub.dev 上にまだ存在しなければここで失敗する。すなわち、公開順序を
+# 誤った場合はこのワークフロー自身がその場で検知して失敗する。
+on:
+  push:
+    tags:
+      - 'platform_interface-v*'
+      - 'darwin-v*'
+      - 'android-v*'
+      - 'web-v*'
+      - 'offline_stt-v*'
+
+env:
+  # .github/workflows/ci.yml の env.FLUTTER_VERSION / FLUTTER_CHANNEL と
+  # 同じ値を使うこと。CI と公開ワークフローで異なる Flutter 版を使うと、
+  # CI を通ったコミットが公開時にだけ壊れる事態になりうる
+  # (docs/VERSION_POLICY.md 1.1節「同時に直す場所」と同じ理由でここも
+  # 手動で同期する必要がある)。
+  FLUTTER_VERSION: '3.47.5'
+  FLUTTER_CHANNEL: 'stable'
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    permissions:
+      # OIDC (Trusted Publishing) を使うために必須。この権限があると
+      # `ACTIONS_ID_TOKEN_REQUEST_URL` / `ACTIONS_ID_TOKEN_REQUEST_TOKEN` が
+      # 実行環境に渡される。後述の dart-lang/setup-dart@v1 がこの2つの
+      # 環境変数を検知して、pub.dev 向けのOIDCトークンを取得し
+      # `dart pub token add` で登録する。
+      id-token: write
+      contents: read
+    steps:
+      # Action は可変タグではなく不変のコミットSHAで固定する。このワークフローは
+      # `id-token: write` を持ち pub.dev へ公開できるため、タグの差し替えが
+      # そのまま公開権限の乗っ取りになりうる。**バージョンを上げるときは
+      # SHAと右側のコメントを必ず同時に直すこと。**
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # GITHUB_TOKEN を .git/config に残さない。このジョブは git push を
+          # しないため資格情報は不要である。
+          persist-credentials: false
+
+      - name: タグからパッケージを判定する
+        id: pkg
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          case "$TAG" in
+            platform_interface-v*)
+              PACKAGE_NAME="offline_stt_platform_interface"
+              VERSION="${TAG#platform_interface-v}"
+              ;;
+            darwin-v*)
+              PACKAGE_NAME="offline_stt_darwin"
+              VERSION="${TAG#darwin-v}"
+              ;;
+            android-v*)
+              PACKAGE_NAME="offline_stt_android"
+              VERSION="${TAG#android-v}"
+              ;;
+            web-v*)
+              PACKAGE_NAME="offline_stt_web"
+              VERSION="${TAG#web-v}"
+              ;;
+            offline_stt-v*)
+              PACKAGE_NAME="offline_stt"
+              VERSION="${TAG#offline_stt-v}"
+              ;;
+            *)
+              # on.push.tags のパターンに合致した時点でここには来ないはず
+              # だが、フォールバックせず明示的に失敗させる(CLAUDE.md/
+              # リポジトリ方針: フォールバック禁止)。
+              echo "::error::tag '${TAG}' は公開対象パッケージのどのタグパターン(platform_interface-v*/darwin-v*/android-v*/web-v*/offline_stt-v*)にも一致しない" >&2
+              exit 1
+              ;;
+          esac
+          echo "package_name=${PACKAGE_NAME}" >> "$GITHUB_OUTPUT"
+          echo "package_dir=packages/${PACKAGE_NAME}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "対象パッケージ: ${PACKAGE_NAME} / バージョン: ${VERSION}"
+
+      - name: タグの version と pubspec.yaml の version が一致することを検証する
+        working-directory: ${{ steps.pkg.outputs.package_dir }}
+        run: |
+          set -euo pipefail
+          PUBSPEC_VERSION="$(grep -m1 '^version:' pubspec.yaml | sed -E 's/^version:[[:space:]]*//')"
+          TAG_VERSION="${{ steps.pkg.outputs.version }}"
+          if [ -z "$PUBSPEC_VERSION" ]; then
+            echo "::error::pubspec.yaml から version を読み取れなかった" >&2
+            exit 1
+          fi
+          if [ "$PUBSPEC_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::タグの version (${TAG_VERSION}) と pubspec.yaml の version (${PUBSPEC_VERSION}) が一致しない" >&2
+            exit 1
+          fi
+          echo "OK: tag version と pubspec.yaml の version (${PUBSPEC_VERSION}) は一致している"
+
+      # --- ここから先が SDK セットアップ。順序が重要 ---
+      #
+      # 1. dart-lang/setup-dart@v1 を Flutter のセットアップより先に実行する。
+      #    このアクションは Dart SDK を入れるだけでなく、
+      #    `ACTIONS_ID_TOKEN_REQUEST_URL` が存在する場合に
+      #    `core.getIDToken('https://pub.dev')` でOIDCトークンを取得し、
+      #    `dart pub token add https://pub.dev --env-var PUB_TOKEN` を実行して
+      #    `$PUB_CACHE` にトークンを保存する処理を行う
+      #    (dart-lang/setup-dart の `lib/main.dart` の `createPubOIDCToken()`
+      #    で確認済み)。**この処理は dart-lang/setup-dart 固有であり、
+      #    subosito/flutter-action は行わない。** そのためこのワークフローは
+      #    `subosito/flutter-action` 単体では成立せず、
+      #    `dart-lang/setup-dart@v1` を明示的に使う。
+      # 2. その後 subosito/flutter-action@v2 をセットアップする。この
+      #    リポジトリのパッケージは Flutter プラグイン(`flutter: sdk: flutter`
+      #    に依存)であり、`dart pub get` が Flutter SDK 同梱の pub を使う
+      #    必要があるため。`dart-lang/setup-dart` が PATH に通した `dart` は
+      #    ここで Flutter 同梱の `dart` に上書きされるが、トークンは
+      #    `$PUB_CACHE`(環境変数として引き継がれる)に保存済みのため
+      #    影響しない。公式の reusable workflow
+      #    (dart-lang/setup-dart/.github/workflows/publish.yml)も
+      #    「dart-lang/setup-dart → Flutterセットアップ」の順で全く同じ
+      #    構成を取っており、この順序を踏襲している。
+      #
+      # この2アクション構成にした理由(公式 reusable workflow を直接使わ
+      # なかった理由): 公式 reusable workflow は1ジョブでSDKセットアップ→
+      # dry-run→publish を行うだけで、format/analyze/test や、
+      # ワークスペースを切り離した依存検証(このファイル冒頭のコメント
+      # 参照)を差し込む余地が無い。このリポジトリは Dart Pub Workspaces の
+      # monorepo であり、公開前に独自の検証手順が要るため、
+      # 同じSDKセットアップ手順を踏襲しつつ自前でジョブを組んだ。
+      - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d # v1.8.1
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: ${{ env.FLUTTER_CHANNEL }}
+          cache: true
+
+      - name: melos をインストールする
+        run: dart pub global activate melos 8.2.2
+
+      - name: workspace を解決する(Dart Pub Workspaces)
+        run: melos bootstrap
+
+      - name: dart format 差分チェック(全パッケージ)
+        run: melos run format
+
+      - name: dart analyze --fatal-infos(全パッケージ)
+        run: melos run analyze
+
+      - name: dart test(test/ を持つパッケージのみ)
+        run: melos run test
+
+      - name: ワークスペースのローカル解決から対象パッケージを切り離す
+        working-directory: ${{ steps.pkg.outputs.package_dir }}
+        run: |
+          set -euo pipefail
+          # resolution: workspace を無効化する公式手順。これにより次の
+          # `dart pub get` はワークスペース内の兄弟パッケージではなく、
+          # pub.dev 上の hosted パッケージを解決対象にする(このファイル
+          # 冒頭のコメント「依存順の強制について」を参照)。
+          printf 'resolution:\n' > pubspec_overrides.yaml
+
+      - name: 依存先が pub.dev 上に存在することを検証する(単体解決)
+        working-directory: ${{ steps.pkg.outputs.package_dir }}
+        run: dart pub get
+
+      - name: dart pub publish --dry-run(単体解決)
+        working-directory: ${{ steps.pkg.outputs.package_dir }}
+        run: dart pub publish --dry-run
+
+      - name: dart pub publish(単体解決。OIDC/Trusted Publishing で認証)
+        working-directory: ${{ steps.pkg.outputs.package_dir }}
+        run: dart pub publish --force

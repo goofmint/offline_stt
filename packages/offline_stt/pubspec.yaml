@@ -7,6 +7,12 @@ version: 0.1.0
 homepage: https://github.com/goofmint/offline_stt
 repository: https://github.com/goofmint/offline_stt
 issue_tracker: https://github.com/goofmint/offline_stt/issues
+topics:
+  - speech-to-text
+  - stt
+  - offline
+  - transcription
+  - on-device
 
 environment:
   sdk: ^3.9.0

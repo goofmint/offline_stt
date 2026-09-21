@@ -124,7 +124,14 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」タ�
 - [ ] README: モデル同梱型代替(sherpa-onnx等)との使い分け記載
 - [ ] APIドキュメント(dartdoc)整備
 - [ ] CHANGELOG / LICENSE / pubspec整備(0.1.0、全パッケージ)
-- [ ] pub.dev dry-run → 6パッケージ公開(publish順: platform_interface → 各実装 → エントリ)
+- [x] pub.dev dry-run(公開対象5パッケージすべてで `Package has 0 warnings.`)
+- [ ] pub.dev 公開(publish順: platform_interface → 各実装 → エントリ)
+  - **公開対象は5パッケージである。** `offline_stt_windows` は `publish_to: none` であり
+    v1 の公開対象外である(WinAppSDK の安定版に `Microsoft.Windows.AI.Speech` が
+    存在しないため。#88)。当初の「6パッケージ」はこの決定より前の記述である。
+  - 手順は [docs/PUBLISHING.md](docs/PUBLISHING.md) を参照。
+  - **`dart pub publish` は取り消せない操作であるため、リポジトリの所有者が
+    明示的に実行する。**
 - [ ] E2E手動チェックリストをリポジトリに収録(リリース前検証手順として)
 
 ## 継続タスク(公開後)
