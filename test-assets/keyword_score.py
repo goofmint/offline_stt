@@ -13,6 +13,19 @@ integration_test では採点まで行わない)。
     test-assets/keyword_score.py jaJP_10s "東京都渋谷区で ..."
 
 `<クリップ名>` は test-assets/baseline-audio/<クリップ名>.json を指す。
+
+`{クリップ名}.json` の `keywords` はキーワードグループの配列であり、
+1要素は次のいずれかを取る(design.md §7「許容表記の表現形式」)。
+
+- 文字列: 表記が1つだけのキーワード(例: "東京都渋谷区")
+- 文字列の配列: 許容表記の列挙(例: ["2024年11月3日", "2024/11/3"])
+
+グループ内のいずれか1表記が一致すれば、そのグループを一致とみなす。
+**包含率の分母はグループ数であり、表記数ではない。**
+
+自己検査:
+    test-assets/keyword_score.py --selfcheck
+M0 実測テキストで jaJP_10s が 66.7%(4/6)になることを確認する。
 """
 
 import json
@@ -72,18 +85,29 @@ def judge(locale: str, rate: float) -> str:
     return "不成立"
 
 
-def main() -> int:
-    if len(sys.argv) != 3:
-        sys.stderr.write(__doc__)
-        return 2
-    clip, result_text = sys.argv[1], sys.argv[2]
+# 自己検査用の既知の入力と期待値。
+# spikes/android/RESULTS.md / spikes/darwin/RESULTS.md / spikes/web/RESULTS.md が
+# いずれも記録している M0 の jaJP_10s 実測テキストを入力すると 4/6 = 66.7% になる。
+# 不一致の2件(東京都渋谷区・株式会社モーンギフト)は表記差ではなく誤認識であり、
+# 許容表記の列挙によって一致に変わってはならない。
+SELFCHECK = (
+    "jaJP_10s",
+    "東京都渋谷で2024年11月3日午後3時株式会社モンギフトが新製品を発表しました"
+    "来場者は128名でした",
+    4,
+    6,
+)
+
+
+def score(clip: str, result_text: str):
+    """(ロケール, [(キーワードグループ, 一致した表記 or None), ...]) を返す。"""
     meta = json.loads((BASE / f"{clip}.json").read_text(encoding="utf-8"))
     locale = meta["locale"]
     keywords = meta["keywords"]
-
     normalized_result = normalize(result_text, locale)
-    matched, unmatched = [], []
+    results = []
     for keyword in keywords:
+        # 文字列単体は「要素数1の許容表記リスト」として扱う
         variants = keyword if isinstance(keyword, list) else [keyword]
         hit = None
         for variant in variants:
@@ -91,10 +115,45 @@ def main() -> int:
             if normalized_variant and normalized_variant in normalized_result:
                 hit = variant
                 break
-        (matched if hit else unmatched).append(keyword)
-        print(f"{'HIT ' if hit else 'MISS'}\t{keyword}")
+        results.append((keyword, hit))
+    return locale, results
 
-    total = len(keywords)
+
+def selfcheck() -> int:
+    clip, text, want_matched, want_total = SELFCHECK
+    _, results = score(clip, text)
+    total = len(results)
+    matched = [k for k, hit in results if hit]
+    unmatched = [k for k, hit in results if not hit]
+    rate = (len(matched) / total * 100.0) if total else 0.0
+    print(f"selfcheck: {clip} → {len(matched)}/{total} = {rate:.1f}%")
+    print(f"  不一致: {unmatched}")
+    if (len(matched), total) != (want_matched, want_total):
+        print(
+            f"NG: 期待は {want_matched}/{want_total} "
+            f"(= {want_matched / want_total * 100.0:.1f}%)"
+        )
+        return 1
+    print("OK: M0 の実測値 66.7%(4/6)を再現した")
+    return 0
+
+
+def main() -> int:
+    if len(sys.argv) == 2 and sys.argv[1] == "--selfcheck":
+        return selfcheck()
+    if len(sys.argv) != 3:
+        sys.stderr.write(__doc__)
+        return 2
+    clip, result_text = sys.argv[1], sys.argv[2]
+    locale, results = score(clip, result_text)
+    matched = [k for k, hit in results if hit]
+    unmatched = [k for k, hit in results if not hit]
+    for keyword, hit in results:
+        # 許容表記が複数あるグループは、どの表記で一致したかも出す
+        suffix = f" (一致表記: {hit})" if hit and isinstance(keyword, list) else ""
+        print(f"{'HIT ' if hit else 'MISS'}\t{keyword}{suffix}")
+
+    total = len(results)
     rate = (len(matched) / total * 100.0) if total else 0.0
     print(f"clip={clip} locale={locale}")
     print(f"包含率: {len(matched)}/{total} = {rate:.1f}% → {judge(locale, rate)}")

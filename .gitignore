@@ -39,6 +39,10 @@ melos_*.iml
 **/windows/flutter/ephemeral/
 **/linux/flutter/ephemeral/
 
+# Python の生成物(test-assets/keyword_score.py 用)
+__pycache__/
+*.pyc
+
 # 一時設計ノート
 .tmp/
 

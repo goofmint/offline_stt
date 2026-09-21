@@ -41,7 +41,7 @@
 | プラットフォーム | バックエンドAPI | 最低OSバージョン | 所要時間特性 | ja-JP検証結果 |
 |---|---|---|---|---|
 | Android | 標準 `android.speech.SpeechRecognizer`(`createOnDeviceSpeechRecognizer`)+ MediaCodecデコード + 実時間ポンプ | Android 12 / API 31(`minSdk 31`) | **実時間**。PFDパイプへ毎秒約32KBで供給するため、ファイル長と同等の時間がかかる(Pixel 6実機: 9.56秒の音声に対しポンプ9,564ms、実効31,993.7バイト/秒) | **不成立**。Pixel 6(Android 17 / API 37)実機で jaJP_10s 66.7%(4/6) |
-| iOS / macOS | SpeechAnalyzer + SpeechTranscriber(AVFoundationデコード) | iOS 26 / macOS 26(podspec の deployment target も 26.0) | **非実時間・高速**。macOS 26.5.1実機でRTF 0.0067〜0.0245、**iPad Pro (iOS 26.6.2) 実機で RTF 0.0059〜0.0511**(いずれも実時間の約20〜170倍速) | **不成立**。macOS 26.5.1実機・iPad Pro (iOS 26.6.2) 実機とも jaJP_10s 66.7%(4/6)、enUS_10s 80.0%。**両プラットフォームで率もHIT/MISSの内訳も完全一致** |
+| iOS / macOS | SpeechAnalyzer + SpeechTranscriber(AVFoundationデコード) | iOS 26 / macOS 26(podspec の deployment target も 26.0) | **非実時間・高速**。macOS 26.5.1実機でRTF 0.0067〜0.0245、**iPad Pro (iOS 26.6.2) 実機で RTF 0.0059〜0.0511**(いずれも実時間の約20〜170倍速) | **不成立**。macOS 26.5.1実機・iPad Pro (iOS 26.6.2) 実機とも jaJP_10s 66.7%(4/6)、enUS_10s 80.0%(いずれもキーワードセット是正の前後で不変)。`enUS_3m` は是正後 80.0%(是正前 44.0%)。**両プラットフォームで率もHIT/MISSの内訳も完全一致** |
 | ~~Windows~~ | — | **v1では対象外**(冒頭参照) | — | — |
 | Web | Chrome オンデバイス Web Speech(`processLocally: true`)+ Web Audio | Chrome 142 以上(オンデバイスWeb Speechのリグレッション修正済みバージョン)。実機検証は Chrome 153 | **実時間**。Chrome 153で9.56秒の音声に9,676ms。`playbackRate` で短縮できるが精度が落ちる(後述) | **不成立**。Chrome 153で jaJP_10s(1.0x)66.7%(4/6) |
 
@@ -59,14 +59,17 @@ Linuxは対象外である(OSネイティブのASR APIが存在しないため�
 
 ### 精度について(重要)
 
-**現時点で design.md §7 のしきい値(クリーン基準音声: ja-JP 90%以上、en-US 95%以上)を満たしたプラットフォームは1つも無い。**
+**design.md §7 のしきい値は、クリーン基準音声で ja-JP が 95%以上で合格・90〜94%が条件付き合格、en-US が 95%以上で合格である。ja-JP は、実測できた Darwin / Web / Android の3つすべてで満たしていない**(Windows は v1 対象外であり測定していない)。en-US では Android(Pixel 6)の `enUS_10s` が 100.0% で満たしている。
 
 - Darwin(macOS 26.5.1)・Web(Chrome 153)・Android(Pixel 6)の3つはいずれも、同一の基準音声 `jaJP_10s` で**ちょうど 66.7%(4/6)**という同率だった。
 - 3プラットフォームすべてが `株式会社モーンギフト` を落としている(Darwin「モーギフト」、Web「ムーンギフト」、Android「モンギフト」)。
-- **この不成立の原因は未確定である。** 基準音声がTTS合成音声であること、キーワード選定と正規化規則が表記差を吸収できていないこと、認識モデル自体の精度、(Darwinでは)プリセット選択、のいずれが支配的かを分離する対照実験を行っていない。したがって「認識品質が低い」とも「基準音声の設計の問題」とも断定しない。詳細は design.md §7 の注記と各 `RESULTS.md` を参照。
+- **この不成立の原因は未確定である。** 基準音声がTTS合成音声であること、キーワード選定と正規化規則が表記差を吸収できていないこと、認識モデル自体の精度、(Darwinでは)プリセット選択、のいずれが支配的かを分離する対照実験を行っていない。したがって「認識品質が低い」とも「基準音声の設計の問題」とも断定しない。**ただし次項のとおり、`jaJP_10s` についてだけは「キーワード選定と正規化規則」を候補から外せている。長尺クリップでは外せていない。** 詳細は design.md §7 の注記と各 `RESULTS.md` を参照。
+- **2026-09-21 にキーワードセットの不備を1件是正した。** design.md §7 は「表記が複数あり得るキーワードは許容表記を列挙する」と定めているのに、`test-assets/baseline-audio/*.json` は各キーワード1表記しか持っておらず、`three hundred and twenty thousand` と `320,000` のような**単なる表記差を不一致として数えていた**。許容表記を列挙できるスキーマ(文字列 または 配列)に改め、**記録済みの確定テキストを採点し直した**。値が動いたのは `enUS_3m`(44.0% → **80.0%**、Darwin)と `jaJP_3m`(39.3% → **42.9%** / 28.6% → **32.1%**、Darwin)であり、**`jaJP_10s` の 66.7% は前後で変わらない**(落としている2件は表記差ではなく誤認識であるため)。**認識結果は一切変わっていない。端末での再測定もしていない。**
+
+  **是正後にしきい値を満たしているのは Android(Pixel 6)の `enUS_10s`(100.0%)だけである。** 条件付き合格圏(ja-JP 90〜94%)に入ったクリップも無い。
 - Darwinでは `SpeechTranscriber.Preset` の違いだけで包含率が最大20ポイント以上動く(`enUS_10s` は `.transcription` で100%に達した)ことが実測されており、包含率という指標自体が条件に強く依存する。
 
-ja-JP以外では、Darwinのみ en-US を実測している(`enUS_10s` 80.0% / `enUS_3m` 44.0%、いずれも不成立)。Web・Android・Windowsの en-US は未検証である。
+ja-JP以外では、Darwin と Android で en-US を実測している。Darwin は `enUS_10s` 80.0% / `enUS_3m` **80.0%**(キーワードセット是正前は 44.0%)で、いずれも不成立である。Android(Pixel 6)は `enUS_10s` が **100.0% で合格**、`enUS_3m` は 40.0%(是正前の値。確定テキストが逐語で記録されていないため再採点できていない)。Web・Windowsの en-US は未検証である。
 
 ### 再生速度オプション(`playbackRate`)
 
