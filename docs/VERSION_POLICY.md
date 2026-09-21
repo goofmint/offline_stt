@@ -123,6 +123,44 @@ SpeechAnalyzer がそのOSバージョンで追加されたAPIであるためで
 > CMake側にバージョン検証を入れるかどうかは、Windows実機での検証
 > (Issue #58)に合わせて判断する。
 
+### 1.4-b Windows AI Speech は experimental チャンネルにしか無い(実機で確定)
+
+**Issue #15〜#18 の作業中に、Windows 11 実機で確定した事実である。**
+
+`winapp init --setup-sdks stable` が展開する WinAppSDK **2.5.1(安定版)**には
+`Microsoft.Windows.AI.Speech` が**存在しない**。生成されるプロジェクション
+ヘッダーは次のとおりで、Speech が無い。
+
+```
+Microsoft.Windows.AI.ContentSafety.h
+Microsoft.Windows.AI.Foundation.h
+Microsoft.Windows.AI.Imaging.h
+Microsoft.Windows.AI.MachineLearning.h
+Microsoft.Windows.AI.Text.h
+Microsoft.Windows.AI.Video.h
+```
+
+`--setup-sdks experimental`(WindowsAppSDK.AI **2.4.8-experimental**)にすると
+`Microsoft.Windows.AI.Speech.h` が現れ、WinRT 実装のコンパイルが通る。
+
+**公式ドキュメントの記述と実際の出荷物が食い違っている。**
+<https://learn.microsoft.com/en-us/windows/ai/apis/speech-recognition> の
+Prerequisites は「WinAppSDK version: Version 1.7.1 or later」と書いているが、
+安定版 1.7 系にも 2.5 系にも当該名前空間は入っていない。
+
+**M0 の記録(`spikes/windows/RESULTS.md`)が「API リファレンスは
+`windows-app-sdk-2.0-experimental` モニカーでのみ存在する」と書いていたのが
+正しく、M4 実装時に本線ドキュメントの Prerequisites を根拠に
+「齟齬は解消した」と判断したのは誤りだった。** SDK を実際に展開せず
+ドキュメントだけで結論を出したことが原因である。
+
+したがって現時点では:
+
+- Windows 実装は **experimental チャンネルの WinAppSDK を要求する**
+- requirements.md NFR-4 の「WinAppSDK 1.7.1以上」は**出荷物と一致しない**
+- 利用者に experimental チャンネルを要求することの是非は、公開(Issue #65)の
+  判断に直結する
+
 ### 1.5 Web
 
 | 固定しているもの | 値 | 場所 |
