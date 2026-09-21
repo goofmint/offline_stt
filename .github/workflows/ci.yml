@@ -108,6 +108,17 @@ env:
   FLUTTER_VERSION: '3.47.5'
   FLUTTER_CHANNEL: 'stable'
 
+# GITHUB_TOKEN の権限を最小にする。このワークフローのどのジョブも
+# リポジトリへの書き込み(コミット・コメント投稿・リリース作成など)を
+# 行わず、チェックアウトして検証するだけである。ジョブ個別ではなく
+# ワークフロー全体に指定して、今後ジョブを足したときに指定漏れが
+# 起きないようにする。
+#
+# 公開(pub.dev への書き込み)は .github/workflows/publish.yml が行う。
+# あちらはジョブ単位で `id-token: write` を持つ(docs/PUBLISHING.md 6.2節)。
+permissions:
+  contents: read
+
 jobs:
   analyze-test:
     name: Analyze + Test + Format
