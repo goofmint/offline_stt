@@ -13,11 +13,20 @@
 extern "C" {
 #endif
 
-// offline_stt のWindowsネイティブ側エントリポイント(Issue #52)。
+// Native entry point of offline_stt on Windows (Issue #52).
 //
-// 実装本体は offline_stt_windows_plugin.cpp。Pigeon生成の
-// `OfflineSttHostApi` / `OfflineSttStreamCallbackApi`(design.md §2.3)と、
-// Windows AI Speech Recognition 連携(design.md §4.4)を結びつける。
+// The implementation lives in offline_stt_windows_plugin.cpp. It wires up the
+// Pigeon-generated `OfflineSttHostApi` / `OfflineSttStreamCallbackApi`
+// (design.md section 2.3) with the Windows AI Speech Recognition integration
+// (design.md section 4.4).
+//
+// NOTE: This header is ASCII-only on purpose. It is included by the consuming
+// application's runner, which this plugin does not control. MSVC decodes a
+// BOM-less source with the system ANSI code page, so non-ASCII characters here
+// would emit warning C4819 and, because Flutter's runner treats warnings as
+// errors, break the build of every app on a non-UTF-8 locale (verified on a
+// Japanese-locale Windows 11 machine). Japanese comments are fine in the
+// plugin's own sources, which are compiled with /utf-8 (see CMakeLists.txt).
 FLUTTER_PLUGIN_EXPORT void OfflineSttWindowsPluginCApiRegisterWithRegistrar(
     FlutterDesktopPluginRegistrarRef registrar);
 

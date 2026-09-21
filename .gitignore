@@ -48,3 +48,11 @@ melos_*.iml
 # パッケージ配下に出力するため、`**/` を付けて全階層にマッチさせる。
 # (マッチしないと生成HTMLが pub publish のアーカイブに混入する。)
 **/doc/api/
+
+# Darwin E2E(Issue #40)用に tool/stage_baseline_audio.sh が
+# test-assets/baseline-audio/ から複製する作業コピー。同じ15MBを
+# リポジトリへ二重に持たない。ディレクトリ自体は .gitkeep で追跡する
+# (apps/example/pubspec.yaml がアセットディレクトリとして宣言しており、
+# 存在しないと flutter build が失敗するため)。
+apps/example/assets/baseline-audio/*
+!apps/example/assets/baseline-audio/.gitkeep

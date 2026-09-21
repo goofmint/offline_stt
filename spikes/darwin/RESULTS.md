@@ -280,3 +280,73 @@ design.md §8 未決事項3(SpeechTranscriberのja-JP対応可否)は、iOS 27.0
 3. **`installedLocales`がロケール単位でなく言語(ベースランゲージ)単位で共有されうる**: design.mdはFR-1をロケール単位の状態(`available`/`downloadable`/`downloading`/`unavailable`)として設計しているが、実測では1つの地域変種(例: en-US)を使うと未使用の同系統変種(en-AU、en-CA等)も`installedLocales`に含まれるようになった。ロケール単位の状態管理という設計前提の一部見直しが必要になる可能性がある。
 4. **Preset選定は design.md に明記されていない**: design.md §4.2は「SpeechAnalyzer + SpeechTranscriber(locale指定)」とのみ記載し、`SpeechTranscriber.Preset`の選定基準には触れていない。本スパイクの実測(プリセットによって包含率が最大20ポイント以上変動)を踏まえ、design.md §4.2にpreset選定の指針(またはM2での要検討事項として明記)を追加することを提案する。
 5. **タイムアウト分類(`DarwinSpikeError.timeout`)はdesign.md §5に存在しない**: 本スパイク独自の追加分類であり、design.md §5表への反映が必要かはM2実装判断による(3分クリップの実測RTFが0.01〜0.03と極めて高速だったため、実運用でタイムアウトが問題になる可能性は低いと考えられる)。
+
+---
+
+## 追記: Issue #7 — iOS 26 実機での `supportedLocales` 確認(完了)
+
+**確認済み。** iPad Pro 11-inch (M4) / **iOS 26.6.2** の実機で
+`spikes/darwin/ios-probe` を実行した。
+
+```
+===DARWIN_STT_PROBE_BEGIN===
+device: iPad / iOS 26.6.2
+isAvailable: true
+supportedLocales (30件):
+  de-AT, de-CH, de-DE, en-AU, en-CA, en-GB, en-IE, en-IN, en-NZ, en-SG,
+  en-US, en-ZA, es-CL, es-ES, es-MX, es-US, fr-BE, fr-CA, fr-CH, fr-FR,
+  it-CH, it-IT, ja-JP, ko-KR, pt-BR, pt-PT, yue-CN, zh-CN, zh-HK, zh-TW
+installedLocales:
+  ja-JP
+jaLocales: ja-JP
+supportedLocale(equivalentTo: ja-JP): ja-JP
+AssetInventory.status(ja-JP): supported
+maximumReservedLocales: 5
+reservedLocales: (なし)
+===DARWIN_STT_PROBE_END===
+```
+
+### 結論
+
+**iOS 26 実機の `supportedLocales` に ja-JP が含まれる。** requirements.md
+NFR-4 が定める対応下限(iOS 26)で日本語が使えることを確認した。design.md §8
+未決事項3 の残課題だった「iOS 26 実機での確認」はこれで確定である。
+
+### OSバージョンによる差は実在した
+
+|  | 件数 | ja-JP |
+|---|---|---|
+| macOS 26.5.1 | 30 | あり |
+| **iOS 26.6.2** | **30** | **あり** |
+| iOS 27.0 | 45 | あり |
+
+`supportedLocales` は OS バージョンによって実際に変わる(26系が30件、27系が
+45件)。**したがって iOS 27.0 の結果から iOS 26 を外挿することはできず、
+下限での確認が必要だったことが裏付けられた。**
+
+### M0 既知の不整合は iOS 26 でも再現する
+
+`installedLocales` に ja-JP が含まれるにもかかわらず
+`AssetInventory.status(forModules:)` が `.installed` ではなく `.supported` を
+返す事象は、macOS 26.5.1 / iOS 27.0 に続き **iOS 26.6.2 でも再現した**。
+本番実装(`ModelAvailability.swift` の判定規則6)は `status` と
+`installedLocales` の両方を突き合わせるため、この挙動でも誤判定しない。
+
+### 実行方法
+
+```
+cd spikes/darwin/ios-probe
+xcodegen generate
+xcodebuild -project DarwinSTTProbe.xcodeproj -scheme DarwinSTTProbe \
+  -destination 'id=<device-udid>' -allowProvisioningUpdates \
+  -derivedDataPath /tmp/probe_dd build
+xcrun devicectl device install app --device <device-udid> \
+  /tmp/probe_dd/Build/Products/Debug-iphoneos/DarwinSTTProbe.app
+xcrun devicectl device process launch --device <device-udid> --console \
+  jp.moongift.offlinestt.darwinprobe
+```
+
+端末は事前に **デベロッパモードを有効化**しておく必要がある
+(設定 → プライバシーとセキュリティ → デベロッパモード、要再起動)。
+無効のままだと `The developer disk image could not be mounted on this device.`
+で destination として使えない。

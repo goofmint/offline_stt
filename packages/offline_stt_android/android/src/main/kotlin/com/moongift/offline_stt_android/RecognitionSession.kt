@@ -185,6 +185,68 @@ object RecognitionSession {
         pacer.flush()
     }
 
+    /**
+     * `onPartialResults()` の内容が「直前の仮説の続き」ではなく
+     * 「新しい仮説の先頭」になったかを判定する。
+     *
+     * オンデバイス認識エンジンは長尺入力で仮説をリセットし、partial が
+     * 最初からやり直しになる。通常の更新では文字列は伸びるか、末尾が
+     * 少し書き換わる程度であるのに対し、リセット直後は数文字まで縮む。
+     * Pixel 6 実機の 3分クリップでは 341 文字 → 数文字という落ち方だった
+     * (E2E_RESULTS.md の B-3)。
+     *
+     * そこで「**長さが半分未満に縮み、かつ直前の仮説の接頭辞でもない**」
+     * ことをリセットの条件とする。接頭辞であれば、同じ仮説に対する
+     * 取り消し(retraction)であってリセットではない。
+     *
+     * **これは経験則であり、OSが公開している判定手段ではない。** 誤検出
+     * すると確定テキストに重複が入り、検出漏れすると従来どおりセグメントが
+     * 失われる。閾値の妥当性は実機でしか確かめられない。
+     */
+    internal fun isHypothesisReset(previous: String, next: String): Boolean {
+        if (previous.isEmpty()) return false
+        if (previous.startsWith(next)) return false
+        return next.length * 2 < previous.length
+    }
+
+    /**
+     * 仮説リセットで分かれたセグメントを連結する。重なりがあれば取り除く。
+     *
+     * リセット後の新しい仮説は、直前のセグメントが既に書き起こした区間を
+     * **もう一度認識し直すことがある**。単純に連結すると確定テキストに同じ
+     * 内容が二重に入る。Pixel 6 実機の `enUS_3m` では、期待 2,888 文字に対し
+     * 単純連結が 3,800 文字になり、約900文字が重複していた
+     * (E2E_RESULTS.md の B-3)。
+     *
+     * そこで「**累積テキストの末尾**と**次セグメントの先頭**が一致する
+     * 最長の区間」を探し、次セグメント側からそれを取り除いてから連結する。
+     * 認識結果は再認識のたびに細部が揺れる(実測: `Moji tall core` /
+     * `Mojit tall core`)ため完全一致では拾い切れないことがあり、その場合は
+     * 重複が残る。取り除きすぎるより残すほうが実害が小さいと判断している
+     * (欠落は復元できないが、重複は読めば分かる)。
+     *
+     * @param minOverlap 偶然の一致を重複と誤認しないための下限。短い一致で
+     *   切り詰めると、本来必要な文字が消える。
+     */
+    internal fun joinWithOverlap(
+        accumulated: String,
+        next: String,
+        maxOverlap: Int = 2000,
+        minOverlap: Int = 20,
+    ): String {
+        if (accumulated.isEmpty()) return next
+        if (next.isEmpty()) return accumulated
+        val limit = minOf(accumulated.length, next.length, maxOverlap)
+        var overlap = 0
+        for (length in limit downTo minOverlap) {
+            if (accumulated.regionMatches(accumulated.length - length, next, 0, length)) {
+                overlap = length
+                break
+            }
+        }
+        return accumulated + next.substring(overlap)
+    }
+
     private suspend fun awaitRecognition(
         recognizer: SpeechRecognizer,
         readSide: ParcelFileDescriptor,
@@ -196,6 +258,14 @@ object RecognitionSession {
         // design.md §4.3(wt73版)「onResults()のtextsがnullになる。その場合は
         // 直前のonPartialResults()の最上位候補を確定結果として採用する」。
         var lastPartialTopCandidate: String? = null
+        // 長尺音声では、オンデバイス認識エンジン(SODA)が途中で仮説を
+        // リセットし、`onPartialResults()` の内容が最初からやり直しになる。
+        // Pixel 6 実機で 3分クリップを流したところ2回リセットが起き、
+        // 341 / 370 / 343 文字の3セグメントに分かれた。直近の候補だけを
+        // 確定結果にすると**音声の最初の2/3が失われる**
+        // (E2E_RESULTS.md の B-3)。リセットを検出して確定済みセグメントを
+        // 貯め、最後に連結して1件の確定結果として返す。
+        val committedSegments = mutableListOf<String>()
         // `settled` はメインスレッドの `RecognitionListener` と、IOスレッドから
         // 走りうる `invokeOnCancellation` の両方から触られる。`pumpJob` は
         // Dispatchers.IO 上で失敗を再送出するため、子ジョブの失敗で親スコープが
@@ -235,8 +305,17 @@ object RecognitionSession {
                     // する正規の仕様として扱う(Web実装が isFinal が立たない
                     // 場合に末尾interimを採用したのと同じ構図)。
                     val texts = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
-                    val finalText = texts?.firstOrNull() ?: lastPartialTopCandidate
-                    if (finalText != null) {
+                    val tail = texts?.firstOrNull() ?: lastPartialTopCandidate
+                    // リセットで切れた確定済みセグメントと、最後のセグメントを
+                    // 連結する(上記 committedSegments のコメント参照)。
+                    // 再認識による重なりは joinWithOverlap が取り除く。
+                    // リセットが起きていなければ committedSegments は空であり、
+                    // 従来どおり tail がそのまま確定結果になる。
+                    val finalText =
+                        (committedSegments + listOfNotNull(tail))
+                            .filter { it.isNotEmpty() }
+                            .fold("") { acc, segment -> joinWithOverlap(acc, segment) }
+                    if (finalText.isNotEmpty()) {
                         segmentsWrapper.send(TranscriptSegment(text = finalText, isFinal = true))
                     }
                     segmentsWrapper.sendEndOfStream()
@@ -249,6 +328,10 @@ object RecognitionSession {
                     val texts =
                         partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     val top = texts?.firstOrNull() ?: return
+                    val previous = lastPartialTopCandidate
+                    if (previous != null && isHypothesisReset(previous, top)) {
+                        committedSegments.add(previous)
+                    }
                     lastPartialTopCandidate = top
                     segmentsWrapper.send(TranscriptSegment(text = top, isFinal = false))
                 }

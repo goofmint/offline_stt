@@ -45,15 +45,18 @@ std::string Utf8FromUtf16(const wchar_t* utf16_string) {
   if (utf16_string == nullptr) {
     return std::string();
   }
-  // NOTE: 本ファイルは `flutter create` が生成するランナーのテンプレートだが、
-  // 以下はテンプレートのままだと符号なしアンダーフローを起こすため意図的に
-  // 変更してある(Issue #59 のレビュー指摘)。
-  // `WideCharToMultiByte` は `WC_ERR_INVALID_CHARS` 指定時、不正なUTF-16を
-  // 与えられると 0 を返す。テンプレートはその戻り値を `unsigned int` に入れて
-  // から 1 を引くため、`target_length` が `UINT_MAX` になり、直後の `resize`
-  // が巨大な確保を試みてプロセスを落としうる。
-  // 終端NULLを変換対象から外して入力長を先に求め、符号付きで受ける形に
-  // 直してある。
+  // NOTE: This file comes from the `flutter create` runner template, but the
+  // code below is intentionally changed (review finding on Issue #59).
+  // `WideCharToMultiByte` returns 0 when it rejects malformed UTF-16 under
+  // `WC_ERR_INVALID_CHARS`. The template stores that in an `unsigned int` and
+  // subtracts 1, so `target_length` becomes `UINT_MAX` and the following
+  // `resize` attempts a huge allocation that can kill the process.
+  // Here the input length is computed first, the terminating NUL is excluded
+  // from the conversion, and the result is held in a signed int.
+  //
+  // Comments in this file are ASCII-only: the runner is not compiled with
+  // /utf-8, so non-ASCII here breaks the build on a non-UTF-8 locale
+  // (warning C4819 -> error, verified on a Japanese-locale Windows 11 machine).
   int input_length = static_cast<int>(wcslen(utf16_string));
   int target_length = ::WideCharToMultiByte(
       CP_UTF8, WC_ERR_INVALID_CHARS, utf16_string,

@@ -10,7 +10,7 @@ issue_tracker: https://github.com/goofmint/offline_stt/issues
 
 environment:
   sdk: ^3.9.0
-  flutter: ">=3.41.0"
+  flutter: ">=3.47.0"
 
 resolution: workspace
 
@@ -21,7 +21,6 @@ dependencies:
   offline_stt_darwin: ^0.1.0
   offline_stt_platform_interface: ^0.1.0
   offline_stt_web: ^0.1.0
-  offline_stt_windows: ^0.1.0
 
 dev_dependencies:
   flutter_lints: ^6.0.0
@@ -37,7 +36,5 @@ flutter:
         default_package: offline_stt_darwin
       macos:
         default_package: offline_stt_darwin
-      windows:
-        default_package: offline_stt_windows
       web:
         default_package: offline_stt_web

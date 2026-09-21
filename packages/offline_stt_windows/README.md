@@ -1,5 +1,21 @@
 # offline_stt_windows
 
+> # v1 では対象外であり、pub.dev に公開していない
+>
+> `Microsoft.Windows.AI.Speech` が **WinAppSDK の安定版に存在しない**
+> (experimental チャンネルにのみ存在)。Windows 11(10.0.26200 / 25H2)の
+> 実機で、安定版ではクリーンビルド時に WinRT 実装4ファイルがコンパイル対象から
+> 外れることを確認済みである。
+>
+> 公式ドキュメントの「WinAppSDK version: Version 1.7.1 or later」という記述は
+> 出荷物と食い違っている(1.7系・2.x安定版のいずれのパッケージにも
+> `Microsoft.Windows.AI.Speech.winmd` が無い)。
+>
+> 安定版で使える代替の調査結果は [`../../spikes/windows/ALTERNATIVES.md`](../../spikes/windows/ALTERNATIVES.md)。
+> **本パッケージの実装はそのまま残す。** API が安定版に入った時点で
+> `publish_to: none` を外し、`offline_stt` のプラットフォームに windows を
+> 戻せば有効化できる。以下の内容はその前提で読むこと。
+
 `offline_stt` の Windows 実装(C++/WinRT + [Windows AI APIs の Speech Recognition](https://learn.microsoft.com/en-us/windows/ai/apis/speech-recognition))。
 
 このパッケージは federated plugin の実装パッケージであり、**利用者が直接依存するものではない**(requirements.md §6 / design.md §1)。アプリ側は `offline_stt` にのみ依存すれば、`offline_stt` の `flutter.plugin.platforms.windows.default_package` によって自動的にこの実装が使われる。

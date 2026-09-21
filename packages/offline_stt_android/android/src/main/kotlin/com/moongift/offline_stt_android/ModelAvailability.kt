@@ -22,6 +22,7 @@ package com.moongift.offline_stt_android
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.os.Looper
 import android.speech.RecognitionSupport
 import android.speech.RecognitionSupportCallback
 import android.speech.RecognizerIntent
@@ -30,6 +31,27 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.suspendCancellableCoroutine
 
 object ModelAvailability {
+
+    /**
+     * `checkRecognitionSupport()` の照会結果。
+     *
+     * **「照会できて、対象ロケールがどのリストにも無い」と「そもそも照会に
+     * 失敗した」を区別するための型である。** 以前は両方とも `null` を返して
+     * いたため、`checkModel()` が失敗を `unavailable` に畳んでいた。Pixel 6
+     * 実機で `checkModel()` を連続呼び出しすると 17〜20%(B-1 修正後も
+     * 2/30 = 6.7%)の確率で偽の `unavailable` が返り、その理由がどこにも
+     * 残らなかった(E2E_RESULTS.md の B-2)。
+     */
+    sealed interface SupportQuery {
+        data class Success(val support: RecognitionSupport) : SupportQuery
+
+        /**
+         * 照会そのものが失敗した。[errorCode] は
+         * `RecognitionSupportCallback.onError()` が返した
+         * `SpeechRecognizer.ERROR_*`。同期例外で失敗した場合は null。
+         */
+        data class Failed(val errorCode: Int?, val cause: Throwable? = null) : SupportQuery
+    }
 
     /** requirements.md FR-1。`OfflineSttApiImpl.checkModel`から呼ばれる。 */
     suspend fun checkModel(context: Context, locale: String): ModelState {
@@ -43,8 +65,45 @@ object ModelAvailability {
             return ModelState.UNAVAILABLE
         }
 
-        val support = querySupport(context, locale) ?: return ModelState.UNAVAILABLE
+        // **照会の失敗を一律に `unavailable` へ畳まない。** 端末が対応して
+        // いないことと、照会が一時的に失敗したことは別である。後者を前者と
+        // して返すと、利用者に「この端末では使えない」という誤った結論を
+        // 与え、しかも原因がどこにも残らない(E2E_RESULTS.md の B-2)。
+        //
+        // ただし `onError()` の中には「照会は成立していて、答えが否定的」と
+        // 解釈すべきものがある。両者を分けて扱う。
+        when (val query = querySupportDetailed(context, locale)) {
+            is SupportQuery.Success -> return classify(query.support, locale)
+            is SupportQuery.Failed -> {
+                when (query.errorCode) {
+                    // 対象ロケールについての確定的な否定応答。FR-1 の
+                    // `unavailable`(終端状態)がそのまま当てはまる。
+                    SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED,
+                    SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE,
+                    -> return ModelState.UNAVAILABLE
+                    // 「対応状況を判定できない」ことを示す定数。端末側の
+                    // 問題であり、`AndroidTranscribeError.DeviceUnsupported`
+                    // の定義がこれを名指ししている。
+                    SpeechRecognizer.ERROR_CANNOT_CHECK_SUPPORT ->
+                        throw AndroidTranscribeError.DeviceUnsupported(
+                            "ERROR_CANNOT_CHECK_SUPPORT(${query.errorCode})",
+                        )
+                }
+                // それ以外(ERROR_RECOGNIZER_BUSY / ERROR_SERVER_DISCONNECTED
+                // / ERROR_CLIENT など)は一時的な失敗である。明示的なエラーに
+                // して呼び出し側が再試行できるようにする。
+                val detail = query.errorCode
+                    ?.let { "${ErrorMapping.errorName(it)}($it)" }
+                    ?: "同期例外: ${query.cause}"
+                throw AndroidTranscribeError.PlatformError(
+                    "checkRecognitionSupport() の照会に失敗した($detail)。" +
+                        "端末が対応していないという意味ではない。再試行すること。",
+                )
+            }
+        }
+    }
 
+    private fun classify(support: RecognitionSupport, locale: String): ModelState {
         return when {
             support.installedOnDeviceLanguages.contains(locale) -> ModelState.AVAILABLE
             support.pendingOnDeviceLanguages.contains(locale) -> ModelState.DOWNLOADING
@@ -54,12 +113,20 @@ object ModelAvailability {
     }
 
     /**
+     * ダウンロード完了ポーリング用。照会できなければ `null` を返す
+     * (「まだ完了していない」として扱う)。失敗理由が要る場合は
+     * [querySupportDetailed] を使うこと。
+     */
+    suspend fun querySupport(context: Context, locale: String): RecognitionSupport? =
+        (querySupportDetailed(context, locale) as? SupportQuery.Success)?.support
+
+    /**
      * `checkRecognitionSupport()`を1回照会する。API未対応・例外・
      * `RecognitionSupportCallback.onError()`はいずれもnullを返す
      * (呼び出し元は`unavailable`として扱う、またはダウンロード完了ポーリング
      * であれば「まだ完了していない」として扱う)。
      */
-    suspend fun querySupport(context: Context, locale: String): RecognitionSupport? =
+    suspend fun querySupportDetailed(context: Context, locale: String): SupportQuery =
         suspendCancellableCoroutine { continuation ->
             // `SpeechRecognizer` の破棄経路を1箇所に集約する。コールバック・
             // 同期例外・コルーチンのキャンセルのいずれで終わっても、必ず
@@ -80,7 +147,23 @@ object ModelAvailability {
                 // destroyOnce() が何もしなくなってリークする。
                 val target = recognizer ?: return
                 if (!destroyed.compareAndSet(false, true)) return
-                mainExecutor.execute { runCatching { target.destroy() } }
+                // **既にメインスレッド上ならその場で破棄する。** post すると
+                // 現在のメッセージ処理の「後」に回るため、コールバックが
+                // continuation を再開 → 呼び出し元が認識用の SpeechRecognizer を
+                // 生成 → その後に本インスタンスが破棄される、という順序になる。
+                // Pixel 6 実機ではこの順序で音声認識サービスの接続が切れ、
+                // 直後の `startListening()` が ERROR_SERVER_DISCONNECTED(11) で
+                // 即座に失敗した(20回中17回。E2E_RESULTS.md の B-1)。
+                // `checkRecognitionSupport()` のコールバックは本関数が渡した
+                // mainExecutor 上で走るため、通常はこの分岐に入る。
+                if (Looper.myLooper() == Looper.getMainLooper()) {
+                    runCatching { target.destroy() }
+                } else {
+                    // キャンセル経路など、メインスレッド以外から呼ばれた場合。
+                    // `SpeechRecognizer` はメインスレッドから操作する契約で
+                    // あるため post する。
+                    mainExecutor.execute { runCatching { target.destroy() } }
+                }
             }
 
             try {
@@ -96,19 +179,29 @@ object ModelAvailability {
                         override fun onSupportResult(recognitionSupport: RecognitionSupport) {
                             destroyOnce()
                             if (continuation.isActive) {
-                                continuation.resumeWith(Result.success(recognitionSupport))
+                                continuation.resumeWith(
+                                    Result.success(SupportQuery.Success(recognitionSupport)),
+                                )
                             }
                         }
 
                         override fun onError(error: Int) {
                             destroyOnce()
-                            if (continuation.isActive) continuation.resumeWith(Result.success(null))
+                            if (continuation.isActive) {
+                                continuation.resumeWith(
+                                    Result.success(SupportQuery.Failed(errorCode = error)),
+                                )
+                            }
                         }
                     },
                 )
             } catch (t: Throwable) {
                 destroyOnce()
-                if (continuation.isActive) continuation.resumeWith(Result.success(null))
+                if (continuation.isActive) {
+                    continuation.resumeWith(
+                        Result.success(SupportQuery.Failed(errorCode = null, cause = t)),
+                    )
+                }
             }
         }
 

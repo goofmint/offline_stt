@@ -17,6 +17,13 @@
 
 ### 既知の制約
 
+- **Windows は v1 の対象外である。** `Microsoft.Windows.AI.Speech` が
+  WinAppSDK の安定版に存在しない(experimental チャンネルのみ)ことを
+  Windows 11 実機で確認したため、`offline_stt` のプラットフォームから
+  windows を外し、`offline_stt_windows` も公開していない。Windows 上で
+  呼び出すとプラットフォーム実装が未登録のため `StateError` になる。
+  実装自体はリポジトリに残してあり、API が安定版に入った時点で有効化できる。
+
 - **Windows はアプリ側の追加セットアップが必須である。** MSIX パッケージ化と
   `systemAIModels` capability の宣言、および `winapp init` によるWinAppSDK
   ヘッダーの配置が必要である。手順は `offline_stt_windows` の README を

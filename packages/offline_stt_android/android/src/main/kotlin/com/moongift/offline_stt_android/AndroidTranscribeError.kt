@@ -89,3 +89,14 @@ val TranscribeErrorCode.wireCode: String
         TranscribeErrorCode.CANCELLED -> "cancelled"
         TranscribeErrorCode.PLATFORM_ERROR -> "platformError"
     }
+
+/**
+ * Pigeon の `HostApi` コールバックへ渡すためのエラーへ変換する。
+ *
+ * EventChannel 側は `sink.error(code, message, details)` を使うが、
+ * `HostApi` の `Result.failure()` に載せる場合は [FlutterError] である
+ * 必要がある(Pigeon 生成コードが code / message を取り出すため)。
+ * どちらの経路でも同じ [pigeonCode] と [detailMessage] を載せる。
+ */
+fun AndroidTranscribeError.toFlutterError(): FlutterError =
+    FlutterError(code = pigeonCode.wireCode, message = detailMessage)

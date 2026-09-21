@@ -20,7 +20,7 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」要�
 |---|---|---|---|
 | Android | 標準 `android.speech.SpeechRecognizer`(`createOnDeviceSpeechRecognizer`)**(構成変更済み。下記「M0判定の反映」参照)** | OS / Google Play services のオンデバイス言語パック(`triggerModelDownload` / `checkRecognitionSupport`) | 技術成立(Pixel 6実機)。**精度は不成立**(jaJP_10s 66.7%) |
 | iOS / macOS | SpeechAnalyzer | OS (AssetInventory) | 技術成立(macOS 26.5.1実機)。**精度は不成立**(jaJP_10s 66.7%)。iOS は `supportedLocales` 照会のみ実施 |
-| Windows | Windows AI APIs Speech Recognition | OS (NPUプリインストール / Windows Update) | **未検証**(Windows実機が存在しない)。ロケール指定APIが無いことのみドキュメント調査で確定 |
+| ~~Windows~~ | ~~Windows AI APIs Speech Recognition~~ | — | **v1では対象外**。`Microsoft.Windows.AI.Speech` が WinAppSDK の安定版に存在しない(experimental のみ)ことを Windows 11 実機で確認した。実装は残すが公開せず、`offline_stt` のプラットフォームからも外した。README 冒頭・`spikes/windows/ALTERNATIVES.md` 参照 |
 | Web | Chrome オンデバイスWeb Speech (processLocally) | Chrome (言語パック約60MB。ja-JP言語パックの取得はChrome 153で実機確認済み) | 技術成立(Chrome 153実機)。**精度は不成立**(jaJP_10s 1.0x 66.7%) |
 
 ### M0判定の反映(Issue #19)
@@ -142,7 +142,17 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」要�
 
 - Android 12 (API 31) 以上
 - iOS 26 以上 / macOS 26 以上
-- Windows 11 24H2 (build 26100) 以上、WinAppSDK 1.7.1以上(**M4実装時に再確認して確定**: 公式ドキュメント https://learn.microsoft.com/en-us/windows/ai/apis/speech-recognition の Prerequisites に「Windows 11, version 24H2 (build 26100) or later」「WinAppSDK version: Version 1.7.1 or later」と明記されている。M0調査時点ではAPIリファレンスが `windows-app-sdk-2.0-experimental` モニカーにしか無く本記述との齟齬を疑っていたが、本記述が正しかった。design.md §4.4 参照)
+- ~~Windows 11 24H2 (build 26100) 以上、WinAppSDK 1.7.1以上~~ → **v1では対象外**。
+  公式ドキュメントの Prerequisites は「WinAppSDK version: Version 1.7.1 or later」と
+  書いているが、**実際の出荷物と食い違っている**。NuGet の
+  `Microsoft.WindowsAppSDK.AI` を展開して確認したところ、安定版(2.5.5 / 2.4.4)にも
+  1.7 系(`1.7.250401001` / `1.7.260224002`)にも `Microsoft.Windows.AI.Speech.winmd` が
+  含まれず、`2.4.8-experimental` にのみ存在する。Windows 11 実機
+  (10.0.26200 / 25H2)でクリーンビルドし、安定版では WinRT 実装4ファイルが
+  コンパイル対象から外れることも確認済みである。
+  **M0調査(`spikes/windows/RESULTS.md`)の「experimental モニカーにしか API
+  リファレンスが無い」という記録が正しく、M4実装時に「本記述が正しかった」と
+  した判断が誤りだった。** SDK を展開せずドキュメントだけで判断したことが原因である
 - Chrome 142 以上(オンデバイスWeb Speechのリグレッション修正済みバージョン)
 
 ### NFR-5 バージョニング
@@ -192,7 +202,7 @@ abstract class OfflineTranscriber {
 | ~~ML Kit GenAI (alpha) の破壊的変更~~ → **顕在化のうえ解消済み(構成変更)** | Android実装の書き直し | ML Kit GenAI は AICore を前提とするが、Pixel 6 実機で AICore が stub 版であり Google Play ストア自身が非対応と明示することが判明した。標準 `android.speech.SpeechRecognizer` へ差し替え済み(§3「M0判定の反映」)。差し替え後の残課題は下行を参照 |
 | 標準 `SpeechRecognizer` の端末差・`onResults()` が確定テキストを返さない事例 | Android品質のばらつき、確定結果が得られない | Pixel 6 実機で `onResults()` の `RESULTS_RECOGNITION` が `null` になる事象を実測した(原因未特定)。他機種での挙動も未検証。実機E2E(Issue #50)で追試する |
 | Chrome オンデバイスWeb Speechの不安定さ(過去に一時無効化の実績) | Web実装が突然動かなくなる | `available()` を毎回確認、機能検出ベースで劣化 |
-| iOS SpeechAnalyzer / Windows AI の日本語対応が未確認 | 主要ユースケース不成立 | 実装前に4プラットフォームでja-JP実機検証(マイルストーン0)。macOS 26.5.1実機・iOS 27.0実機の双方で`supportedLocales`にja-JPを含むことを確認済み(spikes/darwin/RESULTS.md 参照)。残課題: (a)iOS 26実機での確認(supportedLocalesはOSバージョンで異なるため外挿不可)、(b)iOS実機でのファイル文字起こし検証(記録済みの結果はmacOSのもの)、(c)Windows実機での検証全般(ロケール指定APIが存在しないことはドキュメント調査で確定済みだが、ja-JP書き起こしの可否自体は未検証。spikes/windows/RESULTS.md 参照) |
+| iOS SpeechAnalyzer / Windows AI の日本語対応が未確認 | 主要ユースケース不成立 | 実装前に4プラットフォームでja-JP実機検証(マイルストーン0)。macOS 26.5.1実機・**iOS 26.6.2実機(下限、30件)**・iOS 27.0実機(45件)のいずれでも`supportedLocales`にja-JPを含むことを確認済み(spikes/darwin/RESULTS.md 参照)。**`supportedLocales`はOSバージョンで実際に変わるため下限での確認が必要だったが、Issue #7 で完了した。** **(b)iOS実機でのファイル文字起こし検証は Issue #40 で完了した**(iPad Pro / iOS 26.6.2 で基準音声8ファイル、16回すべて完走)。残課題: (c)Windows(**v1対象外**。`Microsoft.Windows.AI.Speech` が安定版に無い)(ロケール指定APIが存在しないことはドキュメント調査で確定済みだが、ja-JP書き起こしの可否自体は未検証。spikes/windows/RESULTS.md 参照) |
 | `continuous = true` では `source.onended` 後に明示的に `recognition.stop()` を呼ばないと `onend` が発火せず、セッションが終了しない(終了検出の実装漏れ) | Web実装がアプリ側の実装ミスで無応答になる(transcribeFile()のStreamが完了しない) | design.md §4.1 に必須手順として明記済み。Chrome 153実機で `onended` 内の `stop()` 呼び出しにより `isFinal` 結果と `onend` が発火することを確認済み(spikes/web/RESULTS.md 参照) |
 | ~~Advanced→Basicフォールバック挙動が未検証~~ → **失効**(ML Kit GenAI 固有の論点であり、構成変更により該当しなくなった) | - | - |
 | 最低OSバージョンが高くユーザー母数が限られる | **ML Kit GenAI Speech Recognitionを採用しないことで、当初懸念していた「Googleが個別に対応と認めたAICore搭載ハードウェアでしか動かない」というリスクは大幅に低減した。** 差し替え後の標準 `android.speech.SpeechRecognizer` は、API 37・ブートローダーロック済みのPixel 6実機(ML Kit GenAI Speech Recognitionでは `checkStatus()` が `PERMISSION_DENIED: Api access revoked.` を返し動作しなかった端末)で、ja-JPのオンデバイス言語パック取得・ファイル入力受理・文字起こしのいずれも実測で成功した(spikes/android/RESULTS.md 参照)。ただし**この実測はPixel 6単一機種によるものであり、他機種・他OEMでの動作は未検証のまま残る** | READMEには「APIレベルの要件(NFR-4のAndroid 12/API 31以上)を満たしていても、`checkRecognitionSupport()` の結果は機種・言語パック導入状況によって異なりうる」旨を明記する。M3実装時にPixel 6以外の複数機種で追加検証を行い、対応機種の線引きを確定させる(spikes/android/RESULTS.md 参照) |

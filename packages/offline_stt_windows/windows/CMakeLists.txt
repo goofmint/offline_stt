@@ -133,6 +133,17 @@ add_library(${PLUGIN_NAME} SHARED ${PLUGIN_SOURCES})
 apply_standard_settings(${PLUGIN_NAME})
 set_target_properties(${PLUGIN_NAME} PROPERTIES
   CXX_VISIBILITY_PRESET hidden)
+# **ソースが UTF-8 であることを MSVC に明示する。**
+# 本プラグインのソースは日本語のコメントと文字列リテラルを含む。MSVC は
+# BOM の無いソースをシステムの ANSI コードページとして解釈するため、
+# 日本語ロケールの Windows(CP932)では日本語が壊れ、
+#   warning C4819(現在のコードページで表示できない文字を含む)
+#   → C2220(警告のエラー化)
+#   error C2001(定数が2行目に続いています)
+# で必ずビルドが失敗する。**日本語ロケールの Windows 11 実機で実際に確認した。**
+# GitHub Actions のランナーは英語ロケールのため CI では顕在化しない。
+target_compile_options(${PLUGIN_NAME} PRIVATE "/utf-8")
+
 target_compile_definitions(${PLUGIN_NAME} PRIVATE FLUTTER_PLUGIN_IMPL)
 target_include_directories(${PLUGIN_NAME} INTERFACE
   "${CMAKE_CURRENT_SOURCE_DIR}/include")
