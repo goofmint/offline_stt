@@ -7,7 +7,7 @@
 
 録音済み音声ファイルを、**OSネイティブの音声認識APIだけで**オフライン文字起こしするFlutterライブラリ。認識モデルも推論エンジンも同梱せず、モデルの取得・更新・削除はすべてOSに委ねる。音声も書き起こし結果もネットワークに出ない([requirements.md](https://github.com/goofmint/offline_stt/blob/main/requirements.md) NFR-2)。
 
-**これはfederated pluginのエントリパッケージである。アプリが依存するのはこのパッケージだけでよい。** `offline_stt_android` / `offline_stt_darwin` / `offline_stt_windows` / `offline_stt_web` は endorsed な実装パッケージであり、`flutter.plugin.platforms.*.default_package` によって自動的に選択される。直接依存に書く必要は無い([design.md](https://github.com/goofmint/offline_stt/blob/main/design.md) §1)。
+**これはfederated pluginのエントリパッケージである。アプリが依存するのはこのパッケージだけでよい。** `offline_stt_android` / `offline_stt_darwin` / `offline_stt_web` は endorsed な実装パッケージであり、`flutter.plugin.platforms.*.default_package` によって自動的に選択される。直接依存に書く必要は無い(`offline_stt_windows` は **v1では endorsed に含めていない**。上記の対象外の説明を参照)([design.md](https://github.com/goofmint/offline_stt/blob/main/design.md) §1)。
 
 ---
 
@@ -17,7 +17,7 @@
 |---|---|---|
 | Android | 標準 `android.speech.SpeechRecognizer`(`createOnDeviceSpeechRecognizer`)+ MediaCodecデコード | Android 12 / API 31(ただし後述の制約により実質 API 33 以上) |
 | iOS / macOS | `SpeechAnalyzer` + `SpeechTranscriber` + `AssetInventory` | iOS 26 / macOS 26 |
-| Windows | Windows AI APIs Speech Recognition(`BatchRecognition`)+ Media Foundation | Windows 11 24H2 (build 26100) / WinAppSDK 1.7.1 以上。**加えてMSIXパッケージ化が必須** |
+| ~~Windows~~ | — | **v1では対象外。** `Microsoft.Windows.AI.Speech` が WinAppSDK の安定版に存在しない(experimental チャンネルのみ)ことを Windows 11 実機で確認した。実装はリポジトリに残しているが公開しておらず、`flutter.plugin.platforms` からも外してある |
 | Web | Chrome オンデバイス Web Speech(`processLocally: true`)+ Web Audio | Chrome 142 以上のデスクトップ版。localhost または https 配信であること |
 
 Linuxは対象外である(OSネイティブのASR APIが存在しないため)。
@@ -26,7 +26,7 @@ Linuxは対象外である(OSネイティブのASR APIが存在しないため)�
 
 - [offline_stt_android/README.md](https://github.com/goofmint/offline_stt/blob/main/packages/offline_stt_android/README.md)
 - [offline_stt_darwin/README.md](https://github.com/goofmint/offline_stt/blob/main/packages/offline_stt_darwin/README.md)
-- [offline_stt_windows/README.md](https://github.com/goofmint/offline_stt/blob/main/packages/offline_stt_windows/README.md)
+- [offline_stt_windows/README.md](https://github.com/goofmint/offline_stt/blob/main/packages/offline_stt_windows/README.md)(**v1では対象外。公開していない**)
 - [offline_stt_web/README.md](https://github.com/goofmint/offline_stt/blob/main/packages/offline_stt_web/README.md)
 
 ## API
@@ -92,9 +92,9 @@ checkModel(locale)
 | Android | 無し(`RECORD_AUDIO` 権限も不要)。ただしモデル取得の同意UIはアプリ側 |
 | iOS / macOS | 無し。同意UIはアプリ側 |
 | Web | localhost または https 配信。同意UIはアプリ側 |
-| Windows | **MSIXパッケージ化 + `systemAIModels` capability 宣言 + `winapp init`。依存を書くだけでは動かない唯一のプラットフォームである** |
+| ~~Windows~~ | **v1では対象外のため、アプリ側の対応も不要である。** Windows 上で呼び出すとプラットフォーム実装が未登録のため `StateError` になる |
 
-Windowsの手順は [offline_stt_windows/README.md](https://github.com/goofmint/offline_stt/blob/main/packages/offline_stt_windows/README.md) にまとめてある。
+Windows は v1 では対象外である。将来 `Microsoft.Windows.AI.Speech` が安定版に入った場合に必要となる手順(MSIXパッケージ化 + `systemAIModels` capability 宣言 + `winapp init`)は [offline_stt_windows/README.md](https://github.com/goofmint/offline_stt/blob/main/packages/offline_stt_windows/README.md) に残してある。
 
 ## 既知の制約(採用前に読むこと)
 

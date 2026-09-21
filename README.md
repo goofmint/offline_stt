@@ -42,7 +42,7 @@
 |---|---|---|---|---|
 | Android | 標準 `android.speech.SpeechRecognizer`(`createOnDeviceSpeechRecognizer`)+ MediaCodecデコード + 実時間ポンプ | Android 12 / API 31(`minSdk 31`) | **実時間**。PFDパイプへ毎秒約32KBで供給するため、ファイル長と同等の時間がかかる(Pixel 6実機: 9.56秒の音声に対しポンプ9,564ms、実効31,993.7バイト/秒) | **不成立**。Pixel 6(Android 17 / API 37)実機で jaJP_10s 66.7%(4/6) |
 | iOS / macOS | SpeechAnalyzer + SpeechTranscriber(AVFoundationデコード) | iOS 26 / macOS 26(podspec の deployment target も 26.0) | **非実時間・高速**。macOS 26.5.1実機でRTF 0.0067〜0.0245、**iPad Pro (iOS 26.6.2) 実機で RTF 0.0059〜0.0511**(いずれも実時間の約20〜170倍速) | **不成立**。macOS 26.5.1実機・iPad Pro (iOS 26.6.2) 実機とも jaJP_10s 66.7%(4/6)、enUS_10s 80.0%。**両プラットフォームで率もHIT/MISSの内訳も完全一致** |
-| Windows | Windows AI APIs Speech Recognition(`BatchRecognition`)+ Media Foundation変換 | Windows 11 24H2 (build 26100) / WinAppSDK 1.7.1 以上。加えて **MSIXパッケージ化が必須** | **未検証**。設計上は非実時間のバッチ認識だが、一度も実行していないため実測値が無い | **未検証**。Windows実機がそもそも存在しない。加えて**ロケール指定APIが存在しない**ため、ja-JPを指定する手段自体が無い(後述の「Windows: `locale` は無視される」参照) |
+| ~~Windows~~ | — | **v1では対象外**(冒頭参照) | — | — |
 | Web | Chrome オンデバイス Web Speech(`processLocally: true`)+ Web Audio | Chrome 142 以上(オンデバイスWeb Speechのリグレッション修正済みバージョン)。実機検証は Chrome 153 | **実時間**。Chrome 153で9.56秒の音声に9,676ms。`playbackRate` で短縮できるが精度が落ちる(後述) | **不成立**。Chrome 153で jaJP_10s(1.0x)66.7%(4/6) |
 
 Linuxは対象外である(OSネイティブのASR APIが存在しないため。requirements.md §3)。
@@ -97,12 +97,16 @@ Chrome 153 での jaJP_10s 実測では、所要時間は短縮される一方�
 
 ### Windows: MSIXパッケージ化(依存を書くだけでは動かない唯一のプラットフォーム)
 
+> **以下は v1 では不要である**(Windows は対象外。冒頭参照)。将来 `Microsoft.Windows.AI.Speech` が安定版に入った場合に必要となる内容として残す。
+
 - アプリを **MSIXでパッケージ化**し、`Package.appxmanifest` に `systemAIModels` capability を宣言する必要がある。`flutter build windows` が生成するのはパッケージ化されていない素のWin32 EXEであり、capabilityを宣言する場所が無い。
 - さらに、**このプラグインのビルド自体が `winapp` CLI(`winapp init`)を必要とする**。`winapp init` が展開する `.winapp/include` にWinAppSDKのC++/WinRTプロジェクションヘッダーが含まれており、プラグインの `windows/CMakeLists.txt` はこれを検出してWindows AI実装をビルドする。見つからない場合、CMake はビルドを中止せず、音声認識を無効にした実装(`speech_backend_unavailable.cpp`)を組み込む。**モデル状態の照会・モデル取得・文字起こしは「`winapp init` を実行せよ」という明示的なエラーで失敗する**(黙って `unavailable` を返すフォールバックはしない)。`cancel()` は止める対象が無いため何もしない。
 - `MaxVersionTested` を `10.0.26226.0` 以降にしておくこと。
-- 手順・マニフェスト記載例・再同意フロー・既知の制約はすべて [packages/offline_stt_windows/README.md](./packages/offline_stt_windows/README.md) にある。ここでは重複させない。**同ドキュメントの手順は一度も実行して確認していない**(Windows実機が無いため。Issue #58)。
+- 手順・マニフェスト記載例・再同意フロー・既知の制約はすべて [packages/offline_stt_windows/README.md](./packages/offline_stt_windows/README.md) にある。ここでは重複させない。**同ドキュメントの MSIX 化の手順は一度も実行して確認していない。** Windows 11 実機で確認したのはビルドが通ることまでである。
 
-### Windows: `locale` は無視される
+### Windows: `locale` は無視される(v1では対象外)
+
+> **Windows は v1 の対象外である**(冒頭参照)。以下は将来有効化した場合の制約として残す。
 
 Windows AI の `Microsoft.Windows.AI.Speech` 名前空間には**ロケール・言語を指定するAPIが1つも存在しない**ことをドキュメント調査で確定している(design.md §8 未決事項2)。したがって `transcribeFile(path, locale)` の `locale` 引数はWindowsでは無視され、認識言語はOS側の設定に従う。OS表示言語に連動するのか既定入力言語に連動するのかは**未確認**である。
 
@@ -141,9 +145,7 @@ Androidのオンデバイス認識は、対象ロケールの言語パックが�
 - **モデルを同梱しないということは、初回利用時にモデルが端末に無い可能性があるということである。** ダウンロードの同意UIと待ち時間、そして「端末の都合で使えない」という状態(`unavailable`)をアプリ側で扱う必要がある。モデル同梱型にはこの状態が存在しない。
 - **最低OSバージョンが高い。** iOS 26 / macOS 26 / Android 12(API 31)/ Windows 11 24H2 / Chrome 142。特にiOS・macOSの下限は、現時点で採用できるユーザー母数を大きく制限する(requirements.md §9 のリスク表にも記載がある)。
 - **精度がしきい値に届いていない。** 上記「精度について」のとおり、検証できた3プラットフォームすべてで design.md §7 のしきい値を下回った(ja-JP 66.7%)。原因は未確定だが、**「OSネイティブだから十分な精度が出る」と期待して採用してはいけない**段階である。
-- **Windowsでは認識言語を指定できない。** OS設定に従う。多言語を扱うアプリでは致命的になりうる。
-- **WindowsはMSIXパッケージ化が必須**であり、`winapp` CLI を含むビルド手順の追加が要る。素のFlutter Windowsビルドでは動かない。
-- **Windowsは一度も動かしていない。** 実機が無い。
+- **Windows は v1 の対象外である。** `Microsoft.Windows.AI.Speech` が WinAppSDK の安定版に存在しないため(冒頭参照)。Windows 上で呼び出すとプラットフォーム実装が未登録のため `StateError` になる。将来有効化した場合の制約(認識言語を指定できない / MSIX パッケージ化が必須)は上記の各節に残してある。
 - **Linuxは対象外**である。
 - **マイク入力のリアルタイム認識は対象外**である(v1はファイル入力専用)。
 - **土台のOS APIがalpha / Experimental段階**のものを含むため、ライブラリは0.x系で公開している(NFR-5)。
