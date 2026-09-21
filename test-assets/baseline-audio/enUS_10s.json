@@ -1,7 +1,7 @@
 {
   "locale": "en-US",
   "transcript": "In San Francisco, on November 3rd, 2024, at 3 PM, Moongift Incorporated announced its new product. Attendance reached 128 people, filling the venue completely.",
-  "keywords": ["San Francisco", "November 3rd, 2024", "3 PM", "Moongift Incorporated", "128"],
+  "keywords": ["San Francisco", ["November 3rd, 2024", "November 3, 2024", "11/3/2024"], ["3 PM", "3:00 PM"], ["Moongift Incorporated", "Moongift Inc."], ["128", "one hundred twenty eight", "one hundred and twenty eight"]],
   "tool": "say+ffmpeg",
   "voice": "Samantha",
   "sample_rate": 16000,

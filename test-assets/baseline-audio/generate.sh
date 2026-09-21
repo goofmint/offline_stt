@@ -92,37 +92,94 @@ max_sec_for() {
   esac
 }
 
-# キーワードリスト(評価用)。design.md 7章「評価基準(キーワード包含率)」の対象。
+# キーワードリスト(評価用)。design.md §7「評価基準(キーワード包含率)」の対象。
 # 各キーワードは対応するscripts/配下のスクリプト本文から逐語で選定した
 # 意味上重要な名詞・固有名詞・数値・専門用語。
+#
+# 1行 = 1キーワードグループ(包含率の分母は「グループ数」であり表記数ではない)。
+# 表記が複数あり得るものは、同一行内をタブ区切りで許容表記を列挙する。
+# いずれか1つに一致すれば当該グループを一致とみなす(design.md §7)。
+# 列挙してよいのは「同じ内容の別表記」に限る。認識器が出したというだけの
+# 誤認識(例: ISO 2701、モンギフト)を足してはならない。
+# 各表記の選定理由は README.md「許容表記の一覧と選定理由」に記載する。
 keywords_for() {
+  local TAB=$'\t'
   case "$1" in
     jaJP_10s)
       printf '%s\n' \
-        "東京都渋谷区" "2024年11月3日" "午後3時" "株式会社モーンギフト" "新製品" "128名"
+        "東京都渋谷区" \
+        "2024年11月3日${TAB}2024/11/3${TAB}2024-11-03" \
+        "午後3時${TAB}15時" \
+        "株式会社モーンギフト" \
+        "新製品" \
+        "128名"
       ;;
     jaJP_3m)
       printf '%s\n' \
-        "東京都渋谷区" "2024年11月3日" "渋谷ヒカリエ" "128名" "モジトルCore" \
-        "月額980円" "田中健一" "2019年" "32万人" "佐藤美咲" \
-        "10分間" "45秒" "96.4パーセント" "98.1パーセント" "12言語" \
-        "20言語" "大阪府" "月間5000件" "2025年2月15日" "名古屋市" \
-        "サンフランシスコ" "3億円" "ベルリン" "山田健太" "ISO27001" \
-        "月額4980円" "鈴木一郎" "18名"
+        "東京都渋谷区" \
+        "2024年11月3日${TAB}2024/11/3${TAB}2024-11-03" \
+        "渋谷ヒカリエ" \
+        "128名" \
+        "モジトルCore${TAB}モジトルコア" \
+        "月額980円" \
+        "田中健一" \
+        "2019年" \
+        "32万人${TAB}320,000人" \
+        "佐藤美咲" \
+        "10分間" \
+        "45秒" \
+        "96.4パーセント${TAB}96.4%" \
+        "98.1パーセント${TAB}98.1%" \
+        "12言語${TAB}十二言語" \
+        "20言語${TAB}二十言語" \
+        "大阪府" \
+        "月間5000件" \
+        "2025年2月15日${TAB}2025/2/15${TAB}2025-02-15" \
+        "名古屋市" \
+        "サンフランシスコ" \
+        "3億円" \
+        "ベルリン" \
+        "山田健太" \
+        "ISO27001" \
+        "月額4980円" \
+        "鈴木一郎" \
+        "18名"
       ;;
     enUS_10s)
       printf '%s\n' \
-        "San Francisco" "November 3rd, 2024" "3 PM" "Moongift Incorporated" "128"
+        "San Francisco" \
+        "November 3rd, 2024${TAB}November 3, 2024${TAB}11/3/2024" \
+        "3 PM${TAB}3:00 PM" \
+        "Moongift Incorporated${TAB}Moongift Inc." \
+        "128${TAB}one hundred twenty eight${TAB}one hundred and twenty eight"
       ;;
     enUS_3m)
       printf '%s\n' \
-        "San Francisco" "Salesforce Tower" "November 3rd, 2024" "Kenichi Tanaka" "2019" \
-        "three hundred and twenty thousand" "Misaki Sato" "forty five seconds" \
-        "ninety six point four percent" "ninety eight point one percent" \
-        "twelve languages" "twenty languages" "Chicago" "five thousand" \
-        "February 15th, 2025" "Austin, Texas" "Berlin, Germany" "three million dollars" \
-        "Kenta Yamada" "ISO 27001" "Ichiro Suzuki" "eighteen" \
-        "Montgomery Street" "November 10th, 2024" "forty two engineers"
+        "San Francisco" \
+        "Salesforce Tower" \
+        "November 3rd, 2024${TAB}November 3, 2024${TAB}11/3/2024" \
+        "Kenichi Tanaka" \
+        "2019" \
+        "three hundred and twenty thousand${TAB}three hundred twenty thousand${TAB}320,000" \
+        "Misaki Sato" \
+        "forty five seconds${TAB}45 seconds" \
+        "ninety six point four percent${TAB}96.4%" \
+        "ninety eight point one percent${TAB}98.1%" \
+        "twelve languages${TAB}12 languages" \
+        "twenty languages${TAB}20 languages" \
+        "Chicago" \
+        "five thousand${TAB}5,000" \
+        "February 15th, 2025${TAB}February 15, 2025${TAB}2/15/2025" \
+        "Austin, Texas${TAB}Austin, TX" \
+        "Berlin, Germany" \
+        "three million dollars${TAB}\$3 million" \
+        "Kenta Yamada" \
+        "ISO 27001" \
+        "Ichiro Suzuki" \
+        "eighteen${TAB}18 people" \
+        "Montgomery Street" \
+        "November 10th, 2024${TAB}November 10, 2024${TAB}11/10/2024" \
+        "forty two engineers${TAB}42 engineers"
       ;;
     *) echo "ERROR: 未知のID '$1'" >&2; exit 1 ;;
   esac
@@ -234,13 +291,28 @@ for id in "${IDS[@]}"; do
   transcript_escaped="$(json_escape "${transcript}")"
   generated_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
+  # 1行 = 1キーワードグループ。タブ区切りで複数表記があるものはJSON配列として
+  # 出力する(単一表記は従来どおり文字列)。読み出し側(keyword_score.py /
+  # spikes/*/KeywordScoring.*)は文字列・配列の双方を受け付ける。
   keywords_json=""
-  while IFS= read -r kw; do
-    kw_escaped="$(json_escape "${kw}")"
+  while IFS= read -r kw_group; do
+    group_json=""
+    while IFS= read -r variant; do
+      variant_escaped="$(json_escape "${variant}")"
+      if [[ -z "${group_json}" ]]; then
+        group_json="\"${variant_escaped}\""
+      else
+        group_json="${group_json}, \"${variant_escaped}\""
+      fi
+    done < <(printf '%s\n' "${kw_group}" | tr '\t' '\n')
+    # 表記が1つだけならスカラー、複数なら配列として出力する
+    if [[ "${kw_group}" == *$'\t'* ]]; then
+      group_json="[${group_json}]"
+    fi
     if [[ -z "${keywords_json}" ]]; then
-      keywords_json="\"${kw_escaped}\""
+      keywords_json="${group_json}"
     else
-      keywords_json="${keywords_json}, \"${kw_escaped}\""
+      keywords_json="${keywords_json}, ${group_json}"
     fi
   done < <(keywords_for "${id}")
 
