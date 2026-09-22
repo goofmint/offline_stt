@@ -6,10 +6,6 @@ environment:
 
 workspace:
   - packages/offline_stt
-  - packages/offline_stt_platform_interface
-  - packages/offline_stt_android
-  - packages/offline_stt_darwin
-  - packages/offline_stt_web
   - apps/example
 
 dev_dependencies:
@@ -47,15 +43,12 @@ melos:
         -print0 | xargs -0 dart format --output=none --set-exit-if-changed
     doc:
       description: >-
-        apps/example を除く5パッケージで dart doc を実行し、
-        APIドキュメントが生成できることを検証する(Issue #63)。
-        `--validate-links` により、docコメント中の `[...]`
-        参照切れとREADMEの相対リンク切れを検出する。出力先の `doc/api/` は
-        .gitignore 済み。apps/example は公開しないため除外する。pub.dev
-        への公開対象も同じ5パッケージである(apps/example のみ
-        publish_to: none。理由は docs/PUBLISHING.md 1節)。公開対象の
-        絞り込みは publish:dry-run script(下記)の
-        `packageFilters.private: false` を参照。
+        offline_stt で dart doc を実行し、APIドキュメントが生成できる
+        ことを検証する(Issue #63)。`--validate-links` により、docコメント
+        中の `[...]` 参照切れとREADMEの相対リンク切れを検出する。出力先の
+        `doc/api/` は .gitignore 済み。apps/example は公開しないため
+        除外する(Issue #91 で単一パッケージへ統合したため、対象は
+        offline_stt 1つだけである)。
       exec:
         command: dart doc --validate-links --output doc/api
         concurrency: 1
@@ -64,10 +57,10 @@ melos:
           - example
     publish:dry-run:
       description: >-
-        pub.dev への公開対象5パッケージ(offline_stt_platform_interface /
-        offline_stt_darwin / offline_stt_android / offline_stt_web /
-        offline_stt)で `dart pub publish --dry-run` を実行し、公開できる
-        状態であることを検証する(Issue #65、docs/PUBLISHING.md)。
+        pub.dev への公開対象である offline_stt で
+        `dart pub publish --dry-run` を実行し、公開できる状態であることを
+        検証する(Issue #65、docs/PUBLISHING.md)。Issue #91 で単一
+        パッケージへ統合したため、公開するのは offline_stt 1つだけである。
         apps/example は publish_to: none であるため、
         `packageFilters.private: false`(melos 8の `--no-private` 相当。
         `publish_to: none` のパッケージを除外する)だけで自動的に除外できる。
@@ -77,32 +70,19 @@ melos:
         concurrency: 1
       packageFilters:
         private: false
-    pigeon:android:
-      description: >-
-        pigeons/offline_stt_events.dart から offline_stt_android 向けの
-        Dart + Kotlin を生成する(design.md §2.3、Issue #24)。
-      run: >-
-        ROOT="$(pwd)" && cd packages/offline_stt_android && dart run pigeon
-        --input "$ROOT/pigeons/offline_stt_events.dart"
-        --package_name offline_stt_android
-        --dart_out lib/src/pigeon.g.dart
-        --kotlin_out android/src/main/kotlin/com/moongift/offline_stt_android/Pigeon.g.kt
-        --kotlin_package com.moongift.offline_stt_android
-    pigeon:darwin:
-      description: >-
-        pigeons/offline_stt_events.dart から offline_stt_darwin 向けの
-        Dart + Swift を生成する(design.md §2.3、Issue #24)。
-      run: >-
-        ROOT="$(pwd)" && cd packages/offline_stt_darwin && dart run pigeon
-        --input "$ROOT/pigeons/offline_stt_events.dart"
-        --package_name offline_stt_darwin
-        --dart_out lib/src/pigeon.g.dart
-        --swift_out darwin/Classes/Pigeon.g.swift
     pigeon:
       description: >-
-        pigeons/ 配下の全スキーマから Android/Darwin 向けの生成物を
-        再生成する(Issue #24)。個別実行は pigeon:android / pigeon:darwin
-        を参照。
+        pigeons/offline_stt_events.dart から offline_stt の Dart + Kotlin +
+        Swift を生成する(design.md §2.3、Issue #24)。単一パッケージへ統合
+        したため(Issue #91)、生成先は packages/offline_stt の1つだけで
+        あり、Dart側の pigeon.g.dart も Android/Darwin で共用する1本に
+        まとめている。チャネル名は `--package_name` から決まるため、
+        Dart/Kotlin/Swift の3者で同じ値を指定すること。
       run: >-
-        melos run pigeon:android &&
-        melos run pigeon:darwin
+        ROOT="$(pwd)" && cd packages/offline_stt && dart run pigeon
+        --input "$ROOT/pigeons/offline_stt_events.dart"
+        --package_name offline_stt
+        --dart_out lib/src/pigeon.g.dart
+        --kotlin_out android/src/main/kotlin/com/moongift/offline_stt/Pigeon.g.kt
+        --kotlin_package com.moongift.offline_stt
+        --swift_out darwin/Classes/Pigeon.g.swift

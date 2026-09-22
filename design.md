@@ -6,32 +6,47 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」技�
 
 ## 1. アーキテクチャ全体像
 
+`offline_stt` は単一パッケージであり、federated pluginではない(Issue #91)。
+アプリが依存するのは `offline_stt` の1パッケージだけであり、`default_package`
+による実装パッケージの自動選択は使わない。実装の選択はパッケージ内部の
+条件付きexportで完結する。
+
 ```
 アプリ
- └── <name>(エントリパッケージ)
-      └── <name>_platform_interface(共通抽象)
-           ├── <name>_android   … Pigeon → Kotlin(標準 SpeechRecognizer + MediaCodecポンプ)
-           ├── <name>_darwin    … Pigeon → Swift(SpeechAnalyzer + AVFoundation)
-           └── <name>_web       … Dart JS interop(Web Speech + Web Audio)
+ └── offline_stt(単一パッケージ)
+      ├── lib/offline_stt.dart          … 公開バレル(OfflineTranscriber 他)
+      └── lib/src/
+           ├── offline_transcriber.dart            … ファサード
+           ├── offline_transcriber_platform.dart    … 内部抽象クラス(非公開)
+           ├── backend.dart(条件付きexport)
+           │    ├── backend_io.dart  → android/ or darwin/(実行時にOS判定)
+           │    └── backend_web.dart → web/(コンパイル時にWebターゲットを選択)
+           ├── android/  … Pigeon → Kotlin(標準 SpeechRecognizer + MediaCodecポンプ)
+           ├── darwin/   … Pigeon → Swift(SpeechAnalyzer + AVFoundation、iOS/macOS共用)
+           └── web/      … Dart JS interop(Web Speech + Web Audio)
 ```
 
 - レイヤは3層: 共通API層(Dart) / ブリッジ層(Pigeon生成コード) / ネイティブ実装層
 - ネイティブ実装層は「デコード」「モデル管理」「認識セッション」の3モジュールに分割し、全プラットフォームで同じモジュール境界を維持する
 
-## 2. パッケージ間契約
+## 2. パッケージ内部の契約
 
-### 2.1 platform_interface
+### 2.1 内部プラットフォーム抽象
 
 ```dart
-abstract class OfflineTranscriberPlatform extends PlatformInterface {
+abstract class OfflineTranscriberPlatform {
   Future<ModelState> checkModel(String locale);
   Stream<DownloadProgress> downloadModel(String locale);
   Stream<TranscriptSegment> transcribeFile(TranscribeRequest request);
 }
 ```
 
-- `PlatformInterface`(plugin_platform_interface)でtoken検証を行う標準構成
-- 各実装パッケージは `registerWith()` でデフォルトインスタンスを差し替える
+- `lib/src/offline_transcriber_platform.dart` に定義される**内部**の抽象クラスであり、公開APIではない。利用者向けの入口は `OfflineTranscriber` 1クラスのみである
+- 単一パッケージ構成であり外部の実装パッケージが登録することはないため、旧
+  federated plugin 構成が持っていた `PlatformInterface`(plugin_platform_interface)
+  によるtoken検証や `registerWith()` によるデフォルトインスタンス差し替えの
+  機構は持たない。実装の選択は `lib/src/backend.dart` の条件付きexportと
+  `backend_io.dart` の実行時OS判定で行う(§1参照)
 
 ### 2.2 データ型
 
@@ -70,6 +85,7 @@ class PlatformException_ extends TranscribeException { final String code; final 
 - ストリームはPigeonのEventChannel対応(`@EventChannelApi`)で `segments` / `downloadProgress` の2本を定義
 - 共通エラー列挙型 `TranscribeErrorCode`(`modelUnavailable` / `localeUnsupported` / `decodeFailed` / `deviceUnsupported` / `cancelled` / `platformError`)をPigeonスキーマに定義する。§2.2 の sealed 例外階層に対応する。Android/Darwin ではEventChannelの組み込みエラーシンクを使うため、スキーマ上は定義のみとする
 - 生成物(`.g.dart` / `.g.kt` / `.g.swift`)は**リポジトリにコミットする**。ネイティブビルド(Gradle / Xcode)はDart・Pigeonツールチェーンを経由せず生成済みコードを直接コンパイルするため、コミットしないとネイティブビルドが成立しない。再生成は melos スクリプト(`melos run pigeon`)で行う
+- 単一パッケージ構成のため、生成先は `packages/offline_stt` の1つだけである。Dart側の `pigeon.g.dart` はAndroid/Darwin実装が共用する1本にまとめてあり、`--package_name offline_stt` を指定して生成する。これによりチャネル名(`MethodChannel` / `EventChannel` の名前)は `dev.flutter.pigeon.offline_stt.*` に統一される(federated plugin構成だった頃はパッケージごとに異なる `--package_name` を指定していたため、`dev.flutter.pigeon.offline_stt_android.*` のようにパッケージ名ごとに異なるチャネル名になっていた)
 - Web: Pigeon不要。`package:web` + `dart:js_interop` で直接実装
 - `HostApi` はネイティブ側実装が非同期APIの完了を待って結果を返す必要があるメソッド(例: Darwinの `checkModel`、`AssetInventory`/`SpeechTranscriber` の async API に依存)には `@async` を使う。プラットフォームスレッドを `DispatchSemaphore` 等でブロックして待ち合わせる実装は禁止とする(ANR・デッドロックの危険があるため)
 
@@ -281,7 +297,7 @@ Webでも同じ基準音声 jaJP_10s(1.0x再生)で実測したところ、包�
 3. 本節のしきい値・正規化規則を見直すか
 4. プリセットを判定条件に含めるか
 
-> **2026-09-21 の是正(キーワードセット側の不備)**: 本節は当初から「表記が複数あり得るキーワードは許容表記を列挙する」と定めていたが、`test-assets/baseline-audio/*.json` の `keywords` は**各キーワード1表記のみの文字列配列**であり、この規定に従っていなかった。そのため `three hundred and twenty thousand` に対する `320,000`、`forty five seconds` に対する `45 seconds` のような**単なる表記差が不一致として計上**されていた。上記「許容表記の表現形式」を明文化したうえで4ファイルの `keywords` を許容表記入りに改めた。**認識結果は一切変わっていない**(再測定はしておらず、記録済みの確定テキストを採点し直しただけである)。グループ数=分母は変えていない。再採点の前後比較は `packages/offline_stt_android/E2E_RESULTS.md` / `packages/offline_stt_darwin/E2E_RESULTS.md` を参照。
+> **2026-09-21 の是正(キーワードセット側の不備)**: 本節は当初から「表記が複数あり得るキーワードは許容表記を列挙する」と定めていたが、`test-assets/baseline-audio/*.json` の `keywords` は**各キーワード1表記のみの文字列配列**であり、この規定に従っていなかった。そのため `three hundred and twenty thousand` に対する `320,000`、`forty five seconds` に対する `45 seconds` のような**単なる表記差が不一致として計上**されていた。上記「許容表記の表現形式」を明文化したうえで4ファイルの `keywords` を許容表記入りに改めた。**認識結果は一切変わっていない**(再測定はしておらず、記録済みの確定テキストを採点し直しただけである)。グループ数=分母は変えていない。再採点の前後比較は `docs/e2e/E2E_RESULTS_ANDROID.md` / `docs/e2e/E2E_RESULTS_DARWIN.md` を参照。
 >
 > 本節冒頭に挙げた M0 スパイクの実測値(ja-JP 28.6〜66.7%、en-US 44.0〜80.0%)は**是正前のキーワードセットで採点した値**である。`spikes/*/RESULTS.md` は M0 時点の記録としてそのまま残しており、再採点していない。是正後の値は本番実装のE2E結果(上記2ファイル)を参照すること。なお ja-JP `jaJP_10s` の 66.7%(4/6)は是正後も変わらない(不一致の2件は表記差ではなく誤認識であるため)。
 

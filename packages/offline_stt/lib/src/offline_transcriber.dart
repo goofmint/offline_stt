@@ -1,11 +1,13 @@
-import 'package:offline_stt_platform_interface/offline_stt_platform_interface.dart';
+import 'backend.dart';
+import 'common.dart';
 
 /// 利用者向けのファサード。
 ///
 /// requirements.md §6 は「利用者は `offline_stt` にのみ依存する」と定めて
 /// いる。本クラスはその契約を成立させるための唯一の入口であり、
-/// `OfflineTranscriberPlatform.instance`(design.md §2.1)へ委譲するだけの
-/// 薄い層である。**独自のロジック・状態・既定値を持たない。** 状態遷移と
+/// プラットフォーム実装(design.md §2.1 の `OfflineTranscriberPlatform`)
+/// へ委譲するだけの薄い層である。**独自のロジック・状態・既定値を
+/// 持たない。** 状態遷移と
 /// セッション排他(design.md §3)は各プラットフォーム実装と
 /// `TranscribeSessionGuard` が担う。
 ///
@@ -35,29 +37,31 @@ import 'package:offline_stt_platform_interface/offline_stt_platform_interface.da
 /// }
 /// ```
 ///
-/// ## プラットフォーム実装の登録について
+/// ## プラットフォーム実装の選択について
 ///
-/// 各メソッドは呼び出し時に `OfflineTranscriberPlatform.instance` を参照する。
-/// 実装パッケージが登録される前に呼ぶと [StateError] が送出される。
-/// フォールバック実装は**意図的に持たない**。「とりあえず動く」既定値は
-/// 不具合の温床になるためである。
+/// 実装は `src/backend.dart` が選ぶ。Web かどうかは
+/// `dart.library.js_interop` による条件付きexportでコンパイル時に、
+/// Android / iOS / macOS の区別は `src/backend_io.dart` が実行時に判定
+/// する。サポート対象外のプラットフォームではフォールバック実装を持たず
+/// [UnsupportedError] を送出する。「とりあえず動く」既定値は不具合の
+/// 温床になるためである。
 class OfflineTranscriber {
   /// ファサードを生成する。状態を持たないため `const` である。
   const OfflineTranscriber();
 
-  /// 現在登録されているプラットフォーム実装。
+  /// このライブラリが使うプラットフォーム実装。
   ///
-  /// 保持せず毎回参照するのは、Flutter のプラグイン登録がアプリ起動時に
-  /// 行われるため、`const` コンストラクタで生成したインスタンスを登録前に
-  /// 保持していても問題が起きないようにするためである。
-  OfflineTranscriberPlatform get _platform =>
-      OfflineTranscriberPlatform.instance;
+  /// 生成は1回だけである。ネイティブ実装はセッション排他
+  /// (`TranscribeSessionGuard`、design.md §3)の状態をインスタンスに
+  /// 持つため、呼び出しごとに作り直すと「同時セッションは1本」の制約が
+  /// 成立しなくなる。
+  static final OfflineTranscriberPlatform _platform = createBackend();
 
   /// 対象ロケールのモデル状態を確認する(requirements.md FR-1)。
   ///
-  /// 戻り値の4値の意味と、プラットフォームごとの写像・既知の制約は各実装
-  /// パッケージの README を参照すること。特に Windows には `downloading` に
-  /// 一意対応する状態が存在しない。
+  /// 戻り値の4値の意味と、プラットフォームごとの写像・既知の制約は
+  /// `lib/src/android/` / `lib/src/darwin/` / `lib/src/web/` の
+  /// `model_state_mapping.dart` とパッケージ README を参照すること。
   Future<ModelState> checkModel(String locale) => _platform.checkModel(locale);
 
   /// 対象ロケールのモデルダウンロードをトリガーし、進捗を返す
@@ -68,8 +72,8 @@ class OfflineTranscriber {
   /// 場合、実装は状態を変化させず、何も emit せずに完了する Stream を返す
   /// (design.md §3 細則3)。
   ///
-  /// [DownloadProgress.fraction] は `null` のことがある。Web と Windows は
-  /// 進捗の粒度が得られないため常に不定進捗である。
+  /// [DownloadProgress.fraction] は `null` のことがある。Web は進捗の
+  /// 粒度が得られないため常に不定進捗である。
   Stream<DownloadProgress> downloadModel(String locale) =>
       _platform.downloadModel(locale);
 

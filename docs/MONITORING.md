@@ -45,7 +45,8 @@
   最上位候補を確定結果として採用することで成立している。**この挙動が直れば
   採用ロジックを見直す必要があり、悪化すれば文字起こしが空になる。**
 - `triggerModelDownload()` の `ModelDownloadListener` が完了を通知しない
-  挙動(design.md §4.3、`packages/offline_stt_android/README.md` §4 制約2)。
+  挙動(design.md §4.3、`packages/offline_stt/README.md`「Android:
+  `checkModel()` を先に呼ぶ」節)。
   本実装は `checkRecognitionSupport()` の再照会で完了判定している。
 - `EXTRA_AUDIO_SOURCE` + 3つの付随Extra(`..._CHANNEL_COUNT` /
   `..._ENCODING` / `..._SAMPLING_RATE`)によるファイル入力の受理。
@@ -146,9 +147,9 @@ Gradle)の固定値そのものの扱いは本書の対象外であり、
 | 範囲 | チェックリスト |
 |---|---|
 | 入口(なぜCIに載せないのか・基準音声・包含率の算出・しきい値) | [E2E_CHECKLIST.md](../E2E_CHECKLIST.md) |
-| Android | [packages/offline_stt_android/E2E_CHECKLIST.md](../packages/offline_stt_android/E2E_CHECKLIST.md) |
-| iOS / macOS | [packages/offline_stt_darwin/E2E_CHECKLIST.md](../packages/offline_stt_darwin/E2E_CHECKLIST.md) |
-| Web | [packages/offline_stt_web/E2E_CHECKLIST.md](../packages/offline_stt_web/E2E_CHECKLIST.md) |
+| Android | [E2E_CHECKLIST_ANDROID.md](./e2e/E2E_CHECKLIST_ANDROID.md) |
+| iOS / macOS | [E2E_CHECKLIST_DARWIN.md](./e2e/E2E_CHECKLIST_DARWIN.md) |
+| Web | [E2E_CHECKLIST_WEB.md](./e2e/E2E_CHECKLIST_WEB.md) |
 
 再実行の範囲は次のように決める。
 

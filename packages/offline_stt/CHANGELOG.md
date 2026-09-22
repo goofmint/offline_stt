@@ -2,18 +2,20 @@
 
 ## 0.1.0
 
-初回リリース。利用者が依存するエントリパッケージ(requirements.md §6)。
+初回リリース。pub.dev へ公開するのはこの1パッケージだけである
+(requirements.md §6、Issue #91)。
 
 ### 追加
 
-- federated plugin のエンドースメント設定。`offline_stt` に依存するだけで
-  Android / iOS / macOS / Web の各実装パッケージが自動的に
-  選択される。
-- `offline_stt_platform_interface` のデータ型・例外型の再エクスポート。
+- Android / iOS / macOS / Web の実装を同梱した単一のFlutterプラグイン。
+  アプリは `offline_stt` にのみ依存すればよい。実装の選択はコンパイル時の
+  条件付きimport(Web か否か)と実行時の `Platform` 判定(Android /
+  iOS / macOS)で行う。
+- データ型・例外型(`ModelState` / `DownloadProgress` /
+  `TranscribeRequest` / `TranscriptSegment` と例外階層)の公開。
 - 利用者向けファサード `OfflineTranscriber`。`checkModel()` /
-  `downloadModel()` / `transcribeFile()` の3メソッドを持ち、
-  `OfflineTranscriberPlatform.instance` へ委譲する。**利用者が
-  `offline_stt_platform_interface` を直接依存に書く必要はない。**
+  `downloadModel()` / `transcribeFile()` の3メソッドを持ち、内部の
+  プラットフォーム実装へ委譲する。
 
 ### 既知の制約
 

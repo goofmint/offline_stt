@@ -22,10 +22,10 @@ requirements.md NFR-4「最低動作環境」・NFR-5「バージョニング」
 | 固定しているもの | 値 | 場所 |
 |---|---|---|
 | Flutter SDK(CIが使う版) | `3.47.5` / `stable` | `.github/workflows/ci.yml` の `env.FLUTTER_VERSION` / `FLUTTER_CHANNEL` |
-| Flutter SDK(パッケージが要求する下限) | `>=3.47.0` | `packages/offline_stt{,_android,_darwin,_web}/pubspec.yaml` と `apps/example/pubspec.yaml` の `environment.flutter`(計5ファイル) |
-| Dart SDK | `^3.9.0` | 上記5ファイル + `packages/offline_stt_platform_interface/pubspec.yaml` + ルート `pubspec.yaml`(計7ファイル) |
+| Flutter SDK(パッケージが要求する下限) | `>=3.47.0` | `packages/offline_stt/pubspec.yaml` と `apps/example/pubspec.yaml` の `environment.flutter`(単一パッケージ統合〈Issue #91〉後は計2ファイル。統合前は `offline_stt_{android,darwin,web}` を含む計5ファイルだった) |
+| Dart SDK | `^3.9.0` | `packages/offline_stt/pubspec.yaml` + `apps/example/pubspec.yaml` + ルート `pubspec.yaml`(計3ファイル。統合前は `offline_stt_platform_interface` を含む計7ファイルだった) |
 | melos | `8.2.2`(CI)/ `^8.2.2`(dev依存) | `.github/workflows/ci.yml` の `dart pub global activate melos 8.2.2`、ルート `pubspec.yaml` の `dev_dependencies.melos` |
-| Pigeon | `^27.3.0` | `packages/offline_stt_{android,darwin}/pubspec.yaml` の `dev_dependencies.pigeon` |
+| Pigeon | `^27.3.0` | `packages/offline_stt/pubspec.yaml` の `dev_dependencies.pigeon`(単一パッケージ統合後は1ファイル。統合前は `offline_stt_{android,darwin}/pubspec.yaml` の2ファイルにそれぞれ書かれていた) |
 
 `apps/example/.metadata` に記録されている Flutter revision
 `00b0c91f06209d9e4a41f71b7a512d6eb3b9c694` は、`flutter create` が
@@ -48,17 +48,17 @@ Android は**プラグイン側とexample app側で別々のツールチェー�
 
 | 固定しているもの | 値 | 場所 |
 |---|---|---|
-| `minSdk`(プラグイン) | `31` | `packages/offline_stt_android/android/build.gradle` |
+| `minSdk`(プラグイン) | `31` | `packages/offline_stt/android/build.gradle` |
 | `minSdk`(example app) | `31` | `apps/example/android/app/build.gradle.kts` |
-| `compileSdk`(プラグイン) | `35` | `packages/offline_stt_android/android/build.gradle` |
-| Java `sourceCompatibility` / `targetCompatibility` | `17` | `packages/offline_stt_android/android/build.gradle`、`apps/example/android/app/build.gradle.kts` |
+| `compileSdk`(プラグイン) | `35` | `packages/offline_stt/android/build.gradle` |
+| Java `sourceCompatibility` / `targetCompatibility` | `17` | `packages/offline_stt/android/build.gradle`、`apps/example/android/app/build.gradle.kts` |
 | CIのJDK | `17`(temurin) | `.github/workflows/ci.yml` の `actions/setup-java@v4` |
-| Kotlin(プラグイン) | `2.1.0` | `packages/offline_stt_android/android/build.gradle` の `ext.kotlin_version` |
+| Kotlin(プラグイン) | `2.1.0` | `packages/offline_stt/android/build.gradle` の `ext.kotlin_version` |
 | Kotlin(example app) | `2.2.20` | `apps/example/android/settings.gradle.kts` |
-| AGP(プラグイン) | `8.7.0` | `packages/offline_stt_android/android/build.gradle` の `classpath` |
+| AGP(プラグイン) | `8.7.0` | `packages/offline_stt/android/build.gradle` の `classpath` |
 | AGP(example app) | `8.11.1` | `apps/example/android/settings.gradle.kts` |
 | Gradle wrapper(example app) | `8.14` | `apps/example/android/gradle/wrapper/gradle-wrapper.properties` |
-| kotlinx-coroutines | `1.9.0` | `packages/offline_stt_android/android/build.gradle` |
+| kotlinx-coroutines | `1.9.0` | `packages/offline_stt/android/build.gradle` |
 
 `minSdk` の意味は requirements.md NFR-4(Android 12 / API 31 以上)に由来
 する。**ただし `checkRecognitionSupport()` が API 33 で追加されたAPIである
@@ -78,7 +78,7 @@ API変更ではなく対応端末範囲の方針判断であり、requirements.m
 
 | 固定しているもの | 値 | 場所 |
 |---|---|---|
-| iOS / macOS Deployment Target(プラグイン) | `26.0` | `packages/offline_stt_darwin/darwin/offline_stt_darwin.podspec` の `s.ios.deployment_target` / `s.osx.deployment_target` |
+| iOS / macOS Deployment Target(プラグイン) | `26.0` | `packages/offline_stt/darwin/offline_stt.podspec` の `s.ios.deployment_target` / `s.osx.deployment_target` |
 | iOS Deployment Target(example app) | `26.0` | `apps/example/ios/Podfile`(`platform :ios, '26.0'`)と `apps/example/ios/Runner.xcodeproj/project.pbxproj`(3構成すべて) |
 | macOS Deployment Target(example app) | `26.0` | `apps/example/macos/Podfile`(`platform :osx, '26.0'`)と `apps/example/macos/Runner.xcodeproj/project.pbxproj`(3構成すべて) |
 | Swift 言語モード | `5.0` | 同 podspec の `s.swift_version` |
@@ -99,8 +99,8 @@ SpeechAnalyzer がそのOSバージョンで追加されたAPIであるためで
 
 | 固定しているもの | 値 | 場所 |
 |---|---|---|
-| Chrome の要求下限 | `142` 以降(デスクトップ版) | requirements.md NFR-4、`packages/offline_stt_web/README.md` §1、README.md 対応状況マトリクス |
-| `package:web` | `^1.1.0`(offline_stt_web)/ `^1.1.1`(example) | `packages/offline_stt_web/pubspec.yaml`、`apps/example/pubspec.yaml` |
+| Chrome の要求下限 | `142` 以降(デスクトップ版) | requirements.md NFR-4、`packages/offline_stt/README.md`「対応プラットフォームとバックエンド」、README.md 対応状況マトリクス |
+| `package:web` | `^1.1.0`(offline_stt)/ `^1.1.1`(example) | `packages/offline_stt/pubspec.yaml`、`apps/example/pubspec.yaml` |
 
 **Chrome 142 は機械的に強制される固定ではない。** ビルド時にも実行時にも
 バージョン番号を検査してはおらず、実装は
@@ -190,9 +190,9 @@ SpeechAnalyzer がそのOSバージョンで追加されたAPIであるためで
 | APIの挙動・制約・エラー写像 | design.md §4.1〜§4.4 / §5 |
 | 未決事項の解消 / 再発 | design.md §8 |
 | 公開APIの形 | design.md §2、および各パッケージの dartdoc |
-| プラットフォーム別の利用者向け注意 | 各 `packages/*/README.md`、ルート README.md「アプリ側に必要な対応」 |
+| プラットフォーム別の利用者向け注意 | `packages/offline_stt/README.md`、ルート README.md「アプリ側に必要な対応」 |
 | 対応状況・実測値 | README.md 対応状況マトリクス(**実測していない欄は「未検証」のまま**) |
-| E2E手順 | `E2E_CHECKLIST.md` と `packages/*/E2E_CHECKLIST.md` |
+| E2E手順 | `E2E_CHECKLIST.md` と `docs/e2e/E2E_CHECKLIST_*.md` |
 | 監視対象そのもの | [MONITORING.md](./MONITORING.md) |
 | 固定値 | 本書 1節の表 |
 

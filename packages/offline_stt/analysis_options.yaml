@@ -1,6 +1,8 @@
 analyzer:
   exclude:
     - build/**
+    # Android の Gradle 生成物(旧 offline_stt_android パッケージから継承)。
+    - android/**
 include: package:flutter_lints/flutter.yaml
 
 # 公開APIのdocコメント欠落を静的解析で検出する(Issue #63)。

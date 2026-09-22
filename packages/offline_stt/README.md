@@ -2,7 +2,7 @@
 
 録音済み音声ファイルを、**OSネイティブの音声認識APIだけで**オフライン文字起こしするFlutterライブラリ。認識モデルも推論エンジンも同梱せず、モデルの取得・更新・削除はすべてOSに委ねる。音声も書き起こし結果もネットワークに出ない([requirements.md](https://github.com/goofmint/offline_stt/blob/main/requirements.md) NFR-2)。
 
-**これはfederated pluginのエントリパッケージである。アプリが依存するのはこのパッケージだけでよい。** `offline_stt_android` / `offline_stt_darwin` / `offline_stt_web` は endorsed な実装パッケージであり、`flutter.plugin.platforms.*.default_package` によって自動的に選択される。直接依存に書く必要は無い([design.md](https://github.com/goofmint/offline_stt/blob/main/design.md) §1)。
+**これは単一パッケージであり、federated pluginではない。アプリが依存するのはこのパッケージだけでよい。** Android / iOS / macOS / Web の全実装を1つのパッケージに同梱しており、実装の選択はパッケージ内部の条件付きexport(`lib/src/backend.dart`)と実行時のOS判定で行う。実装パッケージを個別に依存へ書く必要は無い([design.md](https://github.com/goofmint/offline_stt/blob/main/design.md) §1)。
 
 ---
 
@@ -16,15 +16,11 @@
 
 Linuxは対象外である(OSネイティブのASR APIが存在しないため)。
 
-各実装パッケージの詳細・セットアップ・既知の制約:
-
-- [offline_stt_android/README.md](https://github.com/goofmint/offline_stt/blob/main/packages/offline_stt_android/README.md)
-- [offline_stt_darwin/README.md](https://github.com/goofmint/offline_stt/blob/main/packages/offline_stt_darwin/README.md)
-- [offline_stt_web/README.md](https://github.com/goofmint/offline_stt/blob/main/packages/offline_stt_web/README.md)
+各プラットフォーム実装の詳細・既知の制約は、[実機E2Eチェックリスト](https://github.com/goofmint/offline_stt/blob/main/E2E_CHECKLIST.md)と、後述の「アプリ側に必要な対応」「既知の制約」を参照。
 
 ## API
 
-本パッケージは現在、[`offline_stt_platform_interface`](https://pub.dev/packages/offline_stt_platform_interface) が定義する型を再エクスポートしている。
+本パッケージが公開するのは [`OfflineTranscriber`](https://github.com/goofmint/offline_stt/blob/main/packages/offline_stt/lib/src/offline_transcriber.dart) と、それが受け渡しするデータ型・例外型である。
 
 - `ModelState`(`available` / `downloadable` / `downloading` / `unavailable`)
 - `DownloadProgress` / `TranscribeRequest` / `TranscriptSegment`
@@ -59,9 +55,9 @@ await for (final segment in transcriber.transcribeFile(
 }
 ```
 
-`OfflineTranscriber` は `OfflineTranscriberPlatform.instance` へ委譲するだけの薄い層であり、独自のロジック・状態・既定値を持たない。**`offline_stt_platform_interface` を直接依存に書く必要はない。**
+`OfflineTranscriber` は内部の抽象クラス(`lib/src/offline_transcriber_platform.dart` の `OfflineTranscriberPlatform`。公開APIではない)へ委譲するだけの薄い層であり、独自のロジック・状態・既定値を持たない。
 
-> 参照実装の [`apps/example`](https://github.com/goofmint/offline_stt/tree/main/apps/example) は、ファサードが無かった頃の名残で `offline_stt_platform_interface` を直接依存に書いている。利用側で真似する必要はない。
+参照実装の [`apps/example`](https://github.com/goofmint/offline_stt/tree/main/apps/example) は `offline_stt` にのみ依存し、`const OfflineTranscriber()` を使う。
 
 ## 正しい呼び出し順序
 

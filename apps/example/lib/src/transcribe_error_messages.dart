@@ -1,4 +1,4 @@
-import 'package:offline_stt_platform_interface/offline_stt_platform_interface.dart';
+import 'package:offline_stt/offline_stt.dart';
 
 /// [error] を利用者向けの日本語メッセージへ変換する。
 ///

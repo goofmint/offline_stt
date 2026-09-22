@@ -24,7 +24,7 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」タ�
 ### Darwin
 
 - [x] iOS 26実機で SpeechTranscriber の supportedLocales に ja が含まれるか確認(設計未決事項3)(**確認済み**。iPad Pro 11-inch (M4) / iOS 26.6.2 実機で `supportedLocales`(30件)に ja-JP を確認、`installedLocales` も ja-JP。OSバージョンによる差は実在した(26系30件 / 27系45件)ため、iOS 27.0 の結果からの外挿はできず下限での確認が必要だった。spikes/darwin/RESULTS.md 参照)
-- [x] iOS 実機でのファイル文字起こし検証(**Issue #40 で完了**。iPad Pro (iOS 26.6.2) 実機で基準音声8ファイルを本番実装で実行し、16回すべて完走。macOS とは8ファイル中7ファイルで確定テキストが1文字も違わなかった。packages/offline_stt_darwin/E2E_RESULTS.md 参照)
+- [x] iOS 実機でのファイル文字起こし検証(**Issue #40 で完了**。iPad Pro (iOS 26.6.2) 実機で基準音声8ファイルを本番実装で実行し、16回すべて完走。macOS とは8ファイル中7ファイルで確定テキストが1文字も違わなかった。docs/e2e/E2E_RESULTS_DARWIN.md 参照)
 - [x] AVAudioFile → SpeechAnalyzer のファイル入力スパイク(Swift単体、Flutter外)(ja-JP/en-US × 10秒/3分 × wav/m4a の全8ファイルでエラーなく完走。spikes/darwin/RESULTS.md 参照)
 - [x] ファイル処理速度の実測(実時間比)(RTF 0.008〜0.026、実時間の38〜125倍高速。spikes/darwin/RESULTS.md 参照)
 - [x] macOS 26 でも同スパイクを確認(macOS 26.5.1 実機で確認済み。ただしキーワード包含率は8ファイル中8ファイルとも判定基準未達。spikes/darwin/RESULTS.md 参照)
@@ -47,8 +47,8 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」タ�
 
 ### パッケージ基盤
 
-- [ ] モノレポ構成作成(melos)、5パッケージの雛形
-- [ ] `<name>_platform_interface`: データ型・例外階層・抽象クラス実装
+- [ ] モノレポ構成作成(melos)、単一パッケージ `offline_stt` の雛形
+- [ ] `offline_stt`: データ型・例外階層・抽象クラス実装
 - [ ] 状態遷移とセッション排他(同時1本)のユニットテスト
 - [ ] Pigeonスキーマ定義(Method + EventChannel、Android/Darwin向け生成確認)
 - [ ] CI: 全パッケージのanalyze + test + 各プラットフォームビルド検証
@@ -68,7 +68,7 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」タ�
 
 ## M2 Darwin実装
 
-依存: M1(platform_interface + Pigeonスキーマ確定)
+依存: M1(offline_stt の共通型・状態遷移 + Pigeonスキーマ確定)
 
 - [ ] darwinパッケージ雛形(iOS/macOS共用ソース構成)
 - [ ] OSバージョンゲート(`if #available`、26未満は unavailable)
@@ -103,10 +103,14 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」タ�
 - [ ] README: アプリ側要件(同意ダイアログ、AICore初期化、非Chrome分岐)
 - [ ] README: モデル同梱型代替(sherpa-onnx等)との使い分け記載
 - [ ] APIドキュメント(dartdoc)整備
-- [ ] CHANGELOG / LICENSE / pubspec整備(0.1.0、全パッケージ)
-- [x] pub.dev dry-run(公開対象5パッケージすべてで `Package has 0 warnings.`)
-- [ ] pub.dev 公開(publish順: platform_interface → 各実装 → エントリ)
-  - **公開対象は5パッケージである。**
+- [ ] CHANGELOG / LICENSE / pubspec整備(0.1.0、`offline_stt`)
+- [x] pub.dev dry-run(**当時の federated plugin 構成〈公開対象5パッケージ〉で
+      すべて `Package has 0 warnings.`。単一パッケージ `offline_stt` への
+      統合〈Issue #91〉後は未再実行であり、`melos run publish:dry-run` で
+      改めて確認する必要がある**)
+- [ ] pub.dev 公開(`offline_stt` 1パッケージのみ。federated plugin 構成だった
+      頃の「platform_interface → 各実装 → エントリ」という公開順序の制約は
+      単一パッケージ化により解消した)
   - 手順は [docs/PUBLISHING.md](docs/PUBLISHING.md) を参照。
   - **`dart pub publish` は取り消せない操作であるため、リポジトリの所有者が
     明示的に実行する。**

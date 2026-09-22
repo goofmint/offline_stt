@@ -88,7 +88,7 @@ APIが実際に何を提供しているか、入れるとしたら何を変え�
 
 - **公開API**: `TranscriptSegment`(design.md §2.2)は現在 `text` と
   `isFinal` の2フィールドである。ここに時間情報を足すことになる。
-  `packages/offline_stt_platform_interface` のデータ型、
+  `packages/offline_stt/lib/src/transcript_segment.dart` のデータ型、
   `pigeons/offline_stt_events.dart`、および Kotlin / Swift の2言語の
   生成物と受け口。
 - **型の選び方が難しい。** 取れるものがプラットフォームごとに違いすぎる。
@@ -159,9 +159,9 @@ APIが実際に何を提供しているか、入れるとしたら何を変え�
 > (design.md §4.3、spikes/android/RESULTS.md)。**ファイル入力では
 > 実測上不要だが、マイク入力にすれば必要になる**、というのが素直な解釈
 > である。マイク入力を入れる場合、`RECORD_AUDIO` は避けられない。
-> プラグインの `AndroidManifest.xml` は現在空であり、パーミッションを
-> 一切追加していない(`packages/offline_stt_android/README.md` §3)。
-> これを変えることになる。
+> プラグインの `AndroidManifest.xml`
+> (`packages/offline_stt/android/src/main/AndroidManifest.xml`)は現在空であり、
+> パーミッションを一切追加していない。これを変えることになる。
 
 また同クラスのドキュメントは「**このAPIは連続認識のために使うことを意図して
 いない**」とも明記している。マイク入力の典型的な用途は連続認識であり、
@@ -273,7 +273,7 @@ design.md §3 は「**同時セッションはv1では1本に制限(プラット
 
 ### 3.1 今どう1本に制限しているか
 
-`packages/offline_stt_platform_interface/lib/src/session_guard.dart` の
+`packages/offline_stt/lib/src/session_guard.dart` の
 `TranscribeSessionGuard` mixin である。各ネイティブ実装が個別に排他を書くと
 重複と実装漏れが起きるため、共有層に1つだけ置いてある(Issue #23)。
 
@@ -345,7 +345,7 @@ start することへの制限は仕様に無い**
 **(a) 共有ガード** — `TranscribeSessionGuard` の `bool _sessionActive` を、
 セッションハンドルの集合へ置き換える。上限を設けるなら上限値の根拠が要る
 (現在の「1」の根拠は design.md §3 の「プラットフォーム側の並行動作が
-未検証のため」である)。design.md §3 の記述と、`packages/offline_stt_platform_interface/test/`
+未検証のため」である)。design.md §3 の記述と、`packages/offline_stt/test/`
 にある状態遷移・二重セッション拒否のユニットテストも書き換えになる。
 
 **(b) ブリッジがセッションを識別できない。** これが最も重い。
@@ -393,8 +393,9 @@ Web はシングルスレッド。いずれも「1本」を前提に書かれて
 - **Androidには機種依存の壁がある。** `SpeechRecognizer.isOnDeviceRecognitionAvailable()`
   が `true` を返すか、対象ロケールが `supportedOnDeviceLanguages` に含まれる
   かは端末依存であり、含まれない端末が存在しうる
-  (`packages/offline_stt_android/README.md` §4 制約3)。同時実行可否も
-  同様に端末依存である可能性が高く、**1機種で成功しても一般化できない。**
+  (`packages/offline_stt/README.md`「既知の制約(採用前に読むこと)」)。
+  同時実行可否も同様に端末依存である可能性が高く、
+  **1機種で成功しても一般化できない。**
 
 ### 3.5 評価
 

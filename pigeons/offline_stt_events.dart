@@ -6,15 +6,16 @@
 // FR-2 FR-3 FR-6、GitHub Issue #24。
 //
 // 生成コマンドはリポジトリルートの `pubspec.yaml` の melos スクリプト
-// `pigeon:android` / `pigeon:darwin` を参照。
+// `pigeon` を参照。Dart / Kotlin / Swift を1回の実行でまとめて生成する。
 
 import 'package:pigeon/pigeon.dart';
 
 /// モデルの状態を表す4値(design.md §2.2、requirements.md FR-1)。
 ///
-/// `offline_stt_platform_interface` の `ModelState`(
-/// `packages/offline_stt_platform_interface/lib/src/model_state.dart`)と
-/// 値・順序を一致させること。マッピングは各実装パッケージ側で行う。
+/// `offline_stt` の `ModelState`(
+/// `packages/offline_stt/lib/src/model_state.dart`)と値・順序を一致させる
+/// こと。マッピングは各プラットフォーム実装側(`lib/src/android/` /
+/// `lib/src/darwin/` の `model_state_mapping.dart`)で行う。
 enum ModelState { available, downloadable, downloading, unavailable }
 
 /// モデルダウンロードの進捗(design.md §2.2)。

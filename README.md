@@ -54,9 +54,9 @@ Chrome 153 での jaJP_10s 実測では、所要時間は短縮される一方�
 
 | プラットフォーム | 実装E2Eの状況 |
 |---|---|
-| Web | 手動チェックリストあり([packages/offline_stt_web/E2E_CHECKLIST.md](./packages/offline_stt_web/E2E_CHECKLIST.md))。本番実装での再測定は未実施 |
-| Darwin | **2026-09-21 に本番実装を macOS 26.5.1 + iPad Pro (iOS 26.6.2) で実行済み(Issue #40)。手順1〜6は全て期待どおりで実装バグ0件。16回すべて1回目で完走。包含率は8ファイルとも未達**([結果](./packages/offline_stt_darwin/E2E_RESULTS.md))。iOS 27実機は未実施 |
-| Android | **2026-09-21 に本番実装を Pixel 6 で実行済み(Issue #50)。初回は不合格でバグ4件を発見し、修正後の最終実行は手順3が8/8成功**([結果](./packages/offline_stt_android/E2E_RESULTS.md))。包含率は enUS_10s のみ合格。非Pixel機は未実施(利用者判断により対象外) |
+| Web | 手動チェックリストあり([docs/e2e/E2E_CHECKLIST_WEB.md](./docs/e2e/E2E_CHECKLIST_WEB.md))。本番実装での再測定は未実施 |
+| Darwin | **2026-09-21 に本番実装を macOS 26.5.1 + iPad Pro (iOS 26.6.2) で実行済み(Issue #40)。手順1〜6は全て期待どおりで実装バグ0件。16回すべて1回目で完走。包含率は8ファイルとも未達**([結果](./docs/e2e/E2E_RESULTS_DARWIN.md))。iOS 27実機は未実施 |
+| Android | **2026-09-21 に本番実装を Pixel 6 で実行済み(Issue #50)。初回は不合格でバグ4件を発見し、修正後の最終実行は手順3が8/8成功**([結果](./docs/e2e/E2E_RESULTS_ANDROID.md))。包含率は enUS_10s のみ合格。非Pixel機は未実施(利用者判断により対象外) |
 
 上の表の「ja-JP検証結果」はいずれも**M0スパイク実装での実測値**であり、本リポジトリの実装パッケージで取り直したものではない。
 
@@ -126,16 +126,21 @@ Androidのオンデバイス認識は、対象ロケールの言語パックが�
 offline_stt/
 ├── pubspec.yaml                          … workspace定義 + melos設定
 ├── packages/
-│   ├── offline_stt/                      … エントリパッケージ(利用者はこれのみに依存)
-│   ├── offline_stt_platform_interface/   … 共通抽象・データ型・例外(純Dart)
-│   ├── offline_stt_android/              … Kotlin実装(標準 android.speech.SpeechRecognizer)
-│   ├── offline_stt_darwin/               … Swift実装(iOS/macOS共用、SpeechAnalyzer)
-│   └── offline_stt_web/                  … Dart JS interop実装(Web Speech API)
+│   └── offline_stt/                      … 単一パッケージ(利用者はこれだけに依存する)
+│       ├── android/                      … Kotlin実装(標準 android.speech.SpeechRecognizer)
+│       ├── darwin/                       … Swift実装(iOS/macOS共用、SpeechAnalyzer)
+│       └── lib/src/{android,darwin,web}/ … 各プラットフォームのDart側実装
 └── apps/
     └── example/                          … example app
 ```
 
-federated pluginのエンドースメント構成(`offline_stt` の `flutter.plugin.platforms` で各プラットフォームに `default_package` を指定し、各実装パッケージは `implements: offline_stt` を宣言)は requirements.md §6 / design.md §1 に従っている。
+`offline_stt` は federated plugin ではなく単一パッケージである(Issue #91)。
+以前は `offline_stt_platform_interface` / `offline_stt_android` /
+`offline_stt_darwin` / `offline_stt_web` の4パッケージに分かれ、
+`flutter.plugin.platforms` の `default_package` によって実装パッケージが
+自動選択される構成だったが、この機構はもう使っていない。実装の選択は
+`lib/src/backend.dart` の条件付きexportと実行時のOS判定で行う
+(requirements.md §6 / design.md §1 参照)。
 
 ## セットアップ・コマンド
 
@@ -198,14 +203,14 @@ JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home flutter
 
 CI の Android ジョブが `actions/setup-java` で JDK 17 を用意しているのと同じ理由である(`android/build.gradle` の `sourceCompatibility` は 17)。
 
-**Swift の言語モードについて**: `offline_stt_darwin.podspec` は `s.swift_version = '5.0'` を指定している。Swift 6 言語モード(strict concurrency)では、Pigeon が生成する `Pigeon.g.swift` のトップレベル `var`(`pigeonPigeonMethodCodec`)が `is not concurrency-safe because it is nonisolated global shared mutable state` としてコンパイルエラーになる。Pigeon 27.3.0 と最新の 29.0.2 のどちらでも同じコードが生成されるため、Pigeon の更新では解決しない。Swift 5 モードでも async/await と actor は使えるため、design.md §4.2 の SpeechAnalyzer 連携(M2)には支障がない。
+**Swift の言語モードについて**: `offline_stt.podspec`(`packages/offline_stt/darwin/`)は `s.swift_version = '5.0'` を指定している。Swift 6 言語モード(strict concurrency)では、Pigeon が生成する `Pigeon.g.swift` のトップレベル `var`(`pigeonPigeonMethodCodec`)が `is not concurrency-safe because it is nonisolated global shared mutable state` としてコンパイルエラーになる。Pigeon 27.3.0 と最新の 29.0.2 のどちらでも同じコードが生成されるため、Pigeon の更新では解決しない。Swift 5 モードでも async/await と actor は使えるため、design.md §4.2 の SpeechAnalyzer 連携(M2)には支障がない。
 
 **その他の注意点**:
 
 - ネイティブプロジェクトは **4プラットフォームすべてリポジトリにコミット済み**である(ios / macos / web は Issue #41、android は Issue #51)。**CIジョブ内で `flutter create` を実行することはもう無い。** いずれも Flutter 3.41.9 の `flutter create . --platforms=<platform> --org com.moongift` の出力をそのままコミットしてある(**生成時点のバージョンであり、CI が使う版とは別である**。CI は現在 3.47.5。`flutter create` の生成物は SDK 更新のたびに作り直す性質のものではないため、生成時点のまま据え置いている)。
-- macOS/iOSのDeployment Target引き上げ(26.0、`offline_stt_darwin.podspec` の要求)は、ネイティブプロジェクトをコミットした時点で反映済みであり、CI内での `sed` は不要になったため削除した。
+- macOS/iOSのDeployment Target引き上げ(26.0、`offline_stt.podspec` の要求)は、ネイティブプロジェクトをコミットした時点で反映済みであり、CI内での `sed` は不要になったため削除した。
 - `apps/example/android` をコミット対象に含めたのは、(a) 他の3プラットフォームと扱いを揃えるため、(b) `minSdk 31` の要件をリポジトリ内で表明でき、CI内の `sed` による書き換えという間接的な手当を無くせるため、(c) 実機E2E(Issue #50)を行う人が `flutter create` を自分で再実行せずに `flutter build apk` できるため、の3点である。
-- `apps/example/android/app/build.gradle.kts` の `minSdk` は `flutter.minSdkVersion`(生成時点の Flutter 3.41.9 の既定は 24)ではなく **`31` を直接書いてある**。`offline_stt_android` が要求する 31(requirements.md NFR-4: Android 12 / API 31 以上)より低いと、マニフェストのマージが `uses-sdk:minSdkVersion 24 cannot be smaller than version 31 declared in library [:offline_stt_android]` で失敗することを CI の実行で実際に確認している(Issue #82)。**以前は CI 内の `sed` で引き上げていたが、Issue #51 でこのステップは削除した。** macOS/iOS の Deployment Target を `sed` で引き上げるステップを Issue #41 で削除したのと同じ理由である。
+- `apps/example/android/app/build.gradle.kts` の `minSdk` は `flutter.minSdkVersion`(生成時点の Flutter 3.41.9 の既定は 24)ではなく **`31` を直接書いてある**。`offline_stt` が要求する 31(requirements.md NFR-4: Android 12 / API 31 以上)より低いと、マニフェストのマージが失敗することを CI の実行で実際に確認している(Issue #82。**当時〈単一パッケージ化 Issue #91 より前〉に実際に出力されたエラー文言は `uses-sdk:minSdkVersion 24 cannot be smaller than version 31 declared in library [:offline_stt_android]` であり、パッケージ統合後に再現確認はしていない**)。**以前は CI 内の `sed` で引き上げていたが、Issue #51 でこのステップは削除した。** macOS/iOS の Deployment Target を `sed` で引き上げるステップを Issue #41 で削除したのと同じ理由である。
 
 ## プラットフォーム別の追加セットアップ
 
@@ -229,4 +234,4 @@ CI の Android ジョブが `actions/setup-java` で JDK 17 を用意してい�
 
 ## 現状
 
-`offline_stt_platform_interface` と Web / Darwin(iOS・macOS)/ Android の各実装が入っている(tasks.md の M1〜M3)。エントリパッケージ `offline_stt` は現時点で利用者向けのファサードクラスをまだ持たず、example app は暫定的に `OfflineTranscriberPlatform.instance` を直接使用している(`apps/example/pubspec.yaml` のコメント参照)。
+Web / Darwin(iOS・macOS)/ Android の各実装(tasks.md の M1〜M3)は、単一パッケージ `offline_stt` へ統合済みである(Issue #91)。旧 `offline_stt_platform_interface` / `offline_stt_android` / `offline_stt_darwin` / `offline_stt_web` の4パッケージはもう存在しない。`offline_stt` は利用者向けのファサードクラス `OfflineTranscriber`(`checkModel` / `downloadModel` / `transcribeFile`)を公開しており、example app もこのファサードのみを使用する(`const OfflineTranscriber()`)。

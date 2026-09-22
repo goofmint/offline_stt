@@ -5,7 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart'
     show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:offline_stt_platform_interface/offline_stt_platform_interface.dart';
+import 'package:offline_stt/offline_stt.dart';
 
 import 'download_consent_dialog.dart';
 import 'object_url.dart';
@@ -82,9 +82,7 @@ class _OfflineSttHomePageState extends State<OfflineSttHomePage> {
       _modelCheckError = null;
     });
     try {
-      final state = await OfflineTranscriberPlatform.instance.checkModel(
-        locale,
-      );
+      final state = await const OfflineTranscriber().checkModel(locale);
       if (!mounted) return;
       setState(() {
         _modelState = state;
@@ -196,7 +194,7 @@ class _OfflineSttHomePageState extends State<OfflineSttHomePage> {
     });
 
     final completer = Completer<void>();
-    _downloadSubscription = OfflineTranscriberPlatform.instance
+    _downloadSubscription = const OfflineTranscriber()
         .downloadModel(locale)
         .listen(
           (progress) {
@@ -268,7 +266,7 @@ class _OfflineSttHomePageState extends State<OfflineSttHomePage> {
       // transcribeFile()の呼び出し自体(Streamオブジェクトの生成)が
       // 同期的に例外を送出しうる経路(未登録のプラットフォームでの
       // UnimplementedError等)があるため、ここもtry/catchで捕捉する。
-      stream = OfflineTranscriberPlatform.instance.transcribeFile(request);
+      stream = const OfflineTranscriber().transcribeFile(request);
     } catch (e) {
       setState(() {
         _transcribing = false;

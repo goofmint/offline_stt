@@ -36,14 +36,16 @@ name: CI
 # Issue #51(example appへのAndroid動作追加)で、**4プラットフォームすべての
 # ネイティブプロジェクトがリポジトリにコミット済みになった**:
 #   - macos / ios / web ... Issue #41(Deployment Target 26.0 設定済み、
-#     offline_stt_darwin.podspec 要件)
+#     offline_stt.podspec 要件)
 #   - android ........... Issue #51(Flutter 3.41.9 の
 #     `flutter create . --platforms=android --org com.moongift` の出力。
 #     ただし app/build.gradle.kts の minSdk だけは `flutter.minSdkVersion`
-#     (既定 24)ではなく 31 を直接書いてある。offline_stt_android が
-#     minSdk 31 を宣言しており、24 のままだとマニフェストのマージが
+#     (既定 24)ではなく 31 を直接書いてある。offline_stt が minSdk 31 を
+#     宣言しており、24 のままだとマニフェストのマージが
 #     「uses-sdk:minSdkVersion 24 cannot be smaller than version 31
-#     declared in library [:offline_stt_android]」で失敗するためである)
+#     declared in library [:offline_stt]」で失敗するためである。
+#     Issue #91 の単一パッケージ化以前は、このライブラリ名が
+#     `[:offline_stt_android]` だった)
 #
 #   そのため以下のbuildジョブでは、`flutter create .` による再生成も、
 #   Deployment Target / minSdk を書き換える sed も一切行わない。ジョブは

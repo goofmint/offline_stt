@@ -140,13 +140,19 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」要�
 
 - 土台のAPIが新しく、iOS/macOSのSpeechAnalyzerもOS 26で導入されたばかりである。また各OSのオンデバイス認識の挙動には実測で判明した未確定要素が残る(design.md §8)。そのためライブラリは0.x系で公開し、各OS APIのstable化までstableを名乗らない
 
-## 6. パッケージ構成(federated plugin)
+## 6. パッケージ構成(単一パッケージ)
 
-- `<name>_platform_interface`: 共通抽象、TranscriptSegment、エラー型
-- `<name>_android`: Kotlin実装(標準 `android.speech.SpeechRecognizer` + MediaCodecポンプ)
-- `<name>_darwin`: Swift実装(iOS/macOS共用、SpeechAnalyzer + AVFoundation)
-- `<name>_web`: Dart JS interop実装(Web Speech + Web Audio)
-- `<name>`: エントリパッケージ(利用者が依存するのはこれのみ)
+`offline_stt` は単一パッケージであり、Android / iOS / macOS / Web の全実装を
+1つのパッケージに同梱する(Issue #91)。**アプリは `dependencies:` に
+`offline_stt:` とだけ書けばよく、実装ごとに個別のパッケージへ依存する必要は
+無い。**
+
+- `lib/offline_stt.dart`: 公開バレル。`OfflineTranscriber` とデータ型・例外型のみを公開する
+- `lib/src/offline_transcriber.dart`: 利用者向けファサード `OfflineTranscriber`
+- `lib/src/offline_transcriber_platform.dart`: 内部の抽象クラス(公開APIではない)
+- `lib/src/backend.dart` + `backend_io.dart` / `backend_web.dart`: 実行環境に応じた実装選択(design.md §1参照)
+- `lib/src/android/` / `lib/src/darwin/` / `lib/src/web/`: 各プラットフォーム実装(Kotlin側は `android/`、Swift側は `darwin/` に同梱)
+- `apps/example/`: 参照実装のexample app(公開対象外)
 
 ## 7. 共通API(案)
 
