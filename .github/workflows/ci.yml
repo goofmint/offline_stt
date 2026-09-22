@@ -6,7 +6,7 @@ name: CI
 #   - 全パッケージの静的解析(dart analyze --fatal-infos)・ユニットテスト・
 #     フォーマット
 #   - apps/example の各プラットフォーム向けコンパイル(ビルド検証)
-#   - pub.dev への公開対象5パッケージで
+#   - pub.dev への公開対象である offline_stt(1パッケージ)で
 #     `dart pub publish --dry-run` が通ること(Issue #65、docs/PUBLISHING.md。
 #     `.github/workflows/publish.yml` が実際に公開する前段の安全網であり、
 #     ここでは公開そのものは行わない)
@@ -113,7 +113,8 @@ jobs:
 
       # 公開APIドキュメントが生成でき、かつリンク切れが無いことを検証する
       # (Issue #63)。melos の doc スクリプトは apps/example を除外し、
-      # pub.dev への公開対象5パッケージで `dart doc --validate-links` を実行する。
+      # 公開対象である offline_stt(1パッケージ)で
+      # `dart doc --validate-links` を実行する。
       - name: dart doc 生成とリンク検証
         run: melos run doc
 
@@ -139,11 +140,12 @@ jobs:
       - name: workspace を解決する(Dart Pub Workspaces)
         run: melos bootstrap
 
-      # pub.dev への公開対象5パッケージ(apps/example は publish_to: none
-      # のため対象外。docs/PUBLISHING.md 1節、Issue #65)で `dart pub publish --dry-run`
-      # が警告なしで通ることを検証する。ここでは実際の公開は行わない。
-      # 実際の公開は `.github/workflows/publish.yml` がパッケージ別タグの
-      # push をトリガに行う。
+      # pub.dev への公開対象である offline_stt(apps/example は
+      # publish_to: none のため対象外。docs/PUBLISHING.md 1節、Issue #65・#91)で
+      # `dart pub publish --dry-run` が警告なしで通ることを検証する。
+      # ここでは実際の公開は行わない。実際の公開は
+      # `.github/workflows/publish.yml` が `offline_stt-v*` タグの push を
+      # トリガに行う。
       - name: dart pub publish --dry-run(公開対象5パッケージ)
         run: melos run publish:dry-run
 

@@ -173,8 +173,8 @@ SpeechAnalyzer がそのOSバージョンで追加されたAPIであるためで
 1. **1つずつ動かす。** 複数のバージョンを同時に上げると、壊れたときに
    どれが原因か切り分けられない。
 2. **表1.1〜1.5で「同時に直す場所」を確認する。** 同じ値が複数ファイルに
-   書かれているものは片方だけ直さない。特に Dart SDK(7ファイル)と
-   Flutter SDK(CI 1箇所 + pubspec 5箇所)。
+   書かれているものは片方だけ直さない。特に Dart SDK(3ファイル)と
+   Flutter SDK(CI 1箇所 + pubspec 2箇所)。
 3. **CIを通す。** `melos run analyze` / `melos run test` / `melos run format`
    / `melos run doc` と、4プラットフォームのビルド。
 4. **E2Eを再実行する。** ビルドが通ることと認識が成立することは別である。

@@ -100,7 +100,7 @@ Flutterライブラリ「オフライン音声ファイル文字起こし」タ�
 依存: M2〜M3完了
 
 - [ ] README: 対応状況マトリクス(OS / 最低バージョン / 所要時間特性 / ja-JP検証結果)
-- [ ] README: アプリ側要件(同意ダイアログ、AICore初期化、非Chrome分岐)
+- [ ] README: アプリ側要件(同意ダイアログ、非Chrome分岐)
 - [ ] README: モデル同梱型代替(sherpa-onnx等)との使い分け記載
 - [ ] APIドキュメント(dartdoc)整備
 - [ ] CHANGELOG / LICENSE / pubspec整備(0.1.0、`offline_stt`)
