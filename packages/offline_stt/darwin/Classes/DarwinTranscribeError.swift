@@ -97,3 +97,18 @@ extension DarwinTranscribeError {
     FlutterError(code: pigeonCode.wireCode, message: detailMessage, details: nil)
   }
 }
+
+extension DarwinTranscribeError {
+  /// `@async` なHostApiメソッド(`supportedLocales`)が
+  /// `completion(.failure(_:))` へ渡すエラーへの変換。
+  ///
+  /// `asFlutterError` を使えない理由: `FlutterError` はObjective-Cのクラス
+  /// (`FlutterError : NSObject`)であり Swift の `Error` に適合しないため、
+  /// `Result<T, Error>.failure(_:)` へ渡せない。Pigeonが生成する
+  /// `PigeonError`(Pigeon.g.swift)は `Error` に適合しており、
+  /// `wrapError(_:)` が `FlutterError` と同じく `code`/`message`/`details`
+  /// へ展開する。したがってDart側へ届く形は `asFlutterError` と同一である。
+  var asPigeonError: PigeonError {
+    PigeonError(code: pigeonCode.wireCode, message: detailMessage, details: nil)
+  }
+}

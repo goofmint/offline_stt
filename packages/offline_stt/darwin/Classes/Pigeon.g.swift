@@ -448,6 +448,28 @@ protocol OfflineSttHostApi {
   /// 形式の非同期シグネチャを生成し、スレッドをブロックせずに
   /// `async`/`await` へ素直に橋渡しできる。
   func checkModel(locale: String, completion: @escaping (Result<ModelState, Error>) -> Void)
+  /// このプラットフォームが扱えるロケールの一覧を返す(requirements.md FR-5)。
+  ///
+  /// 返すのは**BCP-47文字列の集合**であり、`ModelState.available` な
+  /// ロケールの一覧ではない。未ダウンロードのロケールも含む。
+  ///
+  /// 列挙できない場合(Android API 33未満、Darwin OS 26未満・
+  /// `SpeechTranscriber.isAvailable == false` 等)は空リストを返さず、
+  /// `deviceUnsupported` のエラーを返さなければならない。空リストは
+  /// 「対応ロケールが1つも無い」と「そもそも列挙できない」を区別できず、
+  /// 呼び出し側を誤らせるためである(フォールバック禁止)。
+  ///
+  /// ## `@async` を付与する理由
+  /// [checkModel] と同じ事情である。Darwin実装は
+  /// `SpeechTranscriber.supportedLocales`(`static var ... { get async }`)
+  /// という Swift Concurrency の async プロパティを読まなければ結果を確定
+  /// できない(`ModelAvailability.swift` 参照)。`@async` を付けない場合、
+  /// Pigeonが生成するSwiftプロトコルは同期シグネチャになり、非同期APIの
+  /// 結果を得るには `DispatchSemaphore` 等でFlutterのプラットフォーム
+  /// スレッドをブロックする回避策が必要になってしまう(ANR・デッドロックの
+  /// 危険があり不可)。Android実装も `checkRecognitionSupport()` の
+  /// コールバック待ちを伴うため同様である。
+  func supportedLocales(completion: @escaping (Result<[String], Error>) -> Void)
   /// モデルダウンロードを開始する(requirements.md FR-2)。
   ///
   /// 進捗は `OfflineSttStreamEvents.downloadProgress()` のEventChannelで
@@ -525,6 +547,42 @@ class OfflineSttHostApiSetup {
       }
     } else {
       checkModelChannel.setMessageHandler(nil)
+    }
+    /// このプラットフォームが扱えるロケールの一覧を返す(requirements.md FR-5)。
+    ///
+    /// 返すのは**BCP-47文字列の集合**であり、`ModelState.available` な
+    /// ロケールの一覧ではない。未ダウンロードのロケールも含む。
+    ///
+    /// 列挙できない場合(Android API 33未満、Darwin OS 26未満・
+    /// `SpeechTranscriber.isAvailable == false` 等)は空リストを返さず、
+    /// `deviceUnsupported` のエラーを返さなければならない。空リストは
+    /// 「対応ロケールが1つも無い」と「そもそも列挙できない」を区別できず、
+    /// 呼び出し側を誤らせるためである(フォールバック禁止)。
+    ///
+    /// ## `@async` を付与する理由
+    /// [checkModel] と同じ事情である。Darwin実装は
+    /// `SpeechTranscriber.supportedLocales`(`static var ... { get async }`)
+    /// という Swift Concurrency の async プロパティを読まなければ結果を確定
+    /// できない(`ModelAvailability.swift` 参照)。`@async` を付けない場合、
+    /// Pigeonが生成するSwiftプロトコルは同期シグネチャになり、非同期APIの
+    /// 結果を得るには `DispatchSemaphore` 等でFlutterのプラットフォーム
+    /// スレッドをブロックする回避策が必要になってしまう(ANR・デッドロックの
+    /// 危険があり不可)。Android実装も `checkRecognitionSupport()` の
+    /// コールバック待ちを伴うため同様である。
+    let supportedLocalesChannel = FlutterBasicMessageChannel(name: "dev.flutter.pigeon.offline_stt.OfflineSttHostApi.supportedLocales\(channelSuffix)", binaryMessenger: binaryMessenger, codec: codec)
+    if let api = api {
+      supportedLocalesChannel.setMessageHandler { _, reply in
+        api.supportedLocales { result in
+          switch result {
+          case .success(let res):
+            reply(wrapResult(res))
+          case .failure(let error):
+            reply(wrapError(error))
+          }
+        }
+      }
+    } else {
+      supportedLocalesChannel.setMessageHandler(nil)
     }
     /// モデルダウンロードを開始する(requirements.md FR-2)。
     ///

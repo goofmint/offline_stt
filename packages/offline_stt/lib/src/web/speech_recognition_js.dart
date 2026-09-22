@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 
@@ -79,6 +80,53 @@ Future<bool> callInstall(JSFunction ctor, String locale) async {
   final promise = ctor.callMethod<JSPromise<JSAny?>>('install'.toJS, options);
   final result = await promise.toDart;
   return (result! as JSBoolean).toDart;
+}
+
+/// `window.speechSynthesis.getVoices()` が返す各ボイスの `lang`(BCP-47)を
+/// 列挙する(requirements.md FR-5)。
+///
+/// ## なぜ音声合成(TTS)のボイス一覧を使うのか
+/// **ブラウザは音声認識の対応言語を列挙するAPIを持たない。**
+/// `SpeechRecognition` のstaticメソッドは `available()` と `install()` の
+/// 2つだけであり、いずれも「与えたロケールに対応しているか」を答える
+/// だけで、対応ロケールを返してはくれない。そのため候補集合を別途作って
+/// 1件ずつ問い合わせるほかない。その候補として、同じブラウザが
+/// 「この端末で扱える言語」として持っている唯一の列挙可能なリストである
+/// TTSのボイス一覧を使う。
+///
+/// requirements.md FR-5 は「静的リストを持たず実行時解決とする」と定めて
+/// おり、ロケールの静的リストをコードへ埋め込むことは禁じられている
+/// (spikes/darwin/RESULTS.md には静的リストで15言語を取りこぼした実測が
+/// ある)。候補は必ず実行時にこの関数から取ること。
+///
+/// ## `voiceschanged` を待つ理由
+/// `getVoices()` はボイス一覧の読み込みが終わる前に呼ばれると空配列を
+/// 返す(MDNが明記している既知の挙動)。空だった場合は `voiceschanged`
+/// イベントを [timeout] まで待ってから読み直す。待っても空のままなら
+/// 空リストを返し、**エラーにするかどうかの判断は呼び出し側
+/// (`model_management.dart`)に委ねる**(この層はブラウザAPIを写すだけで
+/// 判断を持たない、という本ファイルの役割分担による)。
+Future<List<String>> browserVoiceLocaleTags({
+  Duration timeout = const Duration(seconds: 3),
+}) async {
+  final synthesis = web.window.speechSynthesis;
+  var voices = synthesis.getVoices().toDart;
+  if (voices.isEmpty) {
+    final completer = Completer<void>();
+    void onVoicesChanged(web.Event event) {
+      if (!completer.isCompleted) completer.complete();
+    }
+
+    final listener = onVoicesChanged.toJS;
+    synthesis.addEventListener('voiceschanged', listener);
+    try {
+      await completer.future.timeout(timeout, onTimeout: () {});
+    } finally {
+      synthesis.removeEventListener('voiceschanged', listener);
+    }
+    voices = synthesis.getVoices().toDart;
+  }
+  return voices.map((voice) => voice.lang).toList();
 }
 
 /// `new SR()` でインスタンスを生成する。

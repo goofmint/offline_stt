@@ -8,7 +8,7 @@ Nothing is sent over the network. No model files ship with this package — the 
 
 ```yaml
 dependencies:
-  offline_stt: ^0.1.1
+  offline_stt: ^0.2.0
 ```
 
 ## Use
@@ -37,7 +37,19 @@ await for (final segment in transcriber.transcribeFile(
 }
 ```
 
-That's the whole API: `checkModel`, `downloadModel`, `transcribeFile`.
+### Which languages can this device do?
+
+```dart
+final locales = await transcriber.supportedLocales(); // ['en-US', 'ja-JP', ...]
+```
+
+Use it to build a language picker. **This is not a list of languages that are ready to use** — most of them still need downloading. Pick one, then call `checkModel` on it.
+
+If the device can't list its languages at all, this throws `DeviceUnsupportedException` rather than returning an empty list.
+
+On the web there is no API for this, so the list is built from the browser's text-to-speech voices and then checked one by one. A language with no voice installed won't appear even if recognition supports it, and the call takes a moment.
+
+That's the whole API: `supportedLocales`, `checkModel`, `downloadModel`, `transcribeFile`.
 
 ### Model states
 

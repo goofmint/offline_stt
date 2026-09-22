@@ -56,6 +56,28 @@ class OfflineSttApiImpl(
         }
     }
 
+    override fun supportedLocales(callback: (Result<List<String>>) -> Unit) {
+        mainScope.launch {
+            // `checkModel` と同じ理由で例外を必ず callback へ渡す。
+            // `mainScope.launch` の中で例外が外へ抜けると、Pigeon の
+            // コールバックが呼ばれないままコルーチンが異常終了し、Dart 側は
+            // 応答を待ち続けるかアプリごと落ちる。
+            try {
+                callback(Result.success(ModelAvailability.supportedLocales(context)))
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: AndroidTranscribeError) {
+                callback(Result.failure(e.toFlutterError()))
+            } catch (e: Exception) {
+                callback(
+                    Result.failure(
+                        AndroidTranscribeError.PlatformError("$e").toFlutterError(),
+                    ),
+                )
+            }
+        }
+    }
+
     override fun downloadModel(locale: String) {
         currentDownloadJob?.cancel()
         currentDownloadJob = mainScope.launch { runDownload(locale) }
