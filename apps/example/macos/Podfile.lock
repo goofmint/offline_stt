@@ -1,22 +1,22 @@
 PODS:
   - FlutterMacOS (1.0.0)
-  - offline_stt_darwin (0.1.0):
+  - offline_stt (0.1.0):
     - Flutter
     - FlutterMacOS
 
 DEPENDENCIES:
   - FlutterMacOS (from `Flutter/ephemeral`)
-  - offline_stt_darwin (from `Flutter/ephemeral/.symlinks/plugins/offline_stt_darwin/darwin`)
+  - offline_stt (from `Flutter/ephemeral/.symlinks/plugins/offline_stt/darwin`)
 
 EXTERNAL SOURCES:
   FlutterMacOS:
     :path: Flutter/ephemeral
-  offline_stt_darwin:
-    :path: Flutter/ephemeral/.symlinks/plugins/offline_stt_darwin/darwin
+  offline_stt:
+    :path: Flutter/ephemeral/.symlinks/plugins/offline_stt/darwin
 
 SPEC CHECKSUMS:
   FlutterMacOS: c232990155153907050900a2e175c7773903ba4e
-  offline_stt_darwin: fdda55dc5335cb0eb33e76db64f00b33c0b38216
+  offline_stt: e62eab14b80ceea4bfc0846fd1ca01fbd2df3be4
 
 PODFILE CHECKSUM: 224cb1c0d6f5312abfc2477bcb5c7f1fca2574fb
 
