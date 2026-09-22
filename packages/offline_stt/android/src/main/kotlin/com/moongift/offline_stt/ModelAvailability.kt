@@ -103,6 +103,74 @@ object ModelAvailability {
         }
     }
 
+    /**
+     * requirements.md FR-5。`OfflineSttApiImpl.supportedLocales` から呼ばれる。
+     *
+     * `RecognitionSupport` の3リスト
+     * (`supportedOnDeviceLanguages`(要ダウンロード) /
+     * `installedOnDeviceLanguages`(導入済み) /
+     * `pendingOnDeviceLanguages`(取得中))の **和集合** を返す。
+     * `getOnlineLanguages()` は `createOnDeviceSpeechRecognizer()` では空が
+     * 期待される(オンデバイス認識の対応言語ではない)ため**除外する**。
+     *
+     * 返すのは「この端末が扱えるロケールの集合」であり、`available` な
+     * ロケールの一覧ではない。未ダウンロードのロケールも含む。
+     *
+     * **空リストを返さない。** 列挙できない場合は必ず例外を投げる。
+     * 「端末が1言語も扱えない」ことと「列挙する手段が無い/照会に失敗した」
+     * ことを空リストへ畳むと、呼び出し側が前者だと誤解し、しかも原因が
+     * どこにも残らない([checkModel] の `SupportQuery.Failed` 分岐と同じ
+     * 理由である)。
+     */
+    suspend fun supportedLocales(context: Context): List<String> {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            // `checkRecognitionSupport()` とそれが返す `RecognitionSupport`
+            // の4メソッドはいずれも API 33(TIRAMISU)で追加された。API 31/32
+            // には対応ロケールを列挙する手段そのものが存在しない。
+            // [checkModel] は同じ状況で `unavailable`(FR-1 の終端状態)を
+            // 返すが、一覧には「対応ロケールが無い」を表す正しい値が無い
+            // (空リストは上記のとおり誤解を招く)ため、ここは明示的な
+            // エラーにする。
+            throw AndroidTranscribeError.DeviceUnsupported(
+                "対応ロケールの列挙には API 33 以上が必要である" +
+                    "(現在: API ${Build.VERSION.SDK_INT})。",
+            )
+        }
+
+        when (val query = querySupportDetailed(context, locale = null)) {
+            is SupportQuery.Success -> {
+                val support = query.support
+                // 3リストの和集合。`LinkedHashSet` により重複を除きつつ
+                // 「導入済み → 取得中 → 要ダウンロード」の順序を保つ。
+                val union = LinkedHashSet<String>()
+                union.addAll(support.installedOnDeviceLanguages)
+                union.addAll(support.pendingOnDeviceLanguages)
+                union.addAll(support.supportedOnDeviceLanguages)
+                if (union.isEmpty()) {
+                    throw AndroidTranscribeError.DeviceUnsupported(
+                        "checkRecognitionSupport() は成功したが、" +
+                            "オンデバイス認識の対応ロケールが1つも無い。",
+                    )
+                }
+                return union.toList()
+            }
+            is SupportQuery.Failed -> {
+                if (query.errorCode == SpeechRecognizer.ERROR_CANNOT_CHECK_SUPPORT) {
+                    throw AndroidTranscribeError.DeviceUnsupported(
+                        "ERROR_CANNOT_CHECK_SUPPORT(${query.errorCode})",
+                    )
+                }
+                val detail = query.errorCode
+                    ?.let { "${ErrorMapping.errorName(it)}($it)" }
+                    ?: "同期例外: ${query.cause}"
+                throw AndroidTranscribeError.PlatformError(
+                    "checkRecognitionSupport() の照会に失敗した($detail)。" +
+                        "端末が対応していないという意味ではない。再試行すること。",
+                )
+            }
+        }
+    }
+
     private fun classify(support: RecognitionSupport, locale: String): ModelState {
         return when {
             support.installedOnDeviceLanguages.contains(locale) -> ModelState.AVAILABLE
@@ -126,7 +194,7 @@ object ModelAvailability {
      * (呼び出し元は`unavailable`として扱う、またはダウンロード完了ポーリング
      * であれば「まだ完了していない」として扱う)。
      */
-    suspend fun querySupportDetailed(context: Context, locale: String): SupportQuery =
+    suspend fun querySupportDetailed(context: Context, locale: String?): SupportQuery =
         suspendCancellableCoroutine { continuation ->
             // `SpeechRecognizer` の破棄経路を1箇所に集約する。コールバック・
             // 同期例外・コルーチンのキャンセルのいずれで終わっても、必ず
@@ -209,10 +277,15 @@ object ModelAvailability {
      * design.md §4.3(wt73版): `EXTRA_PREFER_OFFLINE = true`
      * (requirements.md NFR-2のオフライン方針)。
      */
-    fun buildRecognizerIntent(locale: String): Intent =
+    fun buildRecognizerIntent(locale: String?): Intent =
         Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale)
+            // [supportedLocales] は特定のロケールについて尋ねているわけでは
+            // ないため `null` を渡す。その場合 `EXTRA_LANGUAGE` を付けず、
+            // 認識サービス側の既定ロケールで照会させる(`RecognitionSupport`
+            // の3リストは `EXTRA_LANGUAGE` を入れても絞られないことを
+            // Pixel 6 実機で確認済みである)。
+            if (locale != null) putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale)
             putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
         }
 }

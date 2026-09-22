@@ -1,4 +1,5 @@
 import 'download_progress.dart';
+import 'exceptions.dart';
 import 'model_state.dart';
 import 'transcribe_request.dart';
 import 'transcript_segment.dart';
@@ -22,6 +23,14 @@ import 'transcript_segment.dart';
 abstract class OfflineTranscriberPlatform {
   /// 対象ロケールのモデル状態を確認する(requirements.md FR-1)。
   Future<ModelState> checkModel(String locale);
+
+  /// このプラットフォームが扱えるロケールの一覧を返す(requirements.md FR-5)。
+  ///
+  /// **`available` なロケールの一覧ではない。** 意味と制約は
+  /// `OfflineTranscriber.supportedLocales()` のドキュメントコメントを
+  /// 参照すること。実装は空リストを返してはならず、列挙できない場合は
+  /// [DeviceUnsupportedException] を投げなければならない。
+  Future<List<String>> supportedLocales();
 
   /// 対象ロケールのモデルダウンロードをトリガーし、進捗をStreamで返す
   /// (requirements.md FR-2)。

@@ -179,6 +179,36 @@ void main() {
     log('ASSETS|dir=$assetDir');
   });
 
+  testWidgets('手順1-0: supportedLocales', (tester) async {
+    // Issue #94。`supportedLocales()` は「このプラットフォームが扱える
+    // ロケールの集合」を返す(Darwin実装は `SpeechTranscriber.supportedLocales` をそのまま写す)。
+    // `available` なロケールの一覧ではないため、この直後の手順1で
+    // `downloadable` になるロケールも含まれていてよい。
+    final stopwatch = Stopwatch()..start();
+    try {
+      final locales = await const OfflineTranscriber()
+          .supportedLocales()
+          .timeout(const Duration(seconds: 60));
+      log(
+        'SUPPORTEDLOCALES|count=${locales.length}'
+        '|ms=${stopwatch.elapsedMilliseconds}',
+      );
+      log('SUPPORTEDLOCALES|list=${locales.join(",")}');
+      // requirements.md FR-5 が全プラットフォームで動作検証を必須として
+      // いる ja-JP と、基準音声で使う en-US が含まれること。
+      expect(locales, contains('ja-JP'));
+      expect(locales, contains('en-US'));
+      // 空リストを返さない契約(空なら例外になる)。
+      expect(locales, isNotEmpty);
+    } catch (e) {
+      log(
+        'SUPPORTEDLOCALES|THREW:${e.runtimeType}:$e'
+        '|ms=${stopwatch.elapsedMilliseconds}',
+      );
+      rethrow;
+    }
+  });
+
   testWidgets('手順1: checkModel', (tester) async {
     // E2E_CHECKLIST.md 手順1。本番実装は `SpeechTranscriber.supportedLocales` /
     // `installedLocales` / `AssetInventory.status` の生の値を Dart へ公開

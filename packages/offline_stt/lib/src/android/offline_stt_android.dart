@@ -57,6 +57,10 @@ class OfflineSttAndroid extends OfflineTranscriberPlatform
       model_management.checkModel(_hostApi, locale);
 
   @override
+  Future<List<String>> supportedLocales() =>
+      model_management.supportedLocales(_hostApi);
+
+  @override
   Stream<DownloadProgress> downloadModel(String locale) =>
       model_management.downloadModel(_hostApi, locale);
 

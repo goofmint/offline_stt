@@ -400,6 +400,46 @@ class OfflineSttHostApi {
     return pigeonVar_replyValue! as ModelState;
   }
 
+  /// このプラットフォームが扱えるロケールの一覧を返す(requirements.md FR-5)。
+  ///
+  /// 返すのは**BCP-47文字列の集合**であり、`ModelState.available` な
+  /// ロケールの一覧ではない。未ダウンロードのロケールも含む。
+  ///
+  /// 列挙できない場合(Android API 33未満、Darwin OS 26未満・
+  /// `SpeechTranscriber.isAvailable == false` 等)は空リストを返さず、
+  /// `deviceUnsupported` のエラーを返さなければならない。空リストは
+  /// 「対応ロケールが1つも無い」と「そもそも列挙できない」を区別できず、
+  /// 呼び出し側を誤らせるためである(フォールバック禁止)。
+  ///
+  /// ## `@async` を付与する理由
+  /// [checkModel] と同じ事情である。Darwin実装は
+  /// `SpeechTranscriber.supportedLocales`(`static var ... { get async }`)
+  /// という Swift Concurrency の async プロパティを読まなければ結果を確定
+  /// できない(`ModelAvailability.swift` 参照)。`@async` を付けない場合、
+  /// Pigeonが生成するSwiftプロトコルは同期シグネチャになり、非同期APIの
+  /// 結果を得るには `DispatchSemaphore` 等でFlutterのプラットフォーム
+  /// スレッドをブロックする回避策が必要になってしまう(ANR・デッドロックの
+  /// 危険があり不可)。Android実装も `checkRecognitionSupport()` の
+  /// コールバック待ちを伴うため同様である。
+  Future<List<String>> supportedLocales() async {
+    final pigeonVar_channelName = 'dev.flutter.pigeon.offline_stt.OfflineSttHostApi.supportedLocales$pigeonVar_messageChannelSuffix';
+    final pigeonVar_channel = BasicMessageChannel<Object?>(
+      pigeonVar_channelName,
+      pigeonChannelCodec,
+      binaryMessenger: pigeonVar_binaryMessenger,
+    );
+    final Future<Object?> pigeonVar_sendFuture = pigeonVar_channel.send(null);
+    final pigeonVar_replyList = await pigeonVar_sendFuture as List<Object?>?;
+
+    final Object? pigeonVar_replyValue = _extractReplyValueOrThrow(
+        pigeonVar_replyList,
+        pigeonVar_channelName,
+        isNullValid: false,
+    )
+    ;
+    return (pigeonVar_replyValue! as List<Object?>).cast<String>();
+  }
+
   /// モデルダウンロードを開始する(requirements.md FR-2)。
   ///
   /// 進捗は `OfflineSttStreamEvents.downloadProgress()` のEventChannelで

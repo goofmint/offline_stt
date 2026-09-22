@@ -57,6 +57,10 @@ class OfflineSttWeb extends OfflineTranscriberPlatform
       model_management.checkModel(locale);
 
   @override
+  Future<List<String>> supportedLocales() =>
+      model_management.supportedLocales();
+
+  @override
   Stream<DownloadProgress> downloadModel(String locale) =>
       model_management.downloadModel(locale);
 

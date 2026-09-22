@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../common.dart';
+import '../locale_list.dart';
 
 import 'model_state_mapping.dart';
 import 'speech_recognition_js.dart';
@@ -30,6 +31,61 @@ Future<ModelState> checkModel(String locale) async {
   }
   final availability = await callAvailable(ctor, locale);
   return mapAvailabilityToModelState(availability);
+}
+
+/// requirements.md FR-5。
+///
+/// **このブラウザが扱えるロケールの集合を返す。`available` なロケールの
+/// 一覧ではない**(意味と制約は `OfflineTranscriber.supportedLocales()` の
+/// ドキュメントコメント参照)。
+///
+/// ## 手順
+/// 1. `speechSynthesis.getVoices()` の各 `lang` を候補にする
+///    ([browserVoiceLocaleTags])。**ロケールの静的リストは持たない**
+///    (requirements.md FR-5)
+/// 2. 候補の重複を除く([dedupeLocaleTags])
+/// 3. 候補を **1件ずつ** `SpeechRecognition.available()` へ問い合わせ、
+///    `unavailable` 以外が返ったものだけを採る
+///
+/// ## 1件ずつ問い合わせる理由
+/// `available({langs: [...]})` は複数ロケールを受け取れるが、返るのは
+/// **「1つでも非対応なら `unavailable`」という集約結果**だけであり、
+/// どのロケールが対応しているかは分からない。したがってまとめて渡しては
+/// ならず、1ロケールにつき1回呼ぶ必要がある。件数分の往復が発生するため
+/// 他のプラットフォームより時間がかかる。
+///
+/// 判定は `processLocally: true`(オンデバイス、requirements.md NFR-2)で
+/// 行う。`quality` は指定せず既定値(`command`)のままである
+/// (`checkModel` / 認識セッションと同じ条件に揃えるため)。
+///
+/// ## 空リストを返さない
+/// 非Chrome環境(`SpeechRecognition` が無い、または Chrome 固有の
+/// `available()` / `install()` を持たない)は `checkModel` と同じ判定
+/// ([findSpeechRecognitionConstructor])で検出し、
+/// [DeviceUnsupportedException] を投げる。ボイス一覧が空のまま取れない
+/// 場合、および1件も対応ロケールが無かった場合も同様である。
+Future<List<String>> supportedLocales() async {
+  final ctor = findSpeechRecognitionConstructor();
+  if (ctor == null) {
+    // `checkModel` は非Chrome環境で `unavailable`(FR-1 の終端状態)を
+    // 返せるが、一覧には「対応ロケールが無い」を表す正しい値が無いため、
+    // ここは明示的なエラーにする。
+    throw const DeviceUnsupportedException();
+  }
+
+  final candidates = dedupeLocaleTags(await browserVoiceLocaleTags());
+  // 候補が1つも作れなければ、対応状況を問い合わせる相手がいない。
+  // 「対応ロケールが無い」と report してはならない(まだ何も判定していない)。
+  requireNonEmptyLocales(candidates);
+
+  final supported = <String>[];
+  for (final tag in candidates) {
+    final availability = await callAvailable(ctor, tag);
+    if (mapAvailabilityToModelState(availability) != ModelState.unavailable) {
+      supported.add(tag);
+    }
+  }
+  return requireNonEmptyLocales(supported);
 }
 
 /// requirements.md FR-2。

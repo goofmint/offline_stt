@@ -479,6 +479,30 @@ interface OfflineSttHostApi {
    */
   fun checkModel(locale: String, callback: (Result<ModelState>) -> Unit)
   /**
+   * このプラットフォームが扱えるロケールの一覧を返す(requirements.md FR-5)。
+   *
+   * 返すのは**BCP-47文字列の集合**であり、`ModelState.available` な
+   * ロケールの一覧ではない。未ダウンロードのロケールも含む。
+   *
+   * 列挙できない場合(Android API 33未満、Darwin OS 26未満・
+   * `SpeechTranscriber.isAvailable == false` 等)は空リストを返さず、
+   * `deviceUnsupported` のエラーを返さなければならない。空リストは
+   * 「対応ロケールが1つも無い」と「そもそも列挙できない」を区別できず、
+   * 呼び出し側を誤らせるためである(フォールバック禁止)。
+   *
+   * ## `@async` を付与する理由
+   * [checkModel] と同じ事情である。Darwin実装は
+   * `SpeechTranscriber.supportedLocales`(`static var ... { get async }`)
+   * という Swift Concurrency の async プロパティを読まなければ結果を確定
+   * できない(`ModelAvailability.swift` 参照)。`@async` を付けない場合、
+   * Pigeonが生成するSwiftプロトコルは同期シグネチャになり、非同期APIの
+   * 結果を得るには `DispatchSemaphore` 等でFlutterのプラットフォーム
+   * スレッドをブロックする回避策が必要になってしまう(ANR・デッドロックの
+   * 危険があり不可)。Android実装も `checkRecognitionSupport()` の
+   * コールバック待ちを伴うため同様である。
+   */
+  fun supportedLocales(callback: (Result<List<String>>) -> Unit)
+  /**
    * モデルダウンロードを開始する(requirements.md FR-2)。
    *
    * 進捗は `OfflineSttStreamEvents.downloadProgress()` のEventChannelで
@@ -540,6 +564,24 @@ interface OfflineSttHostApi {
             val args = message as List<Any?>
             val localeArg = args[0] as String
             api.checkModel(localeArg) { result: Result<ModelState> ->
+              val error = result.exceptionOrNull()
+              if (error != null) {
+                reply.reply(PigeonPigeonUtils.wrapError(error))
+              } else {
+                val data = result.getOrNull()
+                reply.reply(PigeonPigeonUtils.wrapResult(data))
+              }
+            }
+          }
+        } else {
+          channel.setMessageHandler(null)
+        }
+      }
+      run {
+        val channel = BasicMessageChannel<Any?>(binaryMessenger, "dev.flutter.pigeon.offline_stt.OfflineSttHostApi.supportedLocales$separatedMessageChannelSuffix", codec)
+        if (api != null) {
+          channel.setMessageHandler { _, reply ->
+            api.supportedLocales{ result: Result<List<String>> ->
               val error = result.exceptionOrNull()
               if (error != null) {
                 reply.reply(PigeonPigeonUtils.wrapError(error))

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.0
+
+- Added `supportedLocales()`, which lists the BCP 47 locales the platform can
+  handle. It is not a list of what is downloaded — check a locale with
+  `checkModel()` before transcribing. It never returns an empty list; when the
+  platform has no way to enumerate locales it throws
+  `DeviceUnsupportedException`.
+
 ## 0.1.1
 
 - Rewrote the README in English, aimed at people reading it for the first time.

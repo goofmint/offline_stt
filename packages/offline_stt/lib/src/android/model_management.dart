@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/services.dart' show PlatformException;
 import '../common.dart';
 
+import '../locale_list.dart';
 import 'model_state_mapping.dart';
 import '../pigeon.g.dart' as pigeon;
 import 'platform_exception_mapping.dart';
@@ -25,6 +26,25 @@ Future<ModelState> checkModel(
   try {
     final result = await hostApi.checkModel(locale);
     return mapPigeonModelState(result.name);
+  } on PlatformException catch (e) {
+    throw mapPlatformException(e);
+  }
+}
+
+/// requirements.md FR-5。
+///
+/// ネイティブ側(`ModelAvailability.supportedLocales(context)`(Kotlin))が
+/// 組み立てた一覧をそのまま返す。**このプラットフォームが扱えるロケールの
+/// 集合であり、`available` なロケールの一覧ではない**(意味と制約は
+/// `OfflineTranscriber.supportedLocales()` のドキュメントコメント参照)。
+///
+/// 一覧が空になることはネイティブ側で既に禁じているが、Dart側でも
+/// [requireNonEmptyLocales] を通して念のため検査する。空リストを黙って
+/// 返すと「対応ロケールが1つも無い端末」と解釈され、原因がどこにも
+/// 残らないためである。
+Future<List<String>> supportedLocales(pigeon.OfflineSttHostApi hostApi) async {
+  try {
+    return requireNonEmptyLocales(await hostApi.supportedLocales());
   } on PlatformException catch (e) {
     throw mapPlatformException(e);
   }

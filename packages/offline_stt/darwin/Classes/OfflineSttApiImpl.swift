@@ -52,6 +52,30 @@ final class OfflineSttApiImpl: NSObject, OfflineSttHostApi {
     }
   }
 
+  func supportedLocales(completion: @escaping (Result<[String], Error>) -> Void) {
+    // OSバージョンゲート。`checkModel` は26未満で `unavailable`(FR-1の
+    // 終端状態)を返せるが、一覧には「対応ロケールが無い」を表す正しい値が
+    // 無いため、ここは明示的なエラーにする(空配列は「このOSは1言語も
+    // 扱えない」と誤解されるため返さない)。
+    guard #available(macOS 26.0, iOS 26.0, *) else {
+      completion(
+        .failure(
+          DarwinTranscribeError.deviceUnsupported(
+            "対応ロケールの列挙には macOS 26 / iOS 26 以上が必要である。"
+          ).asPigeonError))
+      return
+    }
+    Task {
+      do {
+        completion(.success(try await ModelAvailability.supportedLocales()))
+      } catch let error as DarwinTranscribeError {
+        completion(.failure(error.asPigeonError))
+      } catch {
+        completion(.failure(DarwinTranscribeError.platformError("\(error)").asPigeonError))
+      }
+    }
+  }
+
   func downloadModel(locale: String) throws {
     guard #available(macOS 26.0, iOS 26.0, *) else {
       // design.md §3細則3: downloadable以外(ここではOS非対応=unavailable)

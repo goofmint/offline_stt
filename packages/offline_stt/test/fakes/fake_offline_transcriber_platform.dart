@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:offline_stt/src/common.dart';
+import 'package:offline_stt/src/locale_list.dart';
 // design.md §3の状態遷移を検証するには、このフェイク自身が本番と同じ共有
 // ガードを経由する必要がある。本ファイルは offline_stt パッケージ自身の
 // test/ 配下にあるため、これは「同一パッケージ内の実装詳細を参照する」
@@ -51,8 +52,19 @@ class FakeOfflineTranscriberPlatform extends OfflineTranscriberPlatform
 
   StreamController<DownloadProgress>? _downloadController;
 
+  /// [supportedLocales] が返す一覧。テストから差し替えられるようにしている。
+  ///
+  /// 空にすると [supportedLocales] は本番実装と同じく
+  /// [DeviceUnsupportedException] を投げる(「空リストは返さない」という
+  /// 契約をフェイクでも守る)。
+  List<String> localeCatalog = <String>['ja-JP', 'en-US'];
+
   @override
   Future<ModelState> checkModel(String locale) async => modelState;
+
+  @override
+  Future<List<String>> supportedLocales() async =>
+      requireNonEmptyLocales(localeCatalog);
 
   @override
   Stream<DownloadProgress> downloadModel(String locale) {

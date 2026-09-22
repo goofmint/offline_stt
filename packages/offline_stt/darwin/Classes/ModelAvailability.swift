@@ -91,6 +91,38 @@ enum ModelAvailability {
     }
   }
 
+  /// requirements.md FR-5。`OfflineSttApiImpl.supportedLocales` から
+  /// `Task` 経由で(スレッドをブロックせず)呼ばれる。
+  ///
+  /// `SpeechTranscriber.supportedLocales`(`static var ... { get async }`、
+  /// iOS/macOS 26.0以降)をBCP-47文字列へ写して返す。文字列化は
+  /// [checkModel] 側の `installedLocales` の突き合わせと同じ
+  /// `identifier(.bcp47)` に揃えている。
+  ///
+  /// 返すのは「このOS・端末が扱えるロケールの集合」であり、
+  /// `available` なロケールの一覧ではない。未ダウンロードのロケールも含む。
+  ///
+  /// **空配列をそのまま返さない。** Appleのドキュメントは
+  /// 「デバイスが transcriber に対応していない場合この配列は空になる」と
+  /// 明記している。したがって空が返るのは実質的に端末非対応(iOSシミュレータ
+  /// 等、spikes/darwin/RESULTS.md「iOSシミュレータでの実行」参照)であり、
+  /// 空配列を返すと呼び出し側が「対応ロケールが1つも無いOS」と誤解する。
+  /// `SpeechTranscriber.isAvailable` を先に見たうえで、それでも空なら
+  /// 明示的にエラーにする。
+  static func supportedLocales() async throws -> [String] {
+    guard SpeechTranscriber.isAvailable else {
+      throw DarwinTranscribeError.deviceUnsupported(
+        "SpeechTranscriber.isAvailable == false(この端末では音声認識を利用できない)。")
+    }
+    let locales = await SpeechTranscriber.supportedLocales
+    let identifiers = locales.map { $0.identifier(.bcp47) }
+    guard !identifiers.isEmpty else {
+      throw DarwinTranscribeError.deviceUnsupported(
+        "SpeechTranscriber.supportedLocales が空だった(この端末では音声認識を利用できない)。")
+    }
+    return identifiers
+  }
+
   /// `localeIdentifier`(BCP-47)を`SpeechTranscriber.supportedLocales`の
   /// いずれかへ解決する。解決できなければ`nil`(=LocaleUnsupported相当)。
   static func resolveLocale(_ localeIdentifier: String) async -> Locale? {
