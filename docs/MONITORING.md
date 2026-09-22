@@ -7,7 +7,7 @@
 
 `offline_stt` は**モデルを一切同梱せず、OS / ブラウザが持つ認識エンジンだけ
 を使う**(requirements.md §2 / NFR-3)。この設計上、本ライブラリの動作は
-**自分たちが管理していない4つの外部実装の挙動にそのまま依存する**。依存先が
+**自分たちが管理していない3つの外部実装の挙動にそのまま依存する**。依存先が
 変われば、こちらのコードを1行も変えていなくても動作が変わる。
 
 したがって「リリースしたら終わり」にはできず、依存先の変更を定期的に見に
@@ -45,7 +45,8 @@
   最上位候補を確定結果として採用することで成立している。**この挙動が直れば
   採用ロジックを見直す必要があり、悪化すれば文字起こしが空になる。**
 - `triggerModelDownload()` の `ModelDownloadListener` が完了を通知しない
-  挙動(design.md §4.3、`packages/offline_stt_android/README.md` §4 制約2)。
+  挙動(design.md §4.3、`packages/offline_stt/README.md`「Android:
+  `checkModel()` を先に呼ぶ」節)。
   本実装は `checkRecognitionSupport()` の再照会で完了判定している。
 - `EXTRA_AUDIO_SOURCE` + 3つの付随Extra(`..._CHANNEL_COUNT` /
   `..._ENCODING` / `..._SAMPLING_RATE`)によるファイル入力の受理。
@@ -75,44 +76,7 @@
 - `on-device-speech-recognition` Permissions Policy の既定値が `'self'` で
   あること(`localhost` / `https` 配信が必要な根拠)。
 
-### 1.3 Windows — WinAppSDK / Windows AI APIs
-
-| 見るもの | 場所 |
-|---|---|
-| Windows AI APIs Speech Recognition のドキュメント(最終更新日が動いたら差分を読む) | https://learn.microsoft.com/en-us/windows/ai/apis/speech-recognition |
-| `Microsoft.Windows.AI.Speech` 名前空間のAPIリファレンス | https://learn.microsoft.com/en-us/windows/windows-app-sdk/api/winrt/microsoft.windows.ai.speech |
-| WinAppSDK のリリースノート(1.7 系サービシング / 2.0) | https://learn.microsoft.com/en-us/windows/apps/windows-app-sdk/release-channels |
-| winapp CLI の Flutter 向け手順 | https://learn.microsoft.com/en-us/windows/apps/dev-tools/winapp-cli/guides/flutter |
-
-**特に注視する点**:
-
-- `AIFeatureReadyState` の値の増減。WinAppSDK 2.0 で `CapabilityMissing` /
-  `NotCompatibleWithSystemHardware` / `OSUpdateNeeded` の3値が増えている
-  (design.md §4.4)。実装(`model_availability.cpp`)は全バージョンに存在
-  する値のみを明示列挙し残りを `default` で `unavailable` に倒しているため
-  値が増えても壊れないが、**新しい値が `downloadable` に写像すべきもので
-  あった場合は正しい状態を返せない。**
-- 公式ドキュメントの「Recommended UX pattern」が挙げる `EnsureNeeded` が
-  実際のenumに存在しない、というドキュメント間の不一致(design.md §4.4)。
-  これが解消されたかどうか。
-- `BatchRecognition.RecognizeFromFile()` の対応フォーマットに関する記述が
-  追加されたかどうか(design.md §8 未決事項1 は**未確定のまま**であり、
-  M4は「常に Media Foundation で 16kHz・モノラル・16-bit PCM の wav へ
-  変換する」という処置で回避している。記述が追加されれば変換の要否と
-  出力形式の推定を確定できる)。
-- ロケール指定APIが追加されたかどうか(design.md §8 未決事項2。現在は
-  1件も存在せず、`locale` 引数がWindowsでは無視される根拠になっている)。
-- `MaxVersionTested` の要求値(現在 `10.0.26226.0` 以降)。
-- winapp CLI の手順変更(`.winapp/include` の展開先が変わると
-  `packages/offline_stt_windows/windows/CMakeLists.txt` の自動検出が外れる)。
-
-> **前提として、Windowsは一度も動かしていない。** 本リポジトリにWindows実機
-> は存在せず、ビルドもMSIX化も認識も一度も行っていない(Issue #58)。
-> したがってWindowsについては「変更を監視する」以前に**初回の検証が未了
-> である**。この状態で監視だけを続けても、変更が壊したのか元から動かないのか
-> を区別できない。
-
-### 1.4 Darwin(iOS / macOS)— Speech framework
+### 1.3 Darwin(iOS / macOS)— Speech framework
 
 | 見るもの | 場所 |
 |---|---|
@@ -132,7 +96,7 @@
 - iOSシミュレータで `SpeechTranscriber.isAvailable` が `false` になる制約
   (E2EがCIに載せられない根拠)。
 
-### 1.5 OSベータ・ツールチェーン
+### 1.4 OSベータ・ツールチェーン
 
 四半期の確認では、次のベータ・プレビューに**本ライブラリが依存するAPIの変更
 が含まれていないか**も見る。含まれていた場合は正式版を待たずに追従の検討を
@@ -142,20 +106,19 @@
 |---|---|
 | Android Developer Preview / Beta | https://developer.android.com/about/versions |
 | iOS / macOS ベータ(および WWDC のセッション) | https://developer.apple.com/news/releases/ |
-| Windows Insider Preview ビルド | https://blogs.windows.com/windows-insider/ |
 | Chrome Beta / Canary | https://developer.chrome.com/release-notes |
 | Flutter stable のリリース | https://docs.flutter.dev/release/release-notes |
 
 ツールチェーン側(Flutter / Dart SDK / Pigeon / melos / AGP / Kotlin /
-Gradle / WinAppSDK)の固定値そのものの扱いは本書の対象外であり、
+Gradle)の固定値そのものの扱いは本書の対象外であり、
 [VERSION_POLICY.md](./VERSION_POLICY.md) が扱う。
 
 ## 2. いつ確認するか
 
 ### 2.1 定期(四半期ごと)
 
-**3か月に1回**、上記1.1〜1.5をひととおり確認する。四半期という間隔にした
-のは、監視対象の4実装のうちOSプラットフォーム3つがおおむね年1回のメジャー
+**3か月に1回**、上記1.1〜1.4をひととおり確認する。四半期という間隔にした
+のは、監視対象の3実装のうちOSプラットフォーム2つがおおむね年1回のメジャー
 更新 + 随時のマイナー更新という周期で動いており、メジャー更新を確実に1回の
 確認サイクル内で捕まえられる粒度がこの程度だからである。
 
@@ -164,10 +127,9 @@ Gradle / WinAppSDK)の固定値そのものの扱いは本書の対象外であ�
 定期確認を待たずに確認する。いずれも「動作が変わりうる」ことが分かっている
 タイミングである。
 
-- Android / iOS / macOS / Windows のメジャーバージョンが公開されたとき
+- Android / iOS / macOS のメジャーバージョンが公開されたとき
 - Chrome の安定版メジャーバージョンが上がったとき(オンデバイスWeb Speech
   に関する変更が release notes / chromestatus にあるとき)
-- WinAppSDK の新しいリリース(特に 1.7 系サービシングと 2.0)
 - Flutter stable の更新(`FLUTTER_VERSION` の追従判断)
 - CIが、こちらのコードを変えていないのに落ちたとき
 
@@ -185,10 +147,9 @@ Gradle / WinAppSDK)の固定値そのものの扱いは本書の対象外であ�
 | 範囲 | チェックリスト |
 |---|---|
 | 入口(なぜCIに載せないのか・基準音声・包含率の算出・しきい値) | [E2E_CHECKLIST.md](../E2E_CHECKLIST.md) |
-| Android | [packages/offline_stt_android/E2E_CHECKLIST.md](../packages/offline_stt_android/E2E_CHECKLIST.md) |
-| iOS / macOS | [packages/offline_stt_darwin/E2E_CHECKLIST.md](../packages/offline_stt_darwin/E2E_CHECKLIST.md) |
-| Windows | [packages/offline_stt_windows/E2E_CHECKLIST.md](../packages/offline_stt_windows/E2E_CHECKLIST.md) |
-| Web | [packages/offline_stt_web/E2E_CHECKLIST.md](../packages/offline_stt_web/E2E_CHECKLIST.md) |
+| Android | [E2E_CHECKLIST_ANDROID.md](./e2e/E2E_CHECKLIST_ANDROID.md) |
+| iOS / macOS | [E2E_CHECKLIST_DARWIN.md](./e2e/E2E_CHECKLIST_DARWIN.md) |
+| Web | [E2E_CHECKLIST_WEB.md](./e2e/E2E_CHECKLIST_WEB.md) |
 
 再実行の範囲は次のように決める。
 
@@ -215,7 +176,7 @@ CI(`.github/workflows/ci.yml`)が検証するのは静的解析・ユニット�
 
 E2E_CHECKLIST.md「結果の記録」節の表に従い、実行日・検証環境(OS・端末・
 ブラウザ・SDKの各バージョン)・項目ごとの結果を、対応するIssue
-(Darwin #40 / Android #50 / Windows #58。Webは**専用Issueが無いため新規に
+(Darwin #40 / Android #50。Webは**専用Issueが無いため新規に
 立てる**)へ記録する。**未実施の項目は「合格」ではなく「未実施」と書く。**
 
 依存先の変更を実際に見つけた場合は、記録先が別になる。
@@ -231,6 +192,4 @@ E2E_CHECKLIST.md「結果の記録」節の表に従い、実行日・検証環�
 | — | — | — | — | **四半期ごとの定期実行は一度も行われていない。** |
 
 **この表が空であることは、この運用がまだ一度も回っていないことを意味する。**
-本書(Issue #67)が用意したのは手順であって実行実績ではない。Windows に
-ついてはそもそも初回の検証すら未了である(Issue #58)ことは 1.3 節に
-書いたとおりである。
+本書(Issue #67)が用意したのは手順であって実行実績ではない。

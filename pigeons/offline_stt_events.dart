@@ -5,42 +5,17 @@
 // 対応: design.md §2.2(データ型)/ §2.3(ブリッジ方式)、requirements.md FR-1
 // FR-2 FR-3 FR-6、GitHub Issue #24。
 //
-// ## ファイルをWindows用と分けている理由
-//
-// design.md §2.3 の方針どおり、ストリーム(`segments` / `downloadProgress`)
-// は Pigeon の `@EventChannelApi` で定義している。しかし `@EventChannelApi`
-// を含むスキーマから C++ 出力を生成しようとすると、Pigeon(v29.0.2)は
-// 生成時点で
-//
-//   Error: <file>: C++ does not support event channels
-//
-// というエラーで停止する。これは実際に
-// `dart pub global run pigeon --input <このファイル> --cpp_header_out ... --cpp_source_out ...`
-// を実行して確認した事実である(READMEにも
-// "Event channels are supported only on the Swift, Kotlin, and Dart
-// generators." と明記されている)。そのため Windows 向けのC++生成は本
-// ファイルから行えず、`pigeons/offline_stt_windows.dart` にスキーマを
-// 分離した(`@ConfigurePigeon` の出し分けでは解決できない制約である)。
-//
-// ## データ型がWindows用ファイルと重複している理由
-//
-// Pigeonの入力ファイルはそれぞれ独立してASTを構築する設計であり、他の
-// Pigeon入力ファイルの型をimportして共有する仕組みを持たない。そのため
-// `ModelState` / `DownloadProgress` / `TranscribeRequest` /
-// `TranscriptSegment` / `TranscribeErrorCode` は
-// `pigeons/offline_stt_windows.dart` 側にも同一定義を重複して持つ。
-// 定義を変更する場合は両ファイルを同時に更新すること。
-//
 // 生成コマンドはリポジトリルートの `pubspec.yaml` の melos スクリプト
-// `pigeon:android` / `pigeon:darwin` を参照。
+// `pigeon` を参照。Dart / Kotlin / Swift を1回の実行でまとめて生成する。
 
 import 'package:pigeon/pigeon.dart';
 
 /// モデルの状態を表す4値(design.md §2.2、requirements.md FR-1)。
 ///
-/// `offline_stt_platform_interface` の `ModelState`(
-/// `packages/offline_stt_platform_interface/lib/src/model_state.dart`)と
-/// 値・順序を一致させること。マッピングは各実装パッケージ側で行う。
+/// `offline_stt` の `ModelState`(
+/// `packages/offline_stt/lib/src/model_state.dart`)と値・順序を一致させる
+/// こと。マッピングは各プラットフォーム実装側(`lib/src/android/` /
+/// `lib/src/darwin/` の `model_state_mapping.dart`)で行う。
 enum ModelState { available, downloadable, downloading, unavailable }
 
 /// モデルダウンロードの進捗(design.md §2.2)。
@@ -173,10 +148,6 @@ abstract class OfflineSttHostApi {
 }
 
 /// EventChannel(design.md §2.3)。Android(Kotlin) / Darwin(Swift) 向け。
-///
-/// Pigeonの `@EventChannelApi` はDart / Kotlin / Swift の生成器のみに
-/// 対応しており、C++には対応していない(本ファイル冒頭のコメント、および
-/// 実際に `--cpp_header_out` 等を指定してPigeonを実行した結果で確認済み)。
 @EventChannelApi()
 abstract class OfflineSttStreamEvents {
   /// 文字起こし結果のストリーム(requirements.md FR-3)。

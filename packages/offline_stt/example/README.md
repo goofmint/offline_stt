@@ -1,8 +1,8 @@
 # offline_stt の使い方
 
 録音済み音声ファイルを、OSネイティブの音声認識APIだけでオフライン文字起こしする。
-アプリが依存するのは `offline_stt` だけでよい(実装パッケージは
-`flutter.plugin.platforms.*.default_package` によって自動的に選択される)。
+アプリが依存するのは `offline_stt` だけでよい(単一パッケージであり、
+Android / iOS / macOS / Web の実装を内部の条件付きexportで選択する)。
 
 完全に動作する参照実装(ファイルピッカー・同意ダイアログ・進行表示まで)は
 リポジトリの [`apps/example`](https://github.com/goofmint/offline_stt/tree/main/apps/example)
@@ -65,5 +65,3 @@ Future<String> transcribe(String path, String locale) async {
 - **日本語の精度はしきい値に届いていない**(基準音声 `jaJP_10s` で 66.7%)。
   採用前に [README の「既知の制約」](https://github.com/goofmint/offline_stt/blob/main/packages/offline_stt/README.md#既知の制約採用前に読むこと)
   を読むこと。
-- **Windows は v1 では対象外である。** 呼び出すとプラットフォーム実装が
-  未登録のため `StateError` になる。

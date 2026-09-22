@@ -47,7 +47,7 @@ import 'dart:io';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
-import 'package:offline_stt_platform_interface/offline_stt_platform_interface.dart';
+import 'package:offline_stt/offline_stt.dart';
 import 'package:path_provider/path_provider.dart';
 
 /// `setUpAll` がアセットを書き出した先。
@@ -107,7 +107,7 @@ Future<TranscriptionRun> runTranscription(
   final run = TranscriptionRun(clip);
   final stopwatch = Stopwatch()..start();
   final completer = Completer<void>();
-  final subscription = OfflineTranscriberPlatform.instance
+  final subscription = const OfflineTranscriber()
       .transcribeFile(
         TranscribeRequest(
           path: '$assetDir/$clip',
@@ -214,7 +214,7 @@ void main() {
     for (final locale in locales) {
       final stopwatch = Stopwatch()..start();
       try {
-        final state = await OfflineTranscriberPlatform.instance
+        final state = await const OfflineTranscriber()
             .checkModel(locale)
             .timeout(const Duration(seconds: 30));
         log(
@@ -239,7 +239,7 @@ void main() {
     for (var i = 0; i < 30; i++) {
       final stopwatch = Stopwatch()..start();
       try {
-        final state = await OfflineTranscriberPlatform.instance
+        final state = await const OfflineTranscriber()
             .checkModel('ja-JP')
             .timeout(const Duration(seconds: 30));
         log('REPEAT|$i|${state.name}|ms=${stopwatch.elapsedMilliseconds}');
@@ -294,7 +294,7 @@ void main() {
     var cancelled = false;
     final firstSegment = Completer<void>();
     Object? startError;
-    final subscription = OfflineTranscriberPlatform.instance
+    final subscription = const OfflineTranscriber()
         .transcribeFile(
           TranscribeRequest(path: '$assetDir/jaJP_3m.wav', locale: 'ja-JP'),
         )
@@ -350,7 +350,7 @@ void main() {
     // StateError で即座に終了することを確認する。
     final firstSegment = Completer<void>();
     Object? firstError;
-    final first = OfflineTranscriberPlatform.instance
+    final first = const OfflineTranscriber()
         .transcribeFile(
           TranscribeRequest(path: '$assetDir/jaJP_3m.wav', locale: 'ja-JP'),
         )
@@ -378,7 +378,7 @@ void main() {
 
     Object? secondError;
     final secondDone = Completer<void>();
-    final second = OfflineTranscriberPlatform.instance
+    final second = const OfflineTranscriber()
         .transcribeFile(
           TranscribeRequest(path: '$assetDir/jaJP_10s.wav', locale: 'ja-JP'),
         )
@@ -408,9 +408,7 @@ void main() {
     );
     // LocaleUnsupportedException: supportedLocales に無いロケール。
     for (final locale in <String>['xx-XX', 'zz-ZZ']) {
-      final state = await OfflineTranscriberPlatform.instance.checkModel(
-        locale,
-      );
+      final state = await const OfflineTranscriber().checkModel(locale);
       final run = await runTranscription('jaJP_10s.wav', locale);
       log(
         'ERRORPATH|localeUnsupported|locale=$locale|checkModel=${state.name}'
@@ -419,9 +417,7 @@ void main() {
     }
     // ModelUnavailableException: モデル未取得(downloadable)のロケール。
     for (final locale in <String>['fr-FR', 'de-DE', 'ko-KR']) {
-      final state = await OfflineTranscriberPlatform.instance.checkModel(
-        locale,
-      );
+      final state = await const OfflineTranscriber().checkModel(locale);
       if (state != ModelState.downloadable) {
         log(
           'ERRORPATH|modelUnavailable|locale=$locale|skip'
@@ -470,9 +466,7 @@ void main() {
     ];
     String? target;
     for (final locale in candidates) {
-      final state = await OfflineTranscriberPlatform.instance.checkModel(
-        locale,
-      );
+      final state = await const OfflineTranscriber().checkModel(locale);
       if (state == ModelState.downloadable) {
         target = locale;
         break;
@@ -488,7 +482,7 @@ void main() {
     Object? downloadError;
     var downloadDone = false;
     final downloadCompleter = Completer<void>();
-    final download = OfflineTranscriberPlatform.instance
+    final download = const OfflineTranscriber()
         .downloadModel(target)
         .listen(
           events.add,
@@ -508,7 +502,7 @@ void main() {
     // `recognition_session.dart` の `onListen` クロージャは最初の await
     // (checkModel)で止まっており、`startedNativeTranscription` は必ず
     // false である。
-    final early = OfflineTranscriberPlatform.instance
+    final early = const OfflineTranscriber()
         .transcribeFile(
           TranscribeRequest(path: '$assetDir/jaJP_3m.wav', locale: 'ja-JP'),
         )
@@ -538,7 +532,7 @@ void main() {
         '|completed=${event.completed}',
       );
     }
-    final after = await OfflineTranscriberPlatform.instance.checkModel(target);
+    final after = await const OfflineTranscriber().checkModel(target);
     log(
       'COEXIST|result|locale=$target|events=${events.length}'
       '|done=$downloadDone|timedOut=$timedOut'
@@ -568,9 +562,7 @@ void main() {
     ];
     String? target;
     for (final locale in candidates) {
-      final state = await OfflineTranscriberPlatform.instance.checkModel(
-        locale,
-      );
+      final state = await const OfflineTranscriber().checkModel(locale);
       log('DOWNLOAD|probe|locale=$locale|state=${state.name}');
       if (state == ModelState.downloadable) {
         target = locale;
@@ -587,7 +579,7 @@ void main() {
     var done = false;
     final stopwatch = Stopwatch()..start();
     final completer = Completer<void>();
-    final subscription = OfflineTranscriberPlatform.instance
+    final subscription = const OfflineTranscriber()
         .downloadModel(target)
         .listen(
           events.add,
@@ -620,7 +612,7 @@ void main() {
       '|events=${events.length}|done=$done|timedOut=$timedOut'
       '|error=${error.runtimeType}:$error',
     );
-    final after = await OfflineTranscriberPlatform.instance.checkModel(target);
+    final after = await const OfflineTranscriber().checkModel(target);
     log('DOWNLOAD|after=${after.name}');
   });
 }

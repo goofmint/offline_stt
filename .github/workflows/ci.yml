@@ -6,7 +6,7 @@ name: CI
 #   - 全パッケージの静的解析(dart analyze --fatal-infos)・ユニットテスト・
 #     フォーマット
 #   - apps/example の各プラットフォーム向けコンパイル(ビルド検証)
-#   - pub.dev への公開対象5パッケージ(offline_stt_windows を除く)で
+#   - pub.dev への公開対象である offline_stt(1パッケージ)で
 #     `dart pub publish --dry-run` が通ること(Issue #65、docs/PUBLISHING.md。
 #     `.github/workflows/publish.yml` が実際に公開する前段の安全網であり、
 #     ここでは公開そのものは行わない)
@@ -32,60 +32,20 @@ name: CI
 #   - macos-26 ラベルは GitHub Actions で 2026-02-26 に GA 済み
 #     (Xcode既定 26.4.1、26.5 も選択可能)であり、requirements.md NFR-4 の
 #     「iOS 26 / macOS 26 以上」を満たすビルド環境として利用できる。
-#   - windows-2025 ラベル(Windows Server 2025)も GA 済みであり、
-#     requirements.md NFR-4 が言う「Windows 11 24H2 (build 26100)」と
-#     OSビルド世代は揃うが、Windows Server であり Windows 11 クライアント
-#     そのものではない点に注意。GitHub Hosted Runnerに Windows 11
-#     クライアント版は無い。
-#   - offline_stt_windows/windows/CMakeLists.txt はM4(Issue #52)で
-#     Microsoft.WindowsAppSDK をNuGetで依存宣言する
-#     ようになった。それ以前はTODOコメントのみでWinAppSDKに一切触れて
-#     いなかったため、Windowsビルドはバージョン不一致では失敗しなかった。
-#     この前提はM4で変わった。当初はCMakeの`VS_PACKAGE_REFERENCES`で
-#     NuGet の PackageReference を足す方式にしたが、**このCIで実際に
-#     ビルドして失敗した**:
-#       error C1083: Cannot open include file:
-#       'winrt/Microsoft.Windows.AI.h': No such file or directory
-#     WinAppSDKのプロジェクションヘッダーはWindows SDKに含まれず、NuGet
-#     パッケージ内の.winmdからcppwinrt.exeが生成するものであり、CMakeが
-#     生成する.vcxprojにPackageReferenceを足すだけでは復元も生成も走らない。
-#     そのため winapp CLI(`winapp init`)がアプリ側に展開する
-#     `.winapp/include` を自動検出する方式へ切り替えた。
 #
-#     **このCIランナーは winapp CLI を持たないため、Windowsジョブは
-#     WinRT実装(speech_backend_winrt.cpp / model_availability.cpp /
-#     model_acquisition.cpp / recognition_session.cpp)をビルドしない。**
-#     検証されるのはWinRTに触れない部分(Pigeon受け口・スレッド調停・
-#     エラー分類・Media Foundation変換)のコンパイルだけである。
-#     WinRT実装のコンパイルは Issue #58 の実機検証でしか確認できない。
-#
-# Issue #59(example appへのWindows動作追加)について:
-#   - このCIのWindowsジョブが検証するのは `flutter build windows --debug` が
-#     通ること、すなわちコンパイルとリンクだけである。**MSIXパッケージ化は
-#     検証しない。** `flutter build windows` が生成するのはパッケージ化
-#     されていない素のWin32 EXEであり、Windows AIのモデルへアクセスするのに
-#     必要な `systemAIModels` capability はMSIXの Package.appxmanifest に
-#     しか書けない。MSIX化は `flutter build windows` の外側の工程であり、
-#     手順は apps/example/windows/packaging/README.md と
-#     packages/offline_stt_windows/README.md に文書化してある(いずれも
-#     Windows実機が無いため未実行)。MSIX生成と認識E2Eは Issue #58 の
-#     実機検証の対象である。
-#
-# Issue #51(example appへのAndroid動作追加)で、**5プラットフォームすべての
+# Issue #51(example appへのAndroid動作追加)で、**4プラットフォームすべての
 # ネイティブプロジェクトがリポジトリにコミット済みになった**:
 #   - macos / ios / web ... Issue #41(Deployment Target 26.0 設定済み、
-#     offline_stt_darwin.podspec 要件)
-#   - windows ........... Issue #59(Flutter 3.41.9 の `flutter create .
-#     --platforms=windows --org com.moongift` の出力そのもの。加えて
-#     `flutter create` が生成しないMSIXマニフェストを windows/packaging/ に
-#     置いてある)
-#   - android ........... Issue #51(同じく Flutter 3.41.9 の
+#     offline_stt.podspec 要件)
+#   - android ........... Issue #51(Flutter 3.41.9 の
 #     `flutter create . --platforms=android --org com.moongift` の出力。
 #     ただし app/build.gradle.kts の minSdk だけは `flutter.minSdkVersion`
-#     (既定 24)ではなく 31 を直接書いてある。offline_stt_android が
-#     minSdk 31 を宣言しており、24 のままだとマニフェストのマージが
+#     (既定 24)ではなく 31 を直接書いてある。offline_stt が minSdk 31 を
+#     宣言しており、24 のままだとマニフェストのマージが
 #     「uses-sdk:minSdkVersion 24 cannot be smaller than version 31
-#     declared in library [:offline_stt_android]」で失敗するためである)
+#     declared in library [:offline_stt]」で失敗するためである。
+#     Issue #91 の単一パッケージ化以前は、このライブラリ名が
+#     `[:offline_stt_android]` だった)
 #
 #   そのため以下のbuildジョブでは、`flutter create .` による再生成も、
 #   Deployment Target / minSdk を書き換える sed も一切行わない。ジョブは
@@ -93,7 +53,7 @@ name: CI
 #   android だけをジョブ内で都度生成し、minSdk を sed で引き上げていたが、
 #   その2ステップは削除した。
 #
-#   android をコミット対象に含めた理由は、(a) 他の4プラットフォームと
+#   android をコミット対象に含めた理由は、(a) 他の3プラットフォームと
 #   扱いを揃えること、(b) minSdk 31 の要件をリポジトリ内で表明でき、CIの
 #   sed による書き換えという間接的な手当を無くせること、(c) 実機E2E
 #   (Issue #50)を行う人が `flutter create` を自分で再実行することなく
@@ -153,8 +113,8 @@ jobs:
 
       # 公開APIドキュメントが生成でき、かつリンク切れが無いことを検証する
       # (Issue #63)。melos の doc スクリプトは apps/example を除外し、
-      # 6パッケージ(pub.dev への公開対象5パッケージ + publish_to: none の
-      # offline_stt_windows)で `dart doc --validate-links` を実行する。
+      # 公開対象である offline_stt(1パッケージ)で
+      # `dart doc --validate-links` を実行する。
       - name: dart doc 生成とリンク検証
         run: melos run doc
 
@@ -180,12 +140,12 @@ jobs:
       - name: workspace を解決する(Dart Pub Workspaces)
         run: melos bootstrap
 
-      # pub.dev への公開対象5パッケージ(offline_stt_windows と
-      # apps/example は publish_to: none のため対象外。
-      # docs/PUBLISHING.md 1節、Issue #65)で `dart pub publish --dry-run`
-      # が警告なしで通ることを検証する。ここでは実際の公開は行わない。
-      # 実際の公開は `.github/workflows/publish.yml` がパッケージ別タグの
-      # push をトリガに行う。
+      # pub.dev への公開対象である offline_stt(apps/example は
+      # publish_to: none のため対象外。docs/PUBLISHING.md 1節、Issue #65・#91)で
+      # `dart pub publish --dry-run` が警告なしで通ることを検証する。
+      # ここでは実際の公開は行わない。実際の公開は
+      # `.github/workflows/publish.yml` が `offline_stt-v*` タグの push を
+      # トリガに行う。
       - name: dart pub publish --dry-run(公開対象5パッケージ)
         run: melos run publish:dry-run
 
@@ -201,9 +161,6 @@ jobs:
             continue_on_error: false
           - platform: web
             os: ubuntu-latest
-            continue_on_error: false
-          - platform: windows
-            os: windows-2025
             continue_on_error: false
           - platform: macos
             os: macos-26
@@ -250,9 +207,9 @@ jobs:
       # プラットフォームプロジェクトを `flutter create` で都度生成する
       # ステップは、Issue #51 で apps/example/android をリポジトリに
       # コミットした時点で全プラットフォーム分が不要になったため削除した
-      # (macos/ios/web は Issue #41、windows は Issue #59 で先にコミット
-      # 済みだった)。apps/example 配下の android/ ios/ macos/ web/
-      # windows/ はすべてコミット済みの内容がそのまま使われる。
+      # (macos/ios/web は Issue #41 で先にコミット済みだった)。
+      # apps/example 配下の android/ ios/ macos/ web/ はすべて
+      # コミット済みの内容がそのまま使われる。
       #
       # 併せて、Android の minSdk を 31 へ引き上げる sed ステップも削除した。
       # apps/example/android/app/build.gradle.kts に `minSdk = 31` を直接
@@ -274,11 +231,6 @@ jobs:
         if: matrix.platform == 'macos'
         working-directory: apps/example
         run: flutter build macos --debug
-
-      - name: flutter build windows --debug
-        if: matrix.platform == 'windows'
-        working-directory: apps/example
-        run: flutter build windows --debug
 
       - name: flutter build web
         if: matrix.platform == 'web'

@@ -1,8 +1,7 @@
 name: offline_stt
 description: >-
-  録音済み音声ファイルをOSネイティブAPIのみでオフライン文字起こしするFlutter
-  ライブラリ。認識モデル・推論エンジンは同梱せず、モデル管理はOS側に委ねる。
-  利用者はこのエントリパッケージにのみ依存する。
+  録音済み音声ファイルをOSネイティブAPIだけでオフライン文字起こしするFlutterプラグイン。
+  Android / iOS / macOS / Web に対応し、認識モデルと推論エンジンは同梱せずOS側に委ねる。
 version: 0.1.0
 homepage: https://github.com/goofmint/offline_stt
 repository: https://github.com/goofmint/offline_stt
@@ -23,24 +22,35 @@ resolution: workspace
 dependencies:
   flutter:
     sdk: flutter
-  offline_stt_android: ^0.1.0
-  offline_stt_darwin: ^0.1.0
-  offline_stt_platform_interface: ^0.1.0
-  offline_stt_web: ^0.1.0
+  # Web実装(lib/src/web/)がプラグイン登録エントリポイントで使う。
+  flutter_web_plugins:
+    sdk: flutter
+  meta: ^1.15.0
+  # Web実装(lib/src/web/)のWeb Speech / Web Audio連携(design.md §4.1)。
+  web: ^1.1.0
 
 dev_dependencies:
   flutter_lints: ^6.0.0
   flutter_test:
     sdk: flutter
+  # Pigeon生成物の再生成(ルート pubspec.yaml の melos script `pigeon`)。
+  pigeon: ^27.3.0
+  test: ^1.25.0
 
 flutter:
   plugin:
+    # 単一パッケージで全プラットフォームの実装を持つ(Issue #91)。
+    # federated plugin の `implements:` / `default_package:` は使わない。
     platforms:
       android:
-        default_package: offline_stt_android
+        package: com.moongift.offline_stt
+        pluginClass: OfflineSttAndroidPlugin
       ios:
-        default_package: offline_stt_darwin
+        pluginClass: OfflineSttDarwinPlugin
+        sharedDarwinSource: true
       macos:
-        default_package: offline_stt_darwin
+        pluginClass: OfflineSttDarwinPlugin
+        sharedDarwinSource: true
       web:
-        default_package: offline_stt_web
+        pluginClass: OfflineSttWeb
+        fileName: src/web/offline_stt_web.dart

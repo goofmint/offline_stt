@@ -1,4 +1,4 @@
-import 'package:offline_stt_platform_interface/offline_stt_platform_interface.dart';
+import 'package:offline_stt/offline_stt.dart';
 
 /// [error] を利用者向けの日本語メッセージへ変換する。
 ///
@@ -12,8 +12,8 @@ import 'package:offline_stt_platform_interface/offline_stt_platform_interface.da
 /// ため個別に扱う:
 /// - [StateError]: design.md §3「同時セッションは1本まで。2本目の開始は
 ///   StateErrorをStreamエラーとして送出する」
-/// - [UnimplementedError]: Android/Windows実装(M3/M4)が未実装のスタブ
-///   メソッドから送出される(offline_stt_android・offline_stt_windows参照)
+/// - [UnimplementedError]: Android実装(M3)が未実装のスタブ
+///   メソッドから送出される(offline_stt_android参照)
 String describeTranscribeError(Object error) {
   if (error is TranscribeException) {
     return switch (error) {

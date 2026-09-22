@@ -7,165 +7,90 @@ requirements.md NFR-5「バージョニング」、`.github/workflows/publish.ym
 ## この文書の位置づけ
 
 本書は `offline_stt` monorepo を pub.dev へ公開する手順書である。
-**本書は手順書であって、実行記録ではない。** 2026-09-21 時点で dry-run の
-成功は確認済みだが、`dart pub publish`(dry-run でない方)は本書を書いた
-PR では**実行していない**。初回公開は本書に従って人間が手動で行う。
+**本書は手順書であって、実行記録ではない。** `dart pub publish`(dry-run で
+ない方)はまだ実行していない。初回公開は本書に従って人間が手動で行う。
 
-## 1. 公開対象は5パッケージ(6ではない)
+**単一パッケージへの統合(Issue #91)により、公開対象は `offline_stt` 1つ
+だけになった。** 以前は `offline_stt_platform_interface` /
+`offline_stt_android` / `offline_stt_darwin` / `offline_stt_web` /
+`offline_stt` の5パッケージが対象であり、Dart Pub Workspaces の依存順制約
+から公開順序を守る必要があったが、単一パッケージ化によりこの制約は解消
+した。
 
-このリポジトリには6つのパッケージ(`packages/` 配下)があるが、公開対象は
-次の **5パッケージ**である。
+## 1. 公開対象は `offline_stt` の1パッケージ
 
-- `offline_stt_platform_interface`
-- `offline_stt_darwin`
-- `offline_stt_android`
-- `offline_stt_web`
-- `offline_stt`(利用者が直接依存するエントリパッケージ)
+このリポジトリの `packages/` 配下にあるのは `offline_stt` 1パッケージのみで
+あり、これが公開対象のすべてである。`apps/example` は `publish_to: none` を
+宣言しており公開対象ではない。
 
-`offline_stt_windows` は **v1では公開しない**。`packages/offline_stt_windows/pubspec.yaml`
-に `publish_to: none` が設定されている。理由は次のとおりで、Windows 11
-実機で確認済みの事実である(requirements.md NFR-4、
-`packages/offline_stt_windows/README.md` §1)。
-
-- Windows 実装が使う `Microsoft.Windows.AI.Speech` は WinAppSDK の
-  **安定版に存在しない**。NuGet の `Microsoft.WindowsAppSDK.AI` を実際に
-  展開して確認したところ、安定版(2.5.5系まで確認)にも 1.7系
-  (`1.7.250401001` / `1.7.260224002`)にも当該名前空間の `.winmd` は含まれず、
-  `2.4.8-experimental` などの **experimental チャンネルにのみ存在する**。
-- Windows 11 実機(10.0.26200 / 25H2)でクリーンビルドし、安定版の
-  WinAppSDK では WinRT 実装4ファイルがコンパイル対象から外れることも
-  確認済みである。
-- 公式ドキュメント(<https://learn.microsoft.com/en-us/windows/ai/apis/speech-recognition>)
-  の Prerequisites は「WinAppSDK version: Version 1.7.1 or later」と書いて
-  いるが、これは実際の出荷物と食い違っている。
-- 利用者に experimental チャンネルの WinAppSDK を要求することはできない
-  ため、stable 化するまで公開対象から外す。stable 化した時点で
-  `publish_to` を外して公開対象へ戻す(`packages/offline_stt_windows/pubspec.yaml`
-  冒頭コメント参照)。
-
-`.github/workflows/publish.yml` も `offline_stt_windows` を対象に含めない
-(タグパターンを用意しない)。
-
-## 2. 公開順序とその理由
-
-**必ずこの順序で公開する。**
-
-1. `offline_stt_platform_interface`(依存されるだけで、他の公開パッケージに
-   依存しない)
-2. `offline_stt_android` / `offline_stt_darwin` / `offline_stt_web`
-   (`offline_stt_platform_interface: ^0.1.0` に依存する。3パッケージ間に
-   相互依存は無いため、この3つの間の順序は問わない)
-3. `offline_stt`(上記4パッケージすべてに依存するエントリパッケージ。
-   必ず最後)
-
-### なぜ順序を守る必要があるか
-
-このリポジトリは [Dart Pub Workspaces](https://dart.dev/tools/pub/workspaces)
-(ルート `pubspec.yaml` の `workspace:` フィールド)で管理されており、各
-パッケージの `pubspec.yaml` は `resolution: workspace` を宣言している。
-ワークスペース内では、`offline_stt_platform_interface: ^0.1.0` のような
-hosted 形式の依存であっても **ローカルのワークスペースメンバーが
-自動的に解決に使われ、pub.dev 上の実体は参照されない**
-(<https://dart.dev/tools/pub/workspaces> 「If any of the workspace packages
-depend on each other, they will automatically resolve to the one in the
-workspace, regardless of the source.」)。
-
-一方、`dart pub publish`(dry-run を含む)はパッケージ単体の
-`acquireDependencies` を必ず実行する。ワークスペース内でこれを実行すると
-上記のとおりローカル解決されてしまい、「依存先が実際に pub.dev 上に
-存在するか」を検証できない。**pub.dev 上に存在しない依存先を宣言した
-パッケージを公開すると、そのパッケージに実際に依存しようとした利用者側で
-初めて解決エラーになる。** これを避けるため、公開順序を守り、かつ
-依存先を先に公開してから依存元を公開する。
-
-単体で(ワークスペースのローカル解決を経由せずに)依存解決を検証する
-公式な方法は、対象パッケージ直下に一時的な `pubspec_overrides.yaml` を
-置いて `resolution:` を空にすることである(公式ドキュメント
-<https://dart.dev/tools/pub/workspaces#temporarily-resolving-a-package-outside-its-workspace>
-「One way to do this is to create a `pubspec_overrides.yaml` file that
-resets the `resolution` setting... Now running `dart pub get` inside
-`packages/client_package` will create an independent resolution.」)。
-`.github/workflows/publish.yml` はこの手法で「依存先が pub.dev 上に
-存在すること」を検証してから公開する(詳細は同ファイルのコメント参照)。
-手動公開でも、次に公開するパッケージへ進む前に、同じ手法で依存先が
-解決できることを確認してから進むこと(4節「実行コマンド」の
-「(依存確認)」を参照)。
-
-## 3. 公開前チェックリスト
+## 2. 公開前チェックリスト
 
 初回公開・以降の公開(タグ push)のいずれも、次をすべて満たしてから行う。
 
 - [ ] `main` ブランチが green である(`.github/workflows/ci.yml` の
       `analyze-test` / `build` ジョブがすべて成功している)。
-- [ ] `melos run analyze` が通る(全パッケージ `dart analyze --fatal-infos`)。
-- [ ] `melos run test` が通る(`test/` を持つ全パッケージ)。
+- [ ] `melos run analyze` が通る(`dart analyze --fatal-infos`)。
+- [ ] `melos run test` が通る。
 - [ ] `melos run format` が通る(フォーマット差分が無い)。
-- [ ] `melos run doc` が通る(`dart doc --validate-links`。公開5パッケージで
-      APIドキュメントが生成でき、docコメント中の参照切れ・READMEの相対
-      リンク切れが無いことを検証する)。
-- [ ] `melos run publish:dry-run` が5パッケージすべてで警告0件で通る
-      (ルート `pubspec.yaml` の melos scripts。`packageFilters: { private: false }`
-      により `publish_to: none` の `offline_stt_windows` と `apps/example`
-      は自動的に対象から外れる)。
-- [ ] 公開する各パッケージの `CHANGELOG.md` に、公開するバージョンの
-      エントリが存在し、`pubspec.yaml` の `version:` と一致している。
-- [ ] 依存関係の宣言(`offline_stt_platform_interface: ^0.1.0` 等)が
-      hosted 形式であり、`path:` 依存が残っていない。
+- [ ] `melos run doc` が通る(`dart doc --validate-links`。APIドキュメントが
+      生成でき、docコメント中の参照切れ・READMEの相対リンク切れが無いことを
+      検証する)。
+- [ ] `melos run publish:dry-run` が警告0件で通る(ルート `pubspec.yaml` の
+      melos scripts。`packageFilters: { private: false }` により
+      `publish_to: none` の `apps/example` は自動的に対象から外れる)。
+- [ ] `packages/offline_stt/CHANGELOG.md` に、公開するバージョンのエントリが
+      存在し、`pubspec.yaml` の `version:` と一致している。
+- [ ] 依存関係の宣言に `path:` 依存が残っていない。
 
-## 4. 初回 0.1.0 の手動公開手順
+### 2.1 手動E2E(CIでは検証できない)
 
-**`dart pub publish` は取り消せない外向き操作である(5節参照)。** 実行前に
-3節のチェックリストをすべて満たしていることを確認すること。
+**CI は認識E2E(実際に音声ファイルが正しく文字起こしされること)を検証
+しない。** 実機・実ブラウザ依存であることが実測済みであるため、design.md §7
+はこれを手動チェックリスト運用と定めている。上のチェックリストだけを満たして
+公開すると、**ビルドは通るが認識が動かない版を出せてしまう。**
 
-Pub Workspaces の制約により、依存先パッケージが pub.dev 上に存在しないと
-依存元パッケージの検証・公開ができない。そのため、1パッケージ公開する
-たびに、**次のパッケージへ進む前に** pub.dev 上でその公開が反映されている
-ことを確認する。
+- [ ] [E2E_CHECKLIST.md](../E2E_CHECKLIST.md) を入口に、対象プラット
+      フォームの手順を実行した。
+      [Android](e2e/E2E_CHECKLIST_ANDROID.md) /
+      [Darwin](e2e/E2E_CHECKLIST_DARWIN.md) /
+      [Web](e2e/E2E_CHECKLIST_WEB.md)
+- [ ] 結果を `docs/e2e/E2E_RESULTS_*.md` に記録した。**包含率は実測値を
+      そのまま書くこと。**
+
+#### 既知の不合格を抱えたまま公開する場合
+
+**0.x 系では、しきい値未達のまま公開することを許容する**(NFR-5。土台の
+OS API が新しく、精度が出ないこと自体が現時点の事実であるため)。ただし
+次を満たすこと。
+
+- [ ] 未達・未実施の範囲が `README.md` の「精度について」と
+      `packages/offline_stt/README.md` の「既知の制約」に**具体的な数値で**
+      書かれている。
+- [ ] リポジトリ所有者が、その内容を読んだうえで公開を判断した。
+
+**「CIが緑だから公開してよい」とは判断しないこと。** CI が見ているのは
+ビルドと静的解析だけである。
+
+## 3. 初回 0.1.0 の手動公開手順
+
+**`dart pub publish` は取り消せない外向き操作である(4節参照)。** 実行前に
+2節のチェックリストをすべて満たしていることを確認すること。
 
 ```sh
 # 0. リポジトリルートで依存解決(ワークスペース全体)
 melos bootstrap
 
-# 1. offline_stt_platform_interface を公開する(最初)
-cd packages/offline_stt_platform_interface
-dart pub publish
-cd ../..
-
-# (依存確認) offline_stt_android / offline_stt_darwin / offline_stt_web に
-# 進む前に、pub.dev 上で platform_interface 0.1.0 が解決できることを
-# ワークスペースから切り離して確認する(2節「なぜ順序を守る必要があるか」)。
-# 確認できたら pubspec_overrides.yaml を削除すること(コミットしない)。
-cd packages/offline_stt_android
-echo 'resolution:' > pubspec_overrides.yaml
-dart pub get
-rm pubspec_overrides.yaml
-cd ../..
-
-# 2. offline_stt_android / offline_stt_darwin / offline_stt_web を公開する
-#    (この3つの間に相互依存は無いため順不同)
-cd packages/offline_stt_android && dart pub publish && cd ../..
-cd packages/offline_stt_darwin  && dart pub publish && cd ../..
-cd packages/offline_stt_web     && dart pub publish && cd ../..
-
-# (依存確認) offline_stt に進む前に、上記3パッケージすべてが
-# pub.dev 上で解決できることを同様に確認する。
-cd packages/offline_stt
-echo 'resolution:' > pubspec_overrides.yaml
-dart pub get
-rm pubspec_overrides.yaml
-cd ../..
-
-# 3. offline_stt を公開する(必ず最後)
+# 1. offline_stt を公開する
 cd packages/offline_stt
 dart pub publish
 cd ../..
 ```
 
-各 `dart pub publish` の直前に、対話プロンプトで公開内容(パッケージ名・
+`dart pub publish` の直前に、対話プロンプトで公開内容(パッケージ名・
 バージョン・アップロード先)が表示される。**内容を必ず目視確認してから
-承認すること。** 誤った内容のまま承認すると、5節のとおり取り消せない。
+承認すること。** 誤った内容のまま承認すると、4節のとおり取り消せない。
 
-## 5. `dart pub publish` は取り消せない
+## 4. `dart pub publish` は取り消せない
 
 **`dart pub publish`(dry-run でない方)を実行してよいか迷ったら、実行しない。**
 これは取り消せない外向き操作である。
@@ -183,11 +108,11 @@ cd ../..
   「Retracted versions」として残り続け、**そのバージョン番号を
   空けて再利用できるわけではない。** 内容を差し替えたい場合は、
   常に新しいバージョン番号で公開し直す必要がある。
-- したがって、公開前は必ず3節のチェックリストを満たし、4節のコマンドを
+- したがって、公開前は必ず2節のチェックリストを満たし、3節のコマンドを
   実行する前に対話プロンプトの内容を確認すること。**「とりあえず公開して
   みる」は禁止。**
 
-## 6. 2回目以降: GitHub Actions OIDC(Trusted Publishing)による自動公開
+## 5. 2回目以降: GitHub Actions OIDC(Trusted Publishing)による自動公開
 
 初回 0.1.0 の手動公開が完了した後、以降のバージョンは
 `.github/workflows/publish.yml` によるタグ push トリガの自動公開へ
@@ -198,29 +123,18 @@ cd ../..
 **Trusted Publishing を有効化するには、そのパッケージが pub.dev 上に
 既に存在している必要がある**(同上「Today, you can only automate
 publishing of existing packages. To create a new package, you must publish
-the first version using `dart pub publish`.」)。これが4節で初回を
+the first version using `dart pub publish`.」)。これが3節で初回を
 手動公開にする理由である。
 
-### 6.1 pub.dev 側の設定(パッケージごとに1回)
+### 5.1 pub.dev 側の設定(1回)
 
-5パッケージそれぞれについて、以下を行う。
-
-1. `https://pub.dev/packages/<package>/admin` を開く(該当パッケージの
-   *uploader* または publisher の admin であること)。
+1. `https://pub.dev/packages/offline_stt/admin` を開く(*uploader* または
+   publisher の admin であること)。
 2. **Automated publishing** セクションの
    **Enable publishing from GitHub Actions** をクリックする。
 3. 次を入力する。
    - **Repository**: `goofmint/offline_stt`
-   - **Tag pattern**: 下表のパッケージごとのパターン(`{{version}}` を
-     含む文字列)
-
-| パッケージ | pub.dev の Tag pattern | 例(タグ名) |
-|---|---|---|
-| `offline_stt_platform_interface` | `platform_interface-v{{version}}` | `platform_interface-v0.1.0` |
-| `offline_stt_darwin` | `darwin-v{{version}}` | `darwin-v0.1.0` |
-| `offline_stt_android` | `android-v{{version}}` | `android-v0.1.0` |
-| `offline_stt_web` | `web-v{{version}}` | `web-v0.1.0` |
-| `offline_stt` | `offline_stt-v{{version}}` | `offline_stt-v0.1.0` |
+   - **Tag pattern**: `offline_stt-v{{version}}`(例: `offline_stt-v0.1.0`)
 
 タグパターンは `.github/workflows/publish.yml` の `on.push.tags` と
 **必ず一致させる**こと。一致していないと、タグを push してもワークフローが
@@ -233,23 +147,23 @@ the first version using `dart pub publish`.」)。これが4節で初回を
 (<https://dart.dev/tools/pub/automated-publishing#hardening-security-with-github-deployment-environments>)。
 本書はこの設定手順までは含まない(採用するかどうかは別途判断する)。
 
-### 6.2 公開の実行(パッケージごとに、バージョンを上げるたびに)
+### 5.2 公開の実行(バージョンを上げるたびに)
 
 ```sh
-# 例: offline_stt_platform_interface を 0.2.0 として公開する場合
-# 1. packages/offline_stt_platform_interface/pubspec.yaml の version を 0.2.0 に、
+# 例: offline_stt を 0.2.0 として公開する場合
+# 1. packages/offline_stt/pubspec.yaml の version を 0.2.0 に、
 #    CHANGELOG.md に 0.2.0 のエントリを追加してコミット・マージする。
 # 2. main 上のそのコミットにタグを打って push する。
-git tag platform_interface-v0.2.0
-git push origin platform_interface-v0.2.0
+git tag offline_stt-v0.2.0
+git push origin offline_stt-v0.2.0
 ```
 
 タグ push をトリガに `.github/workflows/publish.yml` が実行され、
-タグ名からパッケージを特定し、タグの version と `pubspec.yaml` の
-`version:` が一致することを検証した上で、format / analyze / test /
-dry-run を通してから公開する(実装は同ファイルのコメント参照)。
+タグの version と `pubspec.yaml` の `version:` が一致することを検証した
+上で、format / analyze / test / dry-run を通してから公開する(実装は
+同ファイルのコメント参照)。
 
-### 6.2 publish.yml の Action は必ずコミットSHAで固定する
+### 5.3 publish.yml の Action は必ずコミットSHAで固定する
 
 `.github/workflows/publish.yml` は `id-token: write` を持ち、pub.dev へ
 実際に公開できる。ここで `actions/checkout@v4` のような**可変タグ**を使うと、
@@ -268,11 +182,11 @@ dry-run を通してから公開する(実装は同ファイルのコメント�
 `persist-credentials: false` を指定している。どのジョブも `git push` を
 しないため `GITHUB_TOKEN` を `.git/config` に残す必要が無い。
 
-## 7. なぜ 0.x 系で公開するか(NFR-5)
+## 6. なぜ 0.x 系で公開するか(NFR-5)
 
 requirements.md NFR-5 のとおり、本ライブラリは 0.x 系で公開する。
 
-> 土台のAPIが新しく、Windows AI APIs は Experimental 段階であり、
+> 土台のAPIが新しく、
 > iOS/macOSのSpeechAnalyzerもOS 26で導入されたばかりである。また各OSの
 > オンデバイス認識の挙動には実測で判明した未確定要素が残る(design.md §8)。
 > そのためライブラリは0.x系で公開し、各OS APIのstable化までstableを

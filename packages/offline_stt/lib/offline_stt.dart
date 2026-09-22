@@ -1,24 +1,24 @@
-/// `offline_stt` エントリパッケージ。
+/// `offline_stt` パッケージ。
 ///
-/// 利用者はこのパッケージにのみ依存する(requirements.md §6)。
+/// 録音済み音声ファイルをOSネイティブAPIのみでオフライン文字起こしする
+/// (requirements.md §6)。Android / iOS / macOS / Web の実装を1つの
+/// パッケージに同梱しており、利用者はこのライブラリだけをimportすればよい。
 ///
-/// 公開APIは [OfflineTranscriber] と、`offline_stt_platform_interface` から
-/// 再エクスポートしているデータ型・例外型である。利用者が
-/// `offline_stt_platform_interface` を直接依存に書く必要は無い。
+/// 公開APIは [OfflineTranscriber] と、それが受け渡しするデータ型・例外型で
+/// ある。`src/` 配下は実装詳細であり、直接importしてはならない。
 library;
 
-export 'src/offline_transcriber.dart';
-
-export 'package:offline_stt_platform_interface/offline_stt_platform_interface.dart'
+export 'src/download_progress.dart' show DownloadProgress;
+export 'src/exceptions.dart'
     show
         CancelledException,
         DecodeFailedException,
         DeviceUnsupportedException,
-        DownloadProgress,
         LocaleUnsupportedException,
-        ModelState,
         ModelUnavailableException,
         PlatformException_,
-        TranscribeException,
-        TranscribeRequest,
-        TranscriptSegment;
+        TranscribeException;
+export 'src/model_state.dart' show ModelState;
+export 'src/offline_transcriber.dart' show OfflineTranscriber;
+export 'src/transcribe_request.dart' show TranscribeRequest;
+export 'src/transcript_segment.dart' show TranscriptSegment;

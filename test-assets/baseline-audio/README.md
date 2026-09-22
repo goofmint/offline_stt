@@ -153,9 +153,9 @@ bash test-assets/baseline-audio/generate.sh
 
 ## この資産の再利用範囲
 
-- **M0検証**: tasks.md「M0 検証スパイク」の各プラットフォーム(Web / Darwin / Android / Windows)でのja-JP文字起こし精度確認に使用する。
+- **M0検証**: tasks.md「M0 検証スパイク」の各プラットフォーム(Web / Darwin / Android)でのja-JP文字起こし精度確認に使用する。
 - **M1〜M4のE2E検証**: 各プラットフォーム実装のE2Eテスト(手動チェックリスト運用、design.md §7)で再利用する。
-- **公開後の四半期回帰**: tasks.md「継続タスク」に記載の、ML Kit alpha / Chrome / WinAppSDK / OSベータ変更時の四半期ごとの基準音声E2E再実行で再利用する。
+- **公開後の四半期回帰**: tasks.md「継続タスク」に記載の、`android.speech.SpeechRecognizer` / Google Play services / Chrome / OSベータの変更時の四半期ごとの基準音声E2E再実行で再利用する。
 
 ## design.md / tasks.md との差異(スコープ注記)
 

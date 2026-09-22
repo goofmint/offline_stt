@@ -41,7 +41,7 @@ flutter run -d <実機のデバイスID>
 26.0.1 であり、同梱のKotlinコンパイラがそのバージョン文字列を解釈できず
 `java.lang.IllegalArgumentException: 26.0.1` で失敗する。CIの Android ジョブ
 が `actions/setup-java` で JDK 17 を用意しているのと同じ理由である
-(`packages/offline_stt_android/android/build.gradle` の
+(`packages/offline_stt/android/build.gradle` の
 `sourceCompatibility` は 17)。
 
 ## プラットフォームごとの注意
@@ -58,37 +58,28 @@ flutter run -d <実機のデバイスID>
 - **Androidは実時間方式であり、ファイル長と同等の時間がかかる。**
   デコード済みPCMを `ParcelFileDescriptor` パイプへ毎秒約32KBで供給する
   ためである(Pixel 6実機の実測: 9.56秒の音声にポンプ9,564ms、実効
-  31,993.7バイト/秒)。バッチ認識の iOS / macOS / Windows とはこの点が
+  31,993.7バイト/秒)。バッチ認識の iOS / macOS とはこの点が
   根本的に異なるため、長時間の音声ではその長さ分だけ待つことになる。
   なお **`RECORD_AUDIO` 権限は不要である**(マイクを使わない)。
-  詳細は `packages/offline_stt_android/README.md` と
-  `packages/offline_stt_android/E2E_CHECKLIST.md` を参照。
-- **Windowsは依存を書くだけでは動かない。** MSIXパッケージ化と
-  `systemAIModels` capability の宣言、および `winapp init`(WinAppSDKの
-  C++/WinRTプロジェクションヘッダー展開)が必要である。手順は
-  `packages/offline_stt_windows/README.md` と
-  `apps/example/windows/packaging/README.md` にある。**このexample appを
-  Windowsで動かした実績は無い**(リポジトリにWindows実機が無いため。
-  Issue #58)。`flutter build windows --debug` によるコンパイル検証のみ
-  CIで行っている。
+  詳細は `packages/offline_stt/README.md` と
+  `docs/e2e/E2E_CHECKLIST_ANDROID.md` を参照。
 - **Webは Chrome 142 以上でのみ動作する。** それ以外のブラウザでは
   モデル状態が「利用不可」になる(requirements.md §8)。`localhost` または
   `https` 配信であることも必要(`on-device-speech-recognition`
   Permissions Policy)。詳細な手動E2E手順は
-  `packages/offline_stt_web/E2E_CHECKLIST.md` を参照。
+  `docs/e2e/E2E_CHECKLIST_WEB.md` を参照。
 
 **検証状況について**: 2026-09-21 に、本 app の `integration_test/` から
 **本番実装に対する実機E2Eを Darwin(macOS 26.5.1 + iPad Pro / iOS 26.6.2)と
 Android(Pixel 6)で実行した**(Issue #40 / #50。結果は
-`packages/offline_stt_darwin/E2E_RESULTS.md` と
-`packages/offline_stt_android/E2E_RESULTS.md`)。
+`docs/e2e/E2E_RESULTS_DARWIN.md` と
+`docs/e2e/E2E_RESULTS_ANDROID.md`)。
 
-ただし **`integration_test` は `OfflineTranscriberPlatform.instance` を直接
-呼ぶため、本 app の UI 経路(ファイルピッカー → 同意ダイアログ → 進行表示)は
+ただし **`integration_test` は `OfflineTranscriber`(`const OfflineTranscriber()`)を
+直接呼ぶため、本 app の UI 経路(ファイルピッカー → 同意ダイアログ → 進行表示)は
 通っていない。** UI を通した確認は人手で別途行う必要がある。
 
 Web は M0 スパイクでの実測のみで、本番実装での再測定は未実施である。
-Windows は v1 対象外である(リポジトリルートの README 冒頭を参照)。
 
 ## モデルダウンロードの同意について
 
