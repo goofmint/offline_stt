@@ -1,110 +1,106 @@
 # offline_stt
 
-録音済み音声ファイルを、**OSネイティブの音声認識APIだけで**オフライン文字起こしするFlutterライブラリ。認識モデルも推論エンジンも同梱せず、モデルの取得・更新・削除はすべてOSに委ねる。音声も書き起こし結果もネットワークに出ない([requirements.md](https://github.com/goofmint/offline_stt/blob/main/requirements.md) NFR-2)。
+Transcribe audio files offline, using only the speech recognition built into the operating system.
 
-**これは単一パッケージであり、federated pluginではない。アプリが依存するのはこのパッケージだけでよい。** Android / iOS / macOS / Web の全実装を1つのパッケージに同梱しており、実装の選択はパッケージ内部の条件付きexport(`lib/src/backend.dart`)と実行時のOS判定で行う。実装パッケージを個別に依存へ書く必要は無い([design.md](https://github.com/goofmint/offline_stt/blob/main/design.md) §1)。
+Nothing is sent over the network. No model files ship with this package — the OS downloads and manages them.
 
----
+## Install
 
-## 対応プラットフォームとバックエンド
+```yaml
+dependencies:
+  offline_stt: ^0.1.1
+```
 
-| プラットフォーム | バックエンドAPI | 最低OSバージョン |
-|---|---|---|
-| Android | 標準 `android.speech.SpeechRecognizer`(`createOnDeviceSpeechRecognizer`)+ MediaCodecデコード | Android 12 / API 31(ただし後述の制約により実質 API 33 以上) |
-| iOS / macOS | `SpeechAnalyzer` + `SpeechTranscriber` + `AssetInventory` | iOS 26 / macOS 26 |
-| Web | Chrome オンデバイス Web Speech(`processLocally: true`)+ Web Audio | Chrome 142 以上のデスクトップ版。localhost または https 配信であること |
-
-Linuxは対象外である(OSネイティブのASR APIが存在しないため)。
-
-各プラットフォーム実装の詳細・既知の制約は、[実機E2Eチェックリスト](https://github.com/goofmint/offline_stt/blob/main/E2E_CHECKLIST.md)と、後述の「アプリ側に必要な対応」「既知の制約」を参照。
-
-## API
-
-本パッケージが公開するのは [`OfflineTranscriber`](https://github.com/goofmint/offline_stt/blob/main/packages/offline_stt/lib/src/offline_transcriber.dart) と、それが受け渡しするデータ型・例外型である。
-
-- `ModelState`(`available` / `downloadable` / `downloading` / `unavailable`)
-- `DownloadProgress` / `TranscribeRequest` / `TranscriptSegment`
-- `TranscribeException`(sealed)とその派生: `ModelUnavailableException` / `LocaleUnsupportedException` / `DecodeFailedException` / `DeviceUnsupportedException` / `CancelledException` / `PlatformException_`
-
-操作は3つである。
-
-| メソッド | シグネチャ |
-|---|---|
-| モデル状態の確認 | `Future<ModelState> checkModel(String locale)` |
-| モデル取得 | `Stream<DownloadProgress> downloadModel(String locale)` |
-| 文字起こし | `Stream<TranscriptSegment> transcribeFile(TranscribeRequest request)` |
-
-上記3メソッドは `OfflineTranscriber` が公開している。
+## Use
 
 ```dart
 import 'package:offline_stt/offline_stt.dart';
 
 const transcriber = OfflineTranscriber();
 
-final state = await transcriber.checkModel('ja-JP');
+// 1. Is the language model ready?
+var state = await transcriber.checkModel('en-US');
+
+// 2. If not, ask the user, then download it.
 if (state == ModelState.downloadable) {
-  // アプリ側で同意を取ってから呼ぶ(ライブラリは同意UIを出さない)。
-  await for (final _ in transcriber.downloadModel('ja-JP')) {}
-}
-await for (final segment in transcriber.transcribeFile(
-  TranscribeRequest(path: path, locale: 'ja-JP'),
-)) {
-  if (segment.isFinal) {
-    // 確定テキスト
+  await for (final progress in transcriber.downloadModel('en-US')) {
+    print(progress.fraction); // null when the OS reports no percentage
   }
+  state = await transcriber.checkModel('en-US');
+}
+
+// 3. Transcribe.
+await for (final segment in transcriber.transcribeFile(
+  TranscribeRequest(path: '/path/to/audio.m4a', locale: 'en-US'),
+)) {
+  if (segment.isFinal) print(segment.text);
 }
 ```
 
-`OfflineTranscriber` は内部の抽象クラス(`lib/src/offline_transcriber_platform.dart` の `OfflineTranscriberPlatform`。公開APIではない)へ委譲するだけの薄い層であり、独自のロジック・状態・既定値を持たない。
+That's the whole API: `checkModel`, `downloadModel`, `transcribeFile`.
 
-参照実装の [`apps/example`](https://github.com/goofmint/offline_stt/tree/main/apps/example) は `offline_stt` にのみ依存し、`const OfflineTranscriber()` を使う。
+### Model states
 
-## 正しい呼び出し順序
-
-```
-checkModel(locale)
-  ├─ available    → transcribeFile() を呼んでよい
-  ├─ downloadable → 【アプリが同意UIを出す】→ 同意後に downloadModel()
-  │                  → 完了後に再度 checkModel()
-  ├─ downloading  → 待つ
-  └─ unavailable  → 端末・OS・ブラウザの問題。アプリからは解消できない
-```
-
-**ライブラリは暗黙にモデルをダウンロードしない**(requirements.md FR-2 / §8)。同意UIはアプリ側の責務である。文言は具体的なモデル名・ベンダー名を出さず「音声認識モデル」のような一般名称で呼ぶこと。参照実装は [`apps/example/lib/src/download_consent_dialog.dart`](https://github.com/goofmint/offline_stt/blob/main/apps/example/lib/src/download_consent_dialog.dart) にある。
-
-また、**認識セッションは同時に1本までである**(design.md §3)。実行中に2本目の `transcribeFile()` を呼ぶと `StateError` になる。
-
-## アプリ側に必要な対応
-
-| プラットフォーム | 依存を書く以外に必要なこと |
+| State | Meaning |
 |---|---|
-| Android | 無し(`RECORD_AUDIO` 権限も不要)。ただしモデル取得の同意UIはアプリ側 |
-| iOS / macOS | 無し。同意UIはアプリ側 |
-| Web | localhost または https 配信。同意UIはアプリ側 |
+| `available` | Ready. Call `transcribeFile`. |
+| `downloadable` | Ask the user, then call `downloadModel`. |
+| `downloading` | Already in progress. Wait. |
+| `unavailable` | This device or browser can't do it. |
 
-## 既知の制約(採用前に読むこと)
+**The library never downloads anything on its own.** Show your own consent dialog first — models can be large and the connection may be metered.
 
-- **日本語の精度がしきい値に届いていない。** design.md §7 のしきい値(クリーン基準音声 ja-JP は 95%以上で合格・90〜94%が条件付き合格)を満たしたプラットフォームは1つも無い。en-US では Android(Pixel 6)の `enUS_10s` が 100.0% で合格している。実測できた Darwin(macOS 26.5.1)/ Web(Chrome 153)/ Android(Pixel 6)の3つはいずれも基準音声 `jaJP_10s` で**ちょうど 66.7%(4/6)**であり、3つとも `株式会社モーンギフト` を落としている。
+### Partial results
 
-  **原因の切り分けは `jaJP_10s` についてだけ1つ進んでいる。** 2026-09-21 に design.md §7 の規定どおり許容表記を列挙し直して採点し直したところ、**`jaJP_10s` の 66.7% は1ポイントも動かなかった**(落としている2件は表記差ではなく誤認識であるため)。したがって **`jaJP_10s` に限っては「キーワード選定と正規化規則の不備」を原因候補から外せる**。一方、**同じ是正で長尺クリップの値は動いている**(Darwin の `jaJP_3m` は 39.3% → 42.9% / 28.6% → 32.1%、`enUS_3m` は 44.0% → 80.0%)。**長尺クリップについては、まだ表記差の影響を除外できていない。** いずれにせよ 10秒クリップの結果1件から「日本語全体が測定の問題ではない」とは結論できない。残る要因(基準音声がTTS合成音声であること、認識モデル自体の精度、プリセット選択)の切り分けも未実施である。「OSネイティブだから十分な精度が出る」と期待して採用してはいけない段階である。
-- **最低OSバージョンが高い。** 特に iOS 26 / macOS 26 の下限は、採用できるユーザー母数を大きく制限する。
-- **マイク入力のリアルタイム認識は対象外**である(v1はファイル入力専用)。
-- **Linuxは対象外**である。
-- 土台のOS APIにalpha / Experimental段階のものを含むため、0.x系で公開している(NFR-5)。
+`transcribeFile` returns a stream. Segments with `isFinal: false` are live guesses that may change; `isFinal: true` segments are settled. Show partials for feedback, keep the finals.
 
-モデル同梱型(sherpa-onnx / whisper.cpp / Vosk 等)との使い分けは、[リポジトリルートのREADME](https://github.com/goofmint/offline_stt/blob/main/README.md)に比較軸をまとめてある。
+## Supported platforms
 
-## 実機E2Eの状況
+| Platform | Minimum version |
+|---|---|
+| Android | Android 13 (API 33) |
+| iOS | iOS 26 |
+| macOS | macOS 26 |
+| Web | Chrome 142+, desktop, served over https or localhost |
 
-認識のE2E(実際に音声ファイルが正しく文字起こしされること)はCIでは検証していない(実機・実ブラウザ依存であることが実測済みのため)。リリース前の手動チェックリストで運用する: [E2E_CHECKLIST.md](https://github.com/goofmint/offline_stt/blob/main/E2E_CHECKLIST.md)。
+Android 12 (API 31) compiles, but `checkModel` always returns `unavailable` — the API it needs arrived in API 33.
 
-2026-09-21 に **Darwin(macOS 26.5.1 + iPad Pro / iOS 26.6.2)と Android(Pixel 6)で本番実装に対する実機E2Eを実行済み**である(Issue #40 / #50)。Darwin は手順1〜6が全て期待どおりで実装バグ0件、Android は初回に4件の不具合を発見し修正後は手順3が8/8成功した。**いずれも包含率はしきい値未達**である。
+Linux and Windows are not supported. Neither ships an on-device speech API this package can use.
 
-未実施として残るのは次の2つである。
+## Before you adopt this
 
-- **example app の UI 経路**(ファイルピッカー → 同意ダイアログ → 進行表示)。`integration_test` は API を直接呼ぶため通っていない
-- **Web の本番実装での再測定**(M0 スパイクでの実測のみ)
+- **Japanese accuracy is not good enough yet.** On our benchmark clip, iOS, macOS, Android and Chrome all land around 67%, and every one of them misheard the company name in the recording. English does better — 100% on a 10-second clip on Android — but is also inconsistent on longer audio. Measure with your own audio before committing.
+- **The minimum OS versions are high.** iOS 26 and macOS 26 rule out most devices in use today.
+- **Audio files only.** No live microphone input.
+- **One transcription at a time.** Starting a second one while the first is running throws a `StateError`.
+- **Accuracy follows the OS.** The recognition model belongs to the platform and is updated by it, so the same audio may transcribe differently after a system update.
 
-## ライセンス
+This is a 0.x release because the underlying OS APIs are themselves new.
 
-MIT License。[LICENSE](https://github.com/goofmint/offline_stt/blob/main/packages/offline_stt/LICENSE) を参照。
+## Errors
+
+Everything throws a subclass of `TranscribeException`:
+
+| Exception | When |
+|---|---|
+| `ModelUnavailableException` | The model isn't ready |
+| `LocaleUnsupportedException` | The OS doesn't have that language |
+| `DecodeFailedException` | The file isn't audio, or the codec isn't supported |
+| `DeviceUnsupportedException` | The device or browser can't do on-device recognition |
+| `CancelledException` | You cancelled the stream |
+| `PlatformException_` | Anything else the OS reported |
+
+## Setup
+
+Nothing beyond the dependency. No permissions to declare — the library reads files you hand it and never touches the microphone.
+
+On the web, serve over https or localhost. Chrome requires it for on-device recognition.
+
+## Example
+
+A complete app with a file picker, consent dialog and progress UI lives in
+[`apps/example`](https://github.com/goofmint/offline_stt/tree/main/apps/example).
+
+## License
+
+MIT

@@ -1,24 +1,23 @@
 # Changelog
 
+## 0.1.1
+
+- Rewrote the README in English, aimed at people reading it for the first time.
+
 ## 0.1.0
 
-初回リリース。pub.dev へ公開するのはこの1パッケージだけである
-(requirements.md §6、Issue #91)。
+First release.
 
-### 追加
+- `OfflineTranscriber` with three methods: `checkModel`, `downloadModel`,
+  `transcribeFile`.
+- Android, iOS, macOS and Web, in one package. Add `offline_stt` and the right
+  implementation is picked for you.
+- Audio never leaves the device. No model files are bundled — the OS downloads
+  and manages them.
 
-- Android / iOS / macOS / Web の実装を同梱した単一のFlutterプラグイン。
-  アプリは `offline_stt` にのみ依存すればよい。実装の選択はコンパイル時の
-  条件付きimport(Web か否か)と実行時の `Platform` 判定(Android /
-  iOS / macOS)で行う。
-- データ型・例外型(`ModelState` / `DownloadProgress` /
-  `TranscribeRequest` / `TranscriptSegment` と例外階層)の公開。
-- 利用者向けファサード `OfflineTranscriber`。`checkModel()` /
-  `downloadModel()` / `transcribeFile()` の3メソッドを持ち、内部の
-  プラットフォーム実装へ委譲する。
+### Known limits
 
-### 既知の制約
-
-- **認識精度は design.md §7 のしきい値に達していない。** 実測できた
-  Darwin / Web / Android のいずれも、基準音声 jaJP_10s で包含率 66.7% で
-  あり不成立である。原因は未確定である(design.md §7「注記」)。
+Japanese accuracy is below what we consider shippable: around 67% keyword
+coverage on our benchmark clip, on every platform we measured. English is
+better but inconsistent on longer audio. Measure with your own audio before
+adopting this.

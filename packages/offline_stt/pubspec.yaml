@@ -1,8 +1,8 @@
 name: offline_stt
 description: >-
-  録音済み音声ファイルをOSネイティブAPIだけでオフライン文字起こしするFlutterプラグイン。
-  Android / iOS / macOS / Web に対応し、認識モデルと推論エンジンは同梱せずOS側に委ねる。
-version: 0.1.0
+  Transcribe audio files offline using only the speech recognition built into
+  the OS. Nothing is sent over the network. Android, iOS, macOS and Web.
+version: 0.1.1
 homepage: https://github.com/goofmint/offline_stt
 repository: https://github.com/goofmint/offline_stt
 issue_tracker: https://github.com/goofmint/offline_stt/issues
